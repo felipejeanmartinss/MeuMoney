@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertMinorUnits, formatMoney } from "../src/utils/money";
+import { assertMinorUnits, formatMoney } from "../src/domain/money";
 
 describe("money", () => {
   it("formats integer minor units", () => expect(formatMoney(12345)).toContain("123,45"));
