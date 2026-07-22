@@ -1,0 +1,1 @@
+export default function PrivacyPage() { return <main className="mx-auto max-w-3xl px-4 py-12"><h1 className="text-3xl font-bold">Política de Privacidade</h1><p className="mt-4 text-slate-600">Documento provisório. A versão jurídica será publicada antes do lançamento público.</p></main>; }

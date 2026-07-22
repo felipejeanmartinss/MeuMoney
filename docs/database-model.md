@@ -1,7 +1,9 @@
 # Modelo de dados
 
-O primeiro esquema contém `profiles`, `accounts`, `categories` e `transactions`. Todas as entidades de produto pertencem a um usuário e possuem Row Level Security.
+## Perfis
 
-Valores monetários usam `bigint` com unidades menores. Datas de competência usam `date`; auditoria usa `timestamptz` em UTC.
+`public.profiles` contém `id`, `full_name`, `created_at` e `updated_at`. `id` referencia `auth.users(id)` com exclusão em cascata.
 
-Antes de suportar múltiplos usuários por espaço financeiro, será criada a entidade `workspace` e as políticas migrarão de propriedade direta para associação de membros.
+A função `handle_new_user` é `security definer`, usa `search_path` vazio e cria o perfil a partir de `raw_user_meta_data.full_name`. Clientes autenticados recebem apenas `SELECT` e `UPDATE (full_name)`; políticas RLS restringem ambas as operações a `auth.uid() = id`. Não há permissão de inserção ou exclusão pelo cliente.
+
+As tabelas financeiras originadas na fundação permanecem reservadas para sprints futuras e não são acessadas pela interface da Sprint 1.

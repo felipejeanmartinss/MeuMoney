@@ -1,5 +1,9 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { requireUser } from "@/services/auth/server-auth";
 
-export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  await requireUser();
   return <AppShell>{children}</AppShell>;
 }

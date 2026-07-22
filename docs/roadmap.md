@@ -1,21 +1,13 @@
 # Roadmap
 
-## Fundação
+## Sprint 0 — Fundação
 
-- CI, autenticação, Supabase local, design system e observabilidade segura.
+Estrutura Next.js, PWA inicial, Supabase, documentação, domínio monetário mínimo e qualidade automatizada.
 
-## Gestão diária
+## Sprint 1 — Identidade e segurança
 
-- Contas, lançamentos, cartões, recorrências, categorias e orçamentos.
+Cadastro, confirmação de e-mail, login, logout, recuperação e troca de senha, sessão SSR, rotas privadas, perfil automático e RLS.
 
-## Patrimônio
+## Próximas sprints
 
-- Posições, ativos, passivos, rentabilidade e metas.
-
-## Automação
-
-- OFX/CSV/XLSX, PDF assistido, Open Finance e conciliação.
-
-## Inteligência
-
-- Cenários, alertas explicáveis, planejamento e relatórios fiscais.
+Contas, categorias, lançamentos, cartões, orçamentos, patrimônio, investimentos, importações e relatórios serão planejados separadamente e não pertencem à Sprint 1.
