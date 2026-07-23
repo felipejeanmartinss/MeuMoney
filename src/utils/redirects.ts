@@ -16,7 +16,15 @@ export function getSafeRedirectPath(
 }
 
 export function isPrivatePath(pathname: string) {
-  return pathname === "/dashboard" || pathname === "/settings" || pathname.startsWith("/settings/");
+  return (
+    pathname === "/dashboard" ||
+    pathname === "/accounts" ||
+    pathname.startsWith("/accounts/") ||
+    pathname === "/categories" ||
+    pathname.startsWith("/categories/") ||
+    pathname === "/settings" ||
+    pathname.startsWith("/settings/")
+  );
 }
 
 export function isGuestOnlyPath(pathname: string) {

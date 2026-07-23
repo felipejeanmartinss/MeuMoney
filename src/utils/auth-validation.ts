@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_CURRENCIES } from "../domain/currencies";
 
 export const PASSWORD_MIN_LENGTH = 8;
 const email = z.email("Informe um e-mail válido.").trim().toLowerCase();
@@ -37,4 +38,7 @@ export const updatePasswordSchema = z
 
 export const profileSchema = z.object({
   fullName: z.string().trim().min(2, "Informe seu nome."),
+  preferredCurrency: z.enum(SUPPORTED_CURRENCIES, {
+    error: "Selecione uma moeda válida.",
+  }),
 });

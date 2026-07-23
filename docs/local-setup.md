@@ -28,3 +28,12 @@ Preencha `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUB
 ## Banco
 
 Execute as migrations em ordem. A migration da Sprint 1 cria o perfil automaticamente ao inserir um usuário em `auth.users`; se a criação do perfil falhar, o cadastro falha na mesma transação.
+
+A migration `202607230001_sprint_2_accounts_categories.sql` deve ser aplicada depois das migrations da Sprint 1. Ela:
+
+- adiciona moeda preferencial ao perfil e data do saldo inicial às contas;
+- cria categorias padrão para usuários novos e existentes;
+- substitui políticas amplas por políticas separadas de leitura, inserção e atualização;
+- não concede exclusão de contas ou categorias ao cliente.
+
+Depois de aplicar a migration, reinicie `npm.cmd run dev`. Em ambiente hospedado, configure as mesmas variáveis públicas do Supabase em Production e Preview na Vercel e gere um novo deployment.

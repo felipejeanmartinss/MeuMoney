@@ -10,7 +10,10 @@ export async function updateProfile(
   _previousState: ProfileActionState,
   formData: FormData,
 ): Promise<ProfileActionState> {
-  const parsed = profileSchema.safeParse({ fullName: formData.get("fullName") });
+  const parsed = profileSchema.safeParse({
+    fullName: formData.get("fullName"),
+    preferredCurrency: formData.get("preferredCurrency"),
+  });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message };
   }
@@ -18,7 +21,10 @@ export async function updateProfile(
   const { supabase, user } = await requireUser();
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: parsed.data.fullName })
+    .update({
+      full_name: parsed.data.fullName,
+      preferred_currency: parsed.data.preferredCurrency,
+    })
     .eq("id", user.id);
 
   if (error) return { status: "error", message: "Não foi possível salvar seu perfil." };

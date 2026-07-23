@@ -9,7 +9,10 @@ describe("safe redirects", () => {
   });
   it("classifies private and guest-only routes", () => {
     expect(isPrivatePath("/dashboard")).toBe(true);
+    expect(isPrivatePath("/accounts/new")).toBe(true);
+    expect(isPrivatePath("/categories/123/edit")).toBe(true);
     expect(isPrivatePath("/settings/profile")).toBe(true);
+    expect(isPrivatePath("/login")).toBe(false);
     expect(isGuestOnlyPath("/login")).toBe(true);
     expect(isGuestOnlyPath("/update-password")).toBe(false);
   });
