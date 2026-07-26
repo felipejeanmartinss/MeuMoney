@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { parseMoneyInputToMinor } from "./money";
 import { SUPPORTED_CURRENCIES } from "./currencies";
+import { isValidIsoDate } from "./dates";
 import type { AccountType, FinancialContext } from "../types/database";
 
 export const EDITABLE_ACCOUNT_TYPES = ["checking", "savings", "cash", "other"] as const;
@@ -19,12 +20,6 @@ export const CONTEXT_LABELS: Record<FinancialContext, string> = {
   personal: "Pessoal",
   professional: "Profissional",
 };
-
-function isValidReferenceDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
-}
 
 const moneyInput = z.string().trim().transform((value, context) => {
   try {
@@ -47,7 +42,7 @@ export const accountFormSchema = z.object({
   openingBalanceMinor: moneyInput,
   openingBalanceDate: z
     .string()
-    .refine(isValidReferenceDate, "Informe uma data de referência válida."),
+    .refine(isValidIsoDate, "Informe uma data de referência válida."),
 });
 
 export const accountIdSchema = z.uuid("Conta inválida.");

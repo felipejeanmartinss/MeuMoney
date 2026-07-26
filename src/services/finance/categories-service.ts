@@ -27,7 +27,6 @@ export async function getCurrentUserCategory(id: string) {
     .select("id, user_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at")
     .eq("user_id", user.id)
     .eq("id", id)
-    .eq("is_system", false)
     .maybeSingle();
 
   return { category: data, hasError: Boolean(error) };
@@ -57,7 +56,6 @@ export async function updateCurrentUserCategory(id: string, input: CategoryMutat
     .update({ name: input.name, kind: input.kind, context: input.context })
     .eq("user_id", user.id)
     .eq("id", id)
-    .eq("is_system", false)
     .select("id")
     .maybeSingle();
 
@@ -76,7 +74,6 @@ export async function setCurrentUserCategoryArchived(id: string, archived: boole
     .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq("user_id", user.id)
     .eq("id", id)
-    .eq("is_system", false)
     .select("id")
     .maybeSingle();
 

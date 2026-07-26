@@ -16,12 +16,50 @@ export default async function DashboardPage() {
           Olá, {firstName}.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-blue-100 sm:text-lg">
-          Estruture suas contas e categorias antes de começar a registrar sua
-          vida financeira.
+          Registre receitas, despesas e transferências para manter o saldo das
+          suas contas sempre coerente.
         </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
+        <Link
+          href="/transactions"
+          className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+        >
+          <p className="text-sm font-bold uppercase tracking-wider text-blue-700">
+            Lançamentos
+          </p>
+          <h2 className="mt-2 text-xl font-extrabold text-slate-950">
+            Registre seu fluxo financeiro
+          </h2>
+          <p className="mt-2 leading-6 text-slate-600">
+            Organize receitas e despesas previstas ou realizadas e encontre
+            movimentações com filtros.
+          </p>
+          <span className="mt-5 inline-flex font-semibold text-blue-700 group-hover:underline">
+            Acessar lançamentos →
+          </span>
+        </Link>
+
+        <Link
+          href="/transfers"
+          className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+        >
+          <p className="text-sm font-bold uppercase tracking-wider text-blue-700">
+            Transferências
+          </p>
+          <h2 className="mt-2 text-xl font-extrabold text-slate-950">
+            Mova valores entre contas
+          </h2>
+          <p className="mt-2 leading-6 text-slate-600">
+            Registre os dois lados da movimentação de forma atômica, sem
+            classificar como receita ou despesa.
+          </p>
+          <span className="mt-5 inline-flex font-semibold text-blue-700 group-hover:underline">
+            Acessar transferências →
+          </span>
+        </Link>
+
         <Link
           href="/accounts"
           className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
@@ -86,10 +124,11 @@ export default async function DashboardPage() {
           </Link>
         </article>
         <aside className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950">
-          <h2 className="font-bold">Escopo desta etapa</h2>
+          <h2 className="font-bold">Próximas etapas</h2>
           <p className="mt-2 leading-6">
-            Lançamentos, transferências, cartões, investimentos, orçamentos e
-            indicadores financeiros permanecem reservados às próximas sprints.
+            Cartões, faturas, parcelamentos, recorrências, orçamentos,
+            investimentos e indicadores avançados permanecem reservados às
+            próximas sprints.
           </p>
         </aside>
       </section>

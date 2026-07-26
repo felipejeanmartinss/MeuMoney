@@ -1,0 +1,444 @@
+import "server-only";
+import { requireUser } from "@/services/auth/server-auth";
+import type {
+  CreditCardBrand,
+  SupportedCurrency,
+} from "@/types/database";
+
+export type CreditCardMutationInput = {
+  name: string;
+  issuer: string;
+  brand: CreditCardBrand;
+  lastFourDigits: string;
+  creditLimit: number;
+  closingDay: number;
+  dueDay: number;
+  currency: SupportedCurrency;
+  linkedAccountId: string | null;
+};
+
+export type CreditCardPurchaseMutationInput = {
+  categoryId: string;
+  description: string;
+  totalAmount: number;
+  purchaseDate: string;
+  installmentCount: number;
+  notes: string | null;
+};
+
+const cardColumns =
+  "id, user_id, name, issuer, brand, last_four_digits, credit_limit, closing_day, due_day, currency, linked_account_id, is_active, created_at, updated_at";
+const cardSummaryColumns = `${cardColumns}, used_limit, available_limit`;
+const purchaseColumns =
+  "id, user_id, credit_card_id, category_id, description, total_amount, purchase_date, installment_count, status, notes, created_at, updated_at";
+const invoiceColumns =
+  "id, user_id, credit_card_id, reference_month, closing_date, due_date, status, total_amount, paid_amount, closed_at, paid_at, payment_account_id, payment_transaction_id, created_at, updated_at";
+const installmentColumns =
+  "id, user_id, purchase_id, credit_card_id, invoice_id, installment_number, installment_count, amount, competence_date, status, created_at, updated_at";
+
+function mutationErrorMessage(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("invalid_purchase_category")) {
+    return "Selecione uma categoria de despesa ativa.";
+  }
+  if (message.includes("invalid_credit_card")) {
+    return "O cartão não está disponível.";
+  }
+  if (message.includes("purchase_structure_locked")) {
+    return "Valor, data e parcelas não podem mudar após o fechamento da fatura.";
+  }
+  if (message.includes("purchase_cancellation_locked")) {
+    return "A compra não pode ser cancelada após o fechamento ou pagamento.";
+  }
+  if (message.includes("invoice_not_payable")) {
+    return "A fatura precisa estar fechada e possuir valor para ser paga.";
+  }
+  if (message.includes("invalid_payment_account")) {
+    return "A conta deve estar ativa e usar a mesma moeda do cartão.";
+  }
+  if (message.includes("invoice_payment_inconsistent")) {
+    return "O pagamento não pode ser revertido com segurança.";
+  }
+  if (message.includes("invoice_not_open")) {
+    return "Esta fatura não está mais aberta.";
+  }
+  return "Não foi possível concluir a operação.";
+}
+
+export async function listCurrentUserCreditCards() {
+  const { supabase, user } = await requireUser();
+  const [cardsResult, invoicesResult] = await Promise.all([
+    supabase
+      .from("credit_card_summaries")
+      .select(cardSummaryColumns)
+      .eq("user_id", user.id)
+      .order("is_active", { ascending: false })
+      .order("name"),
+    supabase
+      .from("credit_card_invoices")
+      .select(invoiceColumns)
+      .eq("user_id", user.id)
+      .neq("status", "paid")
+      .order("reference_month"),
+  ]);
+
+  return {
+    cards: cardsResult.data ?? [],
+    invoices: invoicesResult.data ?? [],
+    hasError: Boolean(cardsResult.error || invoicesResult.error),
+  };
+}
+
+export async function getCurrentUserCreditCard(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("credit_card_summaries")
+    .select(cardSummaryColumns)
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .maybeSingle();
+
+  return { card: data, hasError: Boolean(error) };
+}
+
+export async function getCreditCardFormOptions(includeAccountId?: string) {
+  const { supabase, user } = await requireUser();
+  let query = supabase
+    .from("accounts")
+    .select("id, name, currency, archived_at")
+    .eq("user_id", user.id);
+  query = includeAccountId
+    ? query.or(`archived_at.is.null,id.eq.${includeAccountId}`)
+    : query.is("archived_at", null);
+  const { data, error } = await query.order("name");
+  return { accounts: data ?? [], hasError: Boolean(error) };
+}
+
+export async function createCurrentUserCreditCard(
+  input: CreditCardMutationInput,
+) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("credit_cards").insert({
+    user_id: user.id,
+    name: input.name,
+    issuer: input.issuer,
+    brand: input.brand,
+    last_four_digits: input.lastFourDigits,
+    credit_limit: input.creditLimit,
+    closing_day: input.closingDay,
+    due_day: input.dueDay,
+    currency: input.currency,
+    linked_account_id: input.linkedAccountId,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function updateCurrentUserCreditCard(
+  id: string,
+  input: CreditCardMutationInput,
+) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("credit_cards")
+    .update({
+      name: input.name,
+      issuer: input.issuer,
+      brand: input.brand,
+      last_four_digits: input.lastFourDigits,
+      credit_limit: input.creditLimit,
+      closing_day: input.closingDay,
+      due_day: input.dueDay,
+      currency: input.currency,
+      linked_account_id: input.linkedAccountId,
+    })
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  return error || !data
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function setCurrentUserCreditCardActive(
+  id: string,
+  active: boolean,
+) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("credit_cards")
+    .update({ is_active: active })
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  return error || !data
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function getCreditCardPurchaseFormOptions(cardId: string) {
+  const { supabase, user } = await requireUser();
+  const [cardResult, categoriesResult] = await Promise.all([
+    supabase
+      .from("credit_card_summaries")
+      .select(cardSummaryColumns)
+      .eq("user_id", user.id)
+      .eq("id", cardId)
+      .maybeSingle(),
+    supabase
+      .from("categories")
+      .select("id, name, context")
+      .eq("user_id", user.id)
+      .eq("kind", "expense")
+      .is("archived_at", null)
+      .order("name"),
+  ]);
+  return {
+    card: cardResult.data,
+    categories: categoriesResult.data ?? [],
+    hasError: Boolean(cardResult.error || categoriesResult.error),
+  };
+}
+
+export async function getCurrentUserCreditCardDetails(cardId: string) {
+  const { supabase, user } = await requireUser();
+  const [
+    cardResult,
+    purchasesResult,
+    installmentsResult,
+    invoicesResult,
+    categoriesResult,
+  ] = await Promise.all([
+      supabase
+        .from("credit_card_summaries")
+        .select(cardSummaryColumns)
+        .eq("user_id", user.id)
+        .eq("id", cardId)
+        .maybeSingle(),
+      supabase
+        .from("credit_card_purchases")
+        .select(purchaseColumns)
+        .eq("user_id", user.id)
+        .eq("credit_card_id", cardId)
+        .order("purchase_date", { ascending: false }),
+      supabase
+        .from("credit_card_installments")
+        .select(installmentColumns)
+        .eq("user_id", user.id)
+        .eq("credit_card_id", cardId)
+        .order("competence_date"),
+      supabase
+        .from("credit_card_invoices")
+        .select(invoiceColumns)
+        .eq("user_id", user.id)
+        .eq("credit_card_id", cardId)
+        .order("reference_month"),
+      supabase
+        .from("categories")
+        .select("id, name")
+        .eq("user_id", user.id),
+    ]);
+  return {
+    card: cardResult.data,
+    purchases: purchasesResult.data ?? [],
+    installments: installmentsResult.data ?? [],
+    invoices: invoicesResult.data ?? [],
+    categories: categoriesResult.data ?? [],
+    hasError: Boolean(
+      cardResult.error ||
+        purchasesResult.error ||
+        installmentsResult.error ||
+        invoicesResult.error ||
+        categoriesResult.error,
+    ),
+  };
+}
+
+export async function getCurrentUserCreditCardPurchase(
+  cardId: string,
+  purchaseId: string,
+) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("credit_card_purchases")
+    .select(purchaseColumns)
+    .eq("user_id", user.id)
+    .eq("credit_card_id", cardId)
+    .eq("id", purchaseId)
+    .maybeSingle();
+  return { purchase: data, hasError: Boolean(error) };
+}
+
+export async function createCurrentUserCreditCardPurchase(
+  cardId: string,
+  input: CreditCardPurchaseMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("create_credit_card_purchase", {
+    target_credit_card_id: cardId,
+    target_category_id: input.categoryId,
+    purchase_description: input.description,
+    purchase_total_amount: input.totalAmount,
+    target_purchase_date: input.purchaseDate,
+    target_installment_count: input.installmentCount,
+    purchase_notes: input.notes,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function updateCurrentUserCreditCardPurchase(
+  purchaseId: string,
+  input: CreditCardPurchaseMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("update_credit_card_purchase", {
+    target_purchase_id: purchaseId,
+    target_category_id: input.categoryId,
+    purchase_description: input.description,
+    purchase_total_amount: input.totalAmount,
+    target_purchase_date: input.purchaseDate,
+    target_installment_count: input.installmentCount,
+    purchase_notes: input.notes,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function cancelCurrentUserCreditCardPurchase(purchaseId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("cancel_credit_card_purchase", {
+    target_purchase_id: purchaseId,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function listCurrentUserCreditCardInvoices(cardId: string) {
+  const { supabase, user } = await requireUser();
+  const [cardResult, invoicesResult] = await Promise.all([
+    supabase
+      .from("credit_card_summaries")
+      .select(cardSummaryColumns)
+      .eq("user_id", user.id)
+      .eq("id", cardId)
+      .maybeSingle(),
+    supabase
+      .from("credit_card_invoices")
+      .select(invoiceColumns)
+      .eq("user_id", user.id)
+      .eq("credit_card_id", cardId)
+      .order("reference_month", { ascending: false }),
+  ]);
+  return {
+    card: cardResult.data,
+    invoices: invoicesResult.data ?? [],
+    hasError: Boolean(cardResult.error || invoicesResult.error),
+  };
+}
+
+export async function getCurrentUserCreditCardInvoice(
+  cardId: string,
+  invoiceId: string,
+) {
+  const { supabase, user } = await requireUser();
+  const [
+    cardResult,
+    invoiceResult,
+    installmentsResult,
+    purchasesResult,
+    accountsResult,
+  ] =
+    await Promise.all([
+      supabase
+        .from("credit_card_summaries")
+        .select(cardSummaryColumns)
+        .eq("user_id", user.id)
+        .eq("id", cardId)
+        .maybeSingle(),
+      supabase
+        .from("credit_card_invoices")
+        .select(invoiceColumns)
+        .eq("user_id", user.id)
+        .eq("credit_card_id", cardId)
+        .eq("id", invoiceId)
+        .maybeSingle(),
+      supabase
+        .from("credit_card_installments")
+        .select(installmentColumns)
+        .eq("user_id", user.id)
+        .eq("credit_card_id", cardId)
+        .eq("invoice_id", invoiceId)
+        .order("installment_number"),
+      supabase
+        .from("credit_card_purchases")
+        .select("id, description, category_id")
+        .eq("user_id", user.id)
+        .eq("credit_card_id", cardId),
+      supabase
+        .from("accounts")
+        .select("id, name, currency")
+        .eq("user_id", user.id)
+        .is("archived_at", null)
+        .order("name"),
+    ]);
+  return {
+    card: cardResult.data,
+    invoice: invoiceResult.data,
+    installments: installmentsResult.data ?? [],
+    purchases: purchasesResult.data ?? [],
+    accounts: accountsResult.data ?? [],
+    hasError: Boolean(
+      cardResult.error ||
+        invoiceResult.error ||
+        installmentsResult.error ||
+        purchasesResult.error ||
+        accountsResult.error,
+    ),
+  };
+}
+
+export async function closeCurrentUserCreditCardInvoice(invoiceId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("close_credit_card_invoice", {
+    target_invoice_id: invoiceId,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function payCurrentUserCreditCardInvoice(
+  invoiceId: string,
+  accountId: string,
+  paymentDate: string,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("pay_credit_card_invoice", {
+    target_invoice_id: invoiceId,
+    target_account_id: accountId,
+    target_payment_date: paymentDate,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function reverseCurrentUserCreditCardInvoicePayment(
+  invoiceId: string,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc(
+    "reverse_credit_card_invoice_payment",
+    { target_invoice_id: invoiceId },
+  );
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}

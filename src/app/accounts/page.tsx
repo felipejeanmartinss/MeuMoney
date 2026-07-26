@@ -46,8 +46,8 @@ export default async function AccountsPage({
             Contas
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Organize onde seu dinheiro está e registre o ponto inicial de cada
-            conta.
+            Acompanhe o saldo atual calculado a partir do ponto inicial e das
+            movimentações realizadas.
           </p>
         </div>
         <Link
@@ -133,11 +133,17 @@ export default async function AccountsPage({
               <dl className="mt-5 grid grid-cols-2 gap-4 border-y border-slate-100 py-4">
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Saldo inicial
+                    Saldo atual
                   </dt>
-                  <dd className="mt-1 text-lg font-extrabold text-slate-950">
+                  <dd
+                    className={`mt-1 text-lg font-extrabold ${
+                      account.current_balance_minor < 0
+                        ? "text-rose-700"
+                        : "text-slate-950"
+                    }`}
+                  >
                     {formatMoney(
-                      account.opening_balance_minor,
+                      account.current_balance_minor,
                       account.currency,
                       CURRENCY_LOCALES[account.currency],
                     )}
@@ -145,10 +151,17 @@ export default async function AccountsPage({
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Referência
+                    Saldo inicial
                   </dt>
                   <dd className="mt-1 font-semibold text-slate-800">
-                    {formatReferenceDate(account.opening_balance_date)}
+                    {formatMoney(
+                      account.opening_balance_minor,
+                      account.currency,
+                      CURRENCY_LOCALES[account.currency],
+                    )}
+                  </dd>
+                  <dd className="mt-1 text-xs text-slate-500">
+                    Em {formatReferenceDate(account.opening_balance_date)}
                   </dd>
                 </div>
               </dl>

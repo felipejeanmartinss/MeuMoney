@@ -5,7 +5,11 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const navigation = [
     { href: "/dashboard", label: "Início" },
     { href: "/accounts", label: "Contas" },
+    { href: "/transactions", label: "Movimentações" },
+    { href: "/recurring-transactions", label: "Recorrências" },
+    { href: "/transfers", label: "Transferências" },
     { href: "/categories", label: "Categorias" },
+    { href: "/credit-cards", label: "Cartões" },
     { href: "/settings/profile", label: "Perfil" },
   ];
 
@@ -28,7 +32,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
           </div>
           <nav
             aria-label="Navegação principal"
-            className="-mx-1 grid grid-cols-4 gap-1 border-t border-slate-100 py-2 sm:flex sm:border-0 sm:py-0"
+            className="-mx-1 grid grid-cols-3 gap-1 border-t border-slate-100 py-2 sm:flex sm:border-0 sm:py-0"
           >
             {navigation.map((item) => (
               <Link

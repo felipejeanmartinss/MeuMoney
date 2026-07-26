@@ -3,8 +3,22 @@ export function assertMinorUnits(value: number): number {
   return value;
 }
 
-export function formatMoney(amountMinor: number, currency = "BRL", locale = "pt-BR"): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(assertMinorUnits(amountMinor) / 100);
+export function coerceMinorUnits(value: number | string): number {
+  if (typeof value === "number") return assertMinorUnits(value);
+  if (!/^-?\d+$/.test(value)) {
+    throw new Error("Money must use safe integer minor units.");
+  }
+  return assertMinorUnits(Number(value));
+}
+
+export function formatMoney(
+  amountMinor: number | string,
+  currency = "BRL",
+  locale = "pt-BR",
+): string {
+  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(
+    coerceMinorUnits(amountMinor) / 100,
+  );
 }
 
 export function parseMoneyInputToMinor(input: string): number {

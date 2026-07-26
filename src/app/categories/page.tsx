@@ -29,38 +29,32 @@ function CategoryItem({ category }: { category: Category }) {
         <div className="min-w-0">
           <p className="font-semibold text-slate-950">{category.name}</p>
           <p className="mt-1 text-xs text-slate-500">
-            {category.is_system ? "Categoria padrão" : "Personalizada"}
+            {category.is_system ? "Sugestão inicial" : "Personalizada"}
             {archived ? " · Inativa" : ""}
           </p>
         </div>
-        {category.is_system ? (
-          <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-            Padrão
-          </span>
-        ) : (
-          <div className="flex shrink-0 items-center gap-1">
-            <Link
-              href={`/categories/${category.id}/edit`}
-              className="rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+        <div className="flex shrink-0 items-center gap-1">
+          <Link
+            href={`/categories/${category.id}/edit`}
+            className="rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Editar
+          </Link>
+          <form action={toggleCategoryStatus}>
+            <input type="hidden" name="id" value={category.id} />
+            <input
+              type="hidden"
+              name="archive"
+              value={archived ? "false" : "true"}
+            />
+            <button
+              type="submit"
+              className="rounded-lg px-2 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
             >
-              Editar
-            </Link>
-            <form action={toggleCategoryStatus}>
-              <input type="hidden" name="id" value={category.id} />
-              <input
-                type="hidden"
-                name="archive"
-                value={archived ? "false" : "true"}
-              />
-              <button
-                type="submit"
-                className="rounded-lg px-2 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-              >
-                {archived ? "Reativar" : "Inativar"}
-              </button>
-            </form>
-          </div>
-        )}
+              {archived ? "Reativar" : "Inativar"}
+            </button>
+          </form>
+        </div>
       </div>
     </li>
   );
@@ -89,8 +83,7 @@ export default async function CategoriesPage({
             Categorias
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Consulte a estrutura padrão e adapte sua organização com categorias
-            próprias.
+            Use as sugestões iniciais ou adapte toda a organização ao seu jeito.
           </p>
         </div>
         <Link
@@ -102,9 +95,8 @@ export default async function CategoriesPage({
       </div>
 
       <aside className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
-        As categorias padrão garantem uma base consistente e não podem ser
-        alteradas. Categorias personalizadas podem ser editadas, inativadas e
-        reativadas.
+        As categorias iniciais são apenas sugestões. Todas podem ser editadas,
+        inativadas e reativadas por você.
       </aside>
 
       {feedback ? (

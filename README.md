@@ -1,6 +1,6 @@
 # MeuMoney
 
-Progressive Web App de gestão financeira pessoal. A Sprint 2 acrescenta a fundação financeira segura: contas, saldos iniciais, categorias padrão e personalizadas, contextos Pessoal/Profissional e preferência monetária.
+Progressive Web App de gestão financeira pessoal. A feature atual acrescenta recorrências seguras e idempotentes à fundação financeira existente.
 
 ## Stack
 
@@ -20,17 +20,16 @@ Progressive Web App de gestão financeira pessoal. A Sprint 2 acrescenta a funda
 
 Configure no Supabase Auth as URLs permitidas `http://localhost:3000/**` e as URLs equivalentes da Vercel. Consulte [docs/local-setup.md](docs/local-setup.md).
 
-## Sprint 2
+## Recorrências
 
-- contas correntes, poupanças, dinheiro e outras contas;
-- saldo inicial em unidades monetárias inteiras e sua data de referência;
-- inativação e reativação sem exclusão destrutiva;
-- categorias padrão imutáveis e categorias personalizadas;
-- separação Pessoal/Profissional;
-- moedas BRL, USD e EUR, com moeda preferencial no perfil;
-- RLS e permissões por coluna para isolamento entre usuários.
+- receitas e despesas semanais, mensais ou anuais;
+- datas inicial e final opcional, com próxima ocorrência rastreável;
+- calendário ancorado que trata meses curtos e anos bissextos;
+- geração idempotente, sem duplicidades, sempre como lançamento Previsto;
+- edição, suspensão, reativação e encerramento definitivo;
+- valores inteiros, RLS e isolamento por usuário.
 
-Lançamentos, transferências, cartões, faturas, orçamentos, investimentos e dashboard financeiro completo permanecem fora desta entrega.
+Cashback, milhas, juros rotativos, parcelamento de fatura, antecipação, conversão cambial, orçamentos, investimentos e dashboard financeiro completo permanecem fora desta entrega.
 
 ## Qualidade
 

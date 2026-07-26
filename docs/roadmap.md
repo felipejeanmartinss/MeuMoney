@@ -12,6 +12,18 @@ Cadastro, confirmação de e-mail, login, logout, recuperação e troca de senha
 
 Contas financeiras básicas, saldo inicial e data de referência, categorias padrão e personalizadas, contextos Pessoal/Profissional, preferência monetária, arquivamento lógico e RLS específico.
 
+## Sprint 3 — Lançamentos e transferências
+
+Receitas, despesas, estados Previsto/Realizado, filtros, edição e inativação lógica, transferências atômicas entre contas da mesma moeda e saldo atual calculado.
+
+## Sprint 4 — Cartões de crédito
+
+Cartões, compras à vista ou parceladas, competência por fechamento, faturas, pagamento integral, estorno seguro e limites derivados.
+
+## Sprint 5 — Recorrências
+
+Receitas e despesas semanais, mensais ou anuais, calendário ancorado para meses curtos, data final opcional, geração idempotente de lançamentos previstos e estados ativa, suspensa e encerrada.
+
 ## Próximas sprints
 
-Lançamentos, transferências, cartões, faturas, orçamentos, patrimônio, investimentos, importações e relatórios serão planejados separadamente e não pertencem à Sprint 2.
+Orçamentos, patrimônio, investimentos, importações, relatórios e recursos avançados de cartão serão planejados separadamente.
