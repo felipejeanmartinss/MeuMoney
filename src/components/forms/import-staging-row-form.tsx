@@ -85,6 +85,29 @@ export function ImportStagingRowForm({
         ) : null}
       </div>
 
+      {row.source_pages.length > 0 || row.confidence !== null ? (
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+          {row.source_pages.length > 0 ? (
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">
+              Página{row.source_pages.length === 1 ? "" : "s"}{" "}
+              {row.source_pages.join(", ")}
+            </span>
+          ) : null}
+          {row.confidence !== null ? (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1">
+              Confiança {Math.round(row.confidence * 100)}%
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {row.source_description_original ? (
+        <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <span className="font-semibold">Descrição original:</span>{" "}
+          {row.source_description_original}
+        </p>
+      ) : null}
+
       {row.status === "duplicate" ? (
         <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-sm text-violet-900">
           Uma movimentação com a mesma conta, data, valor e descrição já

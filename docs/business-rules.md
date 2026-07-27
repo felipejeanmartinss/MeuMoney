@@ -131,6 +131,17 @@
 - Staging é apagado ao confirmar ou cancelar. O job preserva apenas metadados e contadores de auditoria.
 - CSV e OFX são limitados a 5 MB e 1.000 movimentações por job no MVP.
 
+## Importação assistida por PDF — Sprint 11
+
+- PDF segue obrigatoriamente o mesmo fluxo de staging, correção e confirmação explícita usado por CSV e OFX. A extração nunca cria lançamentos diretamente.
+- Somente PDFs com texto pesquisável e layout reconhecido por um adaptador versionado são aceitos. Arquivos protegidos, digitalizados, inválidos ou incompatíveis recebem mensagem amigável.
+- Cada adaptador declara banco, tipo de documento e versão de layout. Um banco só pode ser anunciado como suportado quando houver fixture anônima representativa e teste de regressão correspondente.
+- A descrição original extraída, as páginas de origem e o nível de confiança permanecem no staging para auditoria e revisão humana.
+- Confiança é evidência de extração, não autorização financeira. Nenhuma linha é realizada automaticamente por causa da confiança.
+- Os bytes originais são processados somente em memória e descartados antes da persistência do job; confirmar ou cancelar também remove todo o staging.
+- O adaptador `Banco Exemplo (fixture)` é sintético e comprova apenas o contrato técnico. Nenhum banco real é declarado como suportado nesta sprint.
+- OCR, PDFs protegidos por senha, tabelas baseadas apenas em imagem e treinamento automático de layouts estão fora do escopo.
+
 ## Regras financeiras futuras
 
 Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.

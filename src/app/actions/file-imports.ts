@@ -66,7 +66,7 @@ export async function uploadFinancialFile(
   if (!(file instanceof File)) {
     return {
       status: "error",
-      fieldErrors: { file: ["Selecione um arquivo CSV ou OFX."] },
+      fieldErrors: { file: ["Selecione um arquivo CSV, OFX ou PDF."] },
     };
   }
 

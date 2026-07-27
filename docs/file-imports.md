@@ -1,11 +1,11 @@
-# Importação CSV e OFX
+# Importação CSV, OFX e PDF pesquisável
 
 ## Fluxo
 
 1. O usuário envia um arquivo de até 5 MB.
 2. O servidor lê o conteúdo em memória, calcula SHA-256 e descarta os bytes.
-3. CSV configurável ou OFX estruturado é normalizado para no máximo 1.000
-   linhas de staging.
+3. CSV configurável, OFX estruturado ou PDF reconhecido por adaptador é
+   normalizado para no máximo 1.000 linhas de staging.
 4. O usuário associa uma conta, escolhe categorias, corrige dados e ignora
    linhas.
 5. O banco recalcula assinaturas e duplicidades a cada alteração.
@@ -31,6 +31,19 @@ São aceitos documentos SGML ou XML que contenham blocos fechados `STMTTRN`.
 Os campos lidos são `DTPOSTED`, `TRNAMT`, `FITID`, `NAME` e `MEMO`. Arquivos
 sem movimentações estruturadas são rejeitados.
 
+## PDF suportado
+
+PDFs precisam conter texto pesquisável e corresponder exatamente a um adaptador
+versionado com fixture anônima de regressão. O parser preserva em cada linha a
+descrição original, as páginas de origem e o nível de confiança. Esses campos
+servem apenas de evidência para a revisão: nunca autorizam confirmação
+automática.
+
+Nesta branch, existe somente o adaptador sintético `Banco Exemplo (fixture) /
+extrato de conta / layout 1`. Ele valida a arquitetura sem declarar suporte a
+um banco real. A matriz e o contrato dos adaptadores estão em
+[pdf-imports.md](pdf-imports.md).
+
 ## Duplicidades
 
 O material da assinatura é:
@@ -53,7 +66,10 @@ protege contra confirmações concorrentes.
 
 ## Limitações do MVP
 
-- não há XLS, PDF, OCR nem layouts salvos por banco;
+- não há XLS nem OCR;
+- não existe suporte declarado a banco real enquanto não houver fixture anônima
+  representativa e teste de regressão do respectivo layout;
+- PDFs protegidos por senha, digitalizados ou incompatíveis são rejeitados;
 - não há categorização automática;
 - não há importação de transferências ou compras de cartão;
 - OFX sem blocos fechados `STMTTRN` não é aceito;

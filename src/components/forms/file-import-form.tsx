@@ -10,7 +10,7 @@ import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 const initialState: FileImportFormState = { status: "idle" };
 
 export function FileImportForm() {
-  const [fileType, setFileType] = useState<"csv" | "ofx">("csv");
+  const [fileType, setFileType] = useState<"csv" | "ofx" | "pdf">("csv");
   const [state, formAction, pending] = useActionState(
     uploadFinancialFile,
     initialState,
@@ -27,11 +27,12 @@ export function FileImportForm() {
             name="fileType"
             value={fileType}
             onChange={(event) =>
-              setFileType(event.target.value as "csv" | "ofx")
+              setFileType(event.target.value as "csv" | "ofx" | "pdf")
             }
           >
             <option value="csv">CSV configurável</option>
             <option value="ofx">OFX estruturado</option>
+            <option value="pdf">PDF pesquisável</option>
           </select>
         </Field>
 
@@ -40,13 +41,26 @@ export function FileImportForm() {
             className={`${inputClass(Boolean(state.fieldErrors?.file))} py-2`}
             name="file"
             type="file"
-            accept={fileType === "csv" ? ".csv,text/csv" : ".ofx"}
+            accept={
+              fileType === "csv"
+                ? ".csv,text/csv"
+                : fileType === "ofx"
+                  ? ".ofx"
+                  : ".pdf,application/pdf"
+            }
             required
           />
           <span className="text-xs font-normal text-slate-500">
             Até 5 MB e 1.000 movimentações. O arquivo original não é
             armazenado.
           </span>
+          {fileType === "pdf" ? (
+            <span className="text-xs font-normal text-amber-700">
+              Apenas PDFs com texto pesquisável e layouts listados como
+              suportados. Arquivos protegidos ou digitalizados sem OCR serão
+              recusados.
+            </span>
+          ) : null}
         </Field>
       </div>
 

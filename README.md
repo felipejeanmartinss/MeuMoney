@@ -1,8 +1,8 @@
 # MeuMoney
 
 Progressive Web App de gestão financeira pessoal. A feature atual acrescenta
-importação assistida de CSV e OFX com staging, correção, duplicidades e
-confirmação atômica.
+importação assistida de CSV, OFX e PDFs pesquisáveis suportados, com staging,
+correção, duplicidades e confirmação atômica.
 
 ## Stack
 
@@ -48,14 +48,19 @@ rentabilidade sem histórico suficiente permanecem fora da Sprint 9.
 ## Importação de arquivos
 
 - CSV configurável e OFX estruturado;
+- PDF com texto pesquisável por adaptadores versionados e testados;
 - arquivo original lido em memória e descartado antes da criação do job;
 - prévia com associação de conta e categoria, correção e linhas ignoradas;
 - assinatura estável e duplicidades verificadas antes da confirmação;
 - confirmação atômica e staging apagado ao concluir ou cancelar;
-- fixtures anônimas e testes de datas, valores, duplicidades e rollback.
+- descrição original, páginas de origem e confiança preservadas para revisão;
+- fixtures anônimas e testes de datas, valores, layouts, duplicidades e rollback.
 
-XLS, PDF, OCR, categorização automática e layouts salvos por banco permanecem
-fora da Sprint 10. Consulte [docs/file-imports.md](docs/file-imports.md).
+O adaptador PDF desta branch usa somente um banco fictício de fixture e não
+representa suporte a bancos reais. XLS, OCR e categorização automática
+permanecem fora do escopo. Consulte
+[docs/file-imports.md](docs/file-imports.md) e
+[docs/pdf-imports.md](docs/pdf-imports.md).
 
 ## Qualidade
 

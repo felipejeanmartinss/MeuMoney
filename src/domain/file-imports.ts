@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isValidIsoDate } from "./dates";
 import { parseMoneyInputToMinor } from "./money";
 
-export const IMPORT_FILE_TYPES = ["csv", "ofx"] as const;
+export const IMPORT_FILE_TYPES = ["csv", "ofx", "pdf"] as const;
 export const IMPORT_ROW_STATUSES = [
   "needs_review",
   "valid",
@@ -52,6 +52,11 @@ export type ParsedImportRow = {
   description: string | null;
   signedAmountMinor: number | null;
   validationCode: ImportValidationCode | null;
+  sourceDescriptionOriginal?: string | null;
+  sourcePages?: number[];
+  confidence?: number | null;
+  sourceAdapterId?: string | null;
+  sourceDocumentType?: string | null;
 };
 
 export type ImportSignatureInput = {
@@ -98,7 +103,7 @@ export const csvImportConfigSchema = z.object({
 });
 
 export const importFileTypeSchema = z.enum(IMPORT_FILE_TYPES, {
-  error: "Selecione CSV ou OFX.",
+  error: "Selecione CSV, OFX ou PDF.",
 });
 
 export const importJobIdSchema = z.uuid("Importação inválida.");
