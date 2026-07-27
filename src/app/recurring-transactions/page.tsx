@@ -3,7 +3,7 @@ import {
   changeRecurringTransactionState,
   generateRecurringTransactions,
 } from "@/app/actions/recurring-transactions";
-import { inputClass } from "@/components/forms/form-controls";
+import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
   RECURRENCE_FREQUENCY_LABELS,

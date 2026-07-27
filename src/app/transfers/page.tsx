@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { toggleTransferActivity } from "@/app/actions/transfers";
-import { inputClass } from "@/components/forms/form-controls";
+import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
   TRANSACTION_STATUSES,

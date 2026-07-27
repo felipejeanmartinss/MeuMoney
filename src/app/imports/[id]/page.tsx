@@ -5,7 +5,7 @@ import {
   configureFinancialImport,
   confirmFinancialImport,
 } from "@/app/actions/file-imports";
-import { inputClass } from "@/components/forms/form-controls";
+import { inputClass } from "@/components/forms/form-control-styles";
 import { ImportStagingRowForm } from "@/components/forms/import-staging-row-form";
 import { getCurrentUserImportReview } from "@/services/finance/file-imports-service";
 
