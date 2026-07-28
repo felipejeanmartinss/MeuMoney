@@ -1,5 +1,17 @@
 # MeuMoney
 
+## Beta pessoal e segurança
+
+- exportação completa em JSON versionado e restauração transacional;
+- exclusão definitiva com reautenticação e segredo administrativo só no servidor;
+- histórico imutável das operações críticas, sem conteúdo financeiro;
+- retenção de staging e metadados de importação;
+- monitoramento sanitizado, recuperação de erros, acessibilidade e PWA sem cache privado;
+- revisão de RLS e teste SQL de isolamento entre dois usuários.
+
+Consulte [docs/personal-beta-operations.md](docs/personal-beta-operations.md)
+antes de aplicar a migration ou liberar um usuário no beta.
+
 Progressive Web App de gestão financeira pessoal. A feature atual acrescenta
 importação assistida de CSV, OFX e PDFs pesquisáveis suportados, com staging,
 correção, duplicidades e confirmação atômica.

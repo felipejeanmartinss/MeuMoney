@@ -1,11 +1,19 @@
 {
   "name": "MeuMoney",
   "short_name": "MeuMoney",
+  "id": "/",
   "description": "Sua vida financeira com clareza e segurança.",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#1d4ed8",
   "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["finance", "productivity"],
+  "shortcuts": [
+    { "name": "Nova movimentação", "short_name": "Movimentação", "url": "/transactions/new" },
+    { "name": "Importar arquivo", "short_name": "Importar", "url": "/imports/new" }
+  ],
   "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }

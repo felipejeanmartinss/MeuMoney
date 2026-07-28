@@ -7,6 +7,12 @@ const publicEnvSchema = z.object({
     .min(1, "A chave pública do Supabase não foi configurada."),
 });
 
+const serverSecretEnvSchema = z.object({
+  SUPABASE_SECRET_KEY: z
+    .string()
+    .min(1, "A chave secreta do Supabase não foi configurada."),
+});
+
 export function getPublicEnv() {
   const result = publicEnvSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -17,6 +23,20 @@ export function getPublicEnv() {
   if (!result.success) {
     throw new Error(
       "Configuração do Supabase ausente ou inválida. Consulte .env.example.",
+    );
+  }
+
+  return result.data;
+}
+
+export function getServerSecretEnv() {
+  const result = serverSecretEnvSchema.safeParse({
+    SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
+  });
+
+  if (!result.success) {
+    throw new Error(
+      "Configuração administrativa ausente. Consulte .env.example.",
     );
   }
 

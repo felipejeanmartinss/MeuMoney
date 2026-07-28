@@ -15,10 +15,17 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     { href: "/investments", label: "Investimentos" },
     { href: "/net-worth", label: "Patrimônio" },
     { href: "/settings/profile", label: "Perfil" },
+    { href: "/settings/security", label: "Segurança" },
   ];
 
   return (
     <div className="min-h-dvh bg-slate-50">
+      <a
+        href="#main-content"
+        className="fixed left-3 top-3 z-50 -translate-y-24 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white focus:translate-y-0"
+      >
+        Pular para o conteúdo
+      </a>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex min-h-16 items-center justify-between gap-4">
@@ -50,7 +57,9 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
           </nav>
         </div>
       </header>
-      {children}
+      <div id="main-content" tabIndex={-1}>
+        {children}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,18 @@
 # Regras de negócio
 
+## Segurança e ciclo de vida dos dados — Sprint 12
+
+- Todo backup é versionado, pertence à sessão autenticada e inclui todas as
+  tabelas funcionais sem incluir senha ou token.
+- A restauração substitui os dados do usuário em uma única transação, força o
+  proprietário atual e rejeita vínculos externos ou histórico inconsistente.
+- A exclusão exige senha atual e confirmação explícita; não existe recuperação.
+- Eventos críticos guardam apenas tipo, resultado, recurso e horário.
+- Arquivos importados nunca são persistidos. Staging expira em sete dias e
+  metadados terminais em noventa dias.
+- Dados autenticados e respostas de API nunca entram no cache da PWA.
+- Cada tabela do usuário mantém RLS, política de proprietário e privilégio mínimo.
+
 ## Identidade — Sprint 1
 
 - Senhas existem somente no Supabase Auth e nunca são persistidas ou registradas pela aplicação.

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PwaRegistration } from "@/components/pwa/pwa-registration";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,5 +12,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#1d4ed8" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="pt-BR"><body>{children}</body></html>;
+  return <html lang="pt-BR"><body>{children}<PwaRegistration /></body></html>;
 }

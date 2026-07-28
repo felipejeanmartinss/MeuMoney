@@ -190,6 +190,7 @@ export async function createCurrentUserImport(input: CreateImportInput) {
 
 export async function listCurrentUserImportJobs() {
   const { supabase, user } = await requireUser();
+  await supabase.rpc("apply_import_retention");
   const { data, error } = await supabase
     .from("import_jobs")
     .select(
