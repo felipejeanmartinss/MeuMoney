@@ -203,4 +203,31 @@ describe("file imports", () => {
     );
     expect(candidates).toEqual(snapshot);
   });
+
+  it("scopes cancelled import cleanup to the authenticated owner", () => {
+    const migration = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260728190232_cleanup_cancelled_imports.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "current_user_id uuid := (select auth.uid());",
+    );
+    expect(migration).toMatch(
+      /delete from public\.import_jobs\s+where user_id = current_user_id\s+and status = 'cancelled';/,
+    );
+    expect(migration).toContain(
+      "revoke all on function public.clear_cancelled_import_jobs()",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.clear_cancelled_import_jobs()",
+    );
+    expect(migration).not.toContain(
+      "grant delete on table public.import_jobs",
+    );
+  });
 });

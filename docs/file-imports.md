@@ -75,6 +75,7 @@ contra duplicidades no histórico, em jobs anteriores e dentro do mesmo upload.
 - apenas dados necessários à revisão permanecem no staging;
 - confirmar ou cancelar apaga o staging;
 - o job retém nome saneado, hash, configuração e contadores de auditoria;
+- jobs cancelados podem ser removidos definitivamente pelo próprio usuário;
 - os anexos reais usados para validação local não fazem parte do repositório.
 
 ## Limitações

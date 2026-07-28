@@ -130,6 +130,7 @@
 - A confirmação insere somente linhas válidas e selecionadas, sempre como lançamentos realizados. Qualquer falha reverte todos os lançamentos daquele job.
 - O arquivo original é descartado imediatamente após a leitura em memória. Conteúdo financeiro não pode ser enviado a logs.
 - Staging é apagado ao confirmar ou cancelar. O job preserva apenas metadados e contadores de auditoria.
+- O usuário pode limpar definitivamente os metadados dos próprios jobs cancelados. A operação nunca alcança jobs em revisão, prontos, concluídos ou pertencentes a outro usuário.
 - CSV e OFX são limitados a 5 MB e 1.000 movimentações por job no MVP.
 
 ## Importação assistida por PDF — Sprint 11

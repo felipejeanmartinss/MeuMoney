@@ -11,6 +11,7 @@ import {
 } from "@/domain/file-imports";
 import {
   cancelCurrentUserImport,
+  clearCurrentUserCancelledImports,
   configureCurrentUserImport,
   confirmCurrentUserImport,
   createCurrentUserImport,
@@ -161,5 +162,13 @@ export async function cancelFinancialImport(formData: FormData) {
   revalidatePath("/imports");
   redirect(
     `/imports?message=${result.ok ? "cancelled" : "cancel-error"}`,
+  );
+}
+
+export async function clearCancelledFinancialImports() {
+  const result = await clearCurrentUserCancelledImports();
+  revalidatePath("/imports");
+  redirect(
+    `/imports?message=${result.ok ? "cancelled-cleared" : "clear-error"}`,
   );
 }

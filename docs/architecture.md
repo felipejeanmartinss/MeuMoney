@@ -77,6 +77,11 @@ persistida no job para rastreabilidade, sem armazenar o arquivo original.
 
 A confirmação acontece em uma função interna transacional: bloqueia o job, recalcula duplicidades, valida todas as linhas selecionadas, cria os lançamentos realizados e registra as assinaturas. Qualquer falha reverte tudo. Ao concluir ou cancelar, as linhas de staging são apagadas. O arquivo original já havia sido descartado imediatamente após a leitura.
 
+A limpeza de jobs cancelados usa a RPC `clear_cancelled_import_jobs`. A função
+privada valida `auth.uid()` e exclui somente registros `cancelled` do usuário
+autenticado; a função pública é apenas um wrapper `security invoker`. Nenhuma
+permissão direta de exclusão é concedida às tabelas de importação.
+
 ## Orçamento mensal — Sprint 6
 
 A rota `/budgets` é protegida no servidor e segue o fluxo Server Component → Server Action → serviço financeiro. Os filtros de mês, contexto e moeda ficam na URL, permitindo recarregar e compartilhar o mesmo recorte sem estado global no cliente. O único Client Component contém o formulário editável e não acessa o Supabase.

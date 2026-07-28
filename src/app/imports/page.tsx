@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { clearCancelledFinancialImports } from "@/app/actions/file-imports";
 import { listCurrentUserImportJobs } from "@/services/finance/file-imports-service";
 
 export const metadata = { title: "Importações" };
@@ -16,7 +17,9 @@ const statusPresentation = {
 
 const messages: Record<string, string> = {
   cancelled: "Importação cancelada e dados temporários descartados.",
+  "cancelled-cleared": "Importações canceladas removidas da lista.",
   "cancel-error": "Não foi possível cancelar a importação.",
+  "clear-error": "Não foi possível limpar as importações canceladas.",
   "configuration-error": "Não foi possível configurar a importação.",
   "confirmation-error": "Não foi possível confirmar a importação.",
   "row-error": "Não foi possível atualizar a linha.",
@@ -40,6 +43,7 @@ export default async function ImportsPage({
   ]);
   const feedback = params.message ? messages[params.message] : undefined;
   const feedbackIsError = params.message?.endsWith("error");
+  const hasCancelledJobs = jobs.some((job) => job.status === "cancelled");
 
   return (
     <main className="mx-auto grid max-w-6xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
@@ -52,16 +56,25 @@ export default async function ImportsPage({
             Importações
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Revise CSV e OFX em uma área temporária antes de alterar seu
+            Revise CSV, OFX e PDF em uma área temporária antes de alterar seu
             histórico financeiro.
           </p>
         </div>
-        <Link
-          href="/imports/new"
-          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm hover:bg-blue-800"
-        >
-          Nova importação
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {hasCancelledJobs ? (
+            <form action={clearCancelledFinancialImports}>
+              <button className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-300 px-5 font-semibold text-slate-700 hover:bg-slate-100">
+                Limpar canceladas
+              </button>
+            </form>
+          ) : null}
+          <Link
+            href="/imports/new"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm hover:bg-blue-800"
+          >
+            Nova importação
+          </Link>
+        </div>
       </div>
 
       {feedback ? (

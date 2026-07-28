@@ -995,6 +995,10 @@ export type Database = {
         Args: { target_job_id: string };
         Returns: boolean;
       };
+      clear_cancelled_import_jobs: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
     };
     Enums: {
       account_type: AccountType;
