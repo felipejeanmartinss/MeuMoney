@@ -1,13 +1,19 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import {
+  parseDetectedCsv,
   parseConfiguredCsv,
   parseStructuredOfx,
   type CsvImportConfig,
   type ImportFileType,
   type ParsedImportRow,
 } from "@/domain/file-imports";
+import {
+  parseSupportedPdf,
+  PdfImportError,
+} from "@/domain/pdf-imports";
 import { requireUser } from "@/services/auth/server-auth";
+import { extractSearchablePdfText } from "./pdf-text-extractor";
 import type { Json } from "@/types/database";
 
 const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
@@ -42,7 +48,7 @@ function decodeFinancialFile(bytes: Uint8Array) {
 
 function validateFile(input: CreateImportInput) {
   if (!(input.file instanceof File) || input.file.size === 0) {
-    return "Selecione um arquivo CSV ou OFX.";
+    return "Selecione um arquivo CSV, OFX ou PDF.";
   }
   if (input.file.size > MAX_IMPORT_FILE_BYTES) {
     return "O arquivo deve ter no máximo 5 MB.";
@@ -52,22 +58,40 @@ function validateFile(input: CreateImportInput) {
   if (extension !== input.fileType) {
     return `Selecione um arquivo .${input.fileType}.`;
   }
-  if (input.fileType === "csv" && !input.csvConfig) {
-    return "Revise a configuração das colunas do CSV.";
-  }
   return null;
 }
 
-function parseFileRows(
-  content: string,
+async function parseFileRows(
+  bytes: Uint8Array,
   fileType: ImportFileType,
   csvConfig: CsvImportConfig | null,
 ) {
-  if (fileType === "csv") {
-    if (!csvConfig) throw new Error("Configuração CSV ausente.");
-    return parseConfiguredCsv(content, csvConfig);
+  if (fileType === "pdf") {
+    const document = await extractSearchablePdfText(bytes);
+    return { ...parseSupportedPdf(document), csvConfig: null };
   }
-  return parseStructuredOfx(content);
+
+  const content = decodeFinancialFile(bytes);
+  if (fileType === "csv") {
+    if (!csvConfig) {
+      const detected = parseDetectedCsv(content);
+      return {
+        rows: detected.rows,
+        adapter: null,
+        csvConfig: detected.detection.config,
+      };
+    }
+    return {
+      rows: parseConfiguredCsv(content, csvConfig),
+      adapter: null,
+      csvConfig,
+    };
+  }
+  return {
+    rows: parseStructuredOfx(content),
+    adapter: null,
+    csvConfig: null,
+  };
 }
 
 function rowsToJson(rows: ParsedImportRow[]): Json {
@@ -80,6 +104,11 @@ function rowsToJson(rows: ParsedImportRow[]): Json {
     description: row.description,
     signed_amount_minor: row.signedAmountMinor,
     validation_code: row.validationCode,
+    source_description_original: row.sourceDescriptionOriginal ?? null,
+    source_pages: row.sourcePages ?? [],
+    confidence: row.confidence ?? null,
+    source_adapter_id: row.sourceAdapterId ?? null,
+    source_document_type: row.sourceDocumentType ?? null,
   }));
 }
 
@@ -114,8 +143,11 @@ export async function createCurrentUserImport(input: CreateImportInput) {
     const { supabase } = await requireUser();
     const buffer = await input.file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-    const content = decodeFinancialFile(bytes);
-    const rows = parseFileRows(content, input.fileType, input.csvConfig);
+    const { rows, csvConfig } = await parseFileRows(
+      bytes,
+      input.fileType,
+      input.csvConfig,
+    );
 
     if (rows.length < 1 || rows.length > MAX_IMPORT_ROWS) {
       return {
@@ -129,7 +161,7 @@ export async function createCurrentUserImport(input: CreateImportInput) {
       target_file_name: safeFileName(input.file.name),
       target_file_type: input.fileType,
       target_file_sha256: fileSha256,
-      target_csv_config: input.csvConfig as Json | null,
+      target_csv_config: csvConfig as Json | null,
       target_rows: rowsToJson(rows),
     });
 
@@ -144,7 +176,10 @@ export async function createCurrentUserImport(input: CreateImportInput) {
           ),
         }
       : { ok: true as const, id: data };
-  } catch {
+  } catch (error) {
+    if (error instanceof PdfImportError) {
+      return { ok: false as const, message: error.message };
+    }
     return {
       ok: false as const,
       message:
@@ -158,7 +193,7 @@ export async function listCurrentUserImportJobs() {
   const { data, error } = await supabase
     .from("import_jobs")
     .select(
-      "id, user_id, account_id, file_name, file_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
+      "id, user_id, account_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
@@ -172,7 +207,7 @@ export async function getCurrentUserImportReview(jobId: string) {
   const jobResult = await supabase
     .from("import_jobs")
     .select(
-      "id, user_id, account_id, file_name, file_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
+      "id, user_id, account_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
     )
     .eq("user_id", user.id)
     .eq("id", jobId)
@@ -192,7 +227,7 @@ export async function getCurrentUserImportReview(jobId: string) {
     supabase
       .from("import_staging_rows")
       .select(
-        "id, job_id, user_id, source_row_number, source_external_id, source_date_text, source_amount_text, transaction_date, description, normalized_description, signed_amount_minor, transaction_type, amount_minor, account_id, category_id, signature, status, validation_code, duplicate_transaction_id, is_selected, created_at, updated_at",
+        "id, job_id, user_id, source_row_number, source_external_id, source_date_text, source_amount_text, source_description_original, source_pages, confidence, transaction_date, description, normalized_description, signed_amount_minor, transaction_type, amount_minor, account_id, category_id, signature, status, validation_code, duplicate_transaction_id, is_selected, created_at, updated_at",
       )
       .eq("user_id", user.id)
       .eq("job_id", jobId)
@@ -317,4 +352,17 @@ export async function cancelCurrentUserImport(jobId: string) {
         message: "Não foi possível cancelar esta importação.",
       }
     : { ok: true as const };
+}
+
+export async function clearCurrentUserCancelledImports() {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "clear_cancelled_import_jobs",
+  );
+  return error
+    ? {
+        ok: false as const,
+        message: "Não foi possível limpar as importações canceladas.",
+      }
+    : { ok: true as const, deletedCount: data };
 }

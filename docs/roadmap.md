@@ -48,11 +48,21 @@ inventada.
 
 Fluxo assistido com leitura temporária, normalização, staging, prévia,
 associação de conta e categoria, correção, assinatura estável, detecção de
-duplicidades e confirmação atômica. CSV configurável e OFX estruturado entram
-primeiro; arquivos originais e staging possuem descarte explícito.
+duplicidades e confirmação atômica. CSV possui autodetecção versionada para
+Bradesco e Nubank, detector genérico e modo manual; OFX permanece estruturado.
+Arquivos originais e staging possuem descarte explícito.
+
+## Sprint 11 — Importação assistida por PDF
+
+O pipeline de staging passa a aceitar PDFs com texto pesquisável por meio de
+adaptadores versionados. Descrição original, páginas e confiança acompanham
+cada linha até a revisão compartilhada com CSV/OFX. Bradesco e Nubank possuem
+adaptadores de extrato versionados, fixtures anônimas e regressão contra os
+layouts fornecidos. PDFs protegidos, digitalizados, incompatíveis ou com layout
+desconhecido são rejeitados e o documento original é descartado.
 
 ## Próximas sprints
 
-Mapeamentos salvos por banco, importação XLS/PDF, relatórios analíticos,
-avaliações automáticas de mercado e recursos avançados de cartão serão
-planejados separadamente.
+Novas versões e novos bancos com fixtures representativas, OCR, importação XLS,
+relatórios analíticos, avaliações automáticas de mercado e recursos avançados
+de cartão serão planejados separadamente.

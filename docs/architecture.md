@@ -55,13 +55,32 @@ Operações que precisam atravessar várias tabelas mantêm uma fachada de nome 
 
 No plano gratuito do Supabase, a verificação de senhas contra bases de credenciais vazadas não está disponível. O MVP aplica controle compensatório explícito: mínimo de 12 caracteres, bloqueio local de um pequeno conjunto de senhas triviais, confirmação de e-mail, respostas neutras na recuperação e limites do Supabase Auth. Isso reduz o risco, mas não equivale à verificação de credenciais vazadas; o alerta do Advisor permanece aceito até a adoção do plano que oferece o recurso.
 
-## Importação de arquivos — Sprint 10
+## Importação de arquivos — Sprints 10 e 11
 
-As rotas `/imports`, `/imports/new` e `/imports/[id]` usam Server Components para leitura e Server Actions para mutações. O arquivo chega ao servidor, é limitado a 5 MB, decodificado em memória e normalizado por parsers puros de CSV ou OFX. O byte original nunca é persistido nem enviado a logs; apenas uma impressão SHA-256, metadados mínimos e linhas temporárias entram no banco.
+As rotas `/imports`, `/imports/new` e `/imports/[id]` usam Server Components para leitura e Server Actions para mutações. O arquivo chega ao servidor, é limitado a 5 MB, decodificado em memória e normalizado por parsers puros de CSV ou OFX, ou pelo extrator PDF executado exclusivamente no servidor. O byte original nunca é persistido nem enviado a logs; apenas uma impressão SHA-256, metadados mínimos e linhas temporárias entram no banco.
+
+PDFs passam primeiro por `pdf-text-extractor`, que recupera texto, coordenadas
+`x/y` e página, sem OCR. Em seguida, o registro de adaptadores em
+`src/domain/pdf-imports.ts` seleciona somente layouts reconhecidos. O contrato
+do adaptador devolve linhas normalizadas e metadados de banco, documento,
+versão, descrição original, páginas e confiança. Adicionar um adaptador exige
+fixture anônima representativa e teste de regressão. Os adaptadores Bradesco e
+Nubank usam essas coordenadas e o contexto das seções para separar
+movimentações de saldos e totais.
+
+CSV é autodetectado no servidor por cabeçalhos e amostras. Presets conhecidos
+fixam as convenções de Bradesco e Nubank; um detector genérico exige colunas
+inequívocas e amostra predominantemente válida. A configuração efetiva é
+persistida no job para rastreabilidade, sem armazenar o arquivo original.
 
 `import_jobs` controla o fluxo; `import_staging_rows` contém a prévia corrigível; `imported_transaction_signatures` mantém a barreira de idempotência. Conta e categorias são associadas antes da confirmação. A assinatura usa usuário, conta, data, valor com sinal e descrição normalizada.
 
 A confirmação acontece em uma função interna transacional: bloqueia o job, recalcula duplicidades, valida todas as linhas selecionadas, cria os lançamentos realizados e registra as assinaturas. Qualquer falha reverte tudo. Ao concluir ou cancelar, as linhas de staging são apagadas. O arquivo original já havia sido descartado imediatamente após a leitura.
+
+A limpeza de jobs cancelados usa a RPC `clear_cancelled_import_jobs`. A função
+privada valida `auth.uid()` e exclui somente registros `cancelled` do usuário
+autenticado; a função pública é apenas um wrapper `security invoker`. Nenhuma
+permissão direta de exclusão é concedida às tabelas de importação.
 
 ## Orçamento mensal — Sprint 6
 

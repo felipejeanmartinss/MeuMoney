@@ -11,6 +11,7 @@ import {
 } from "@/domain/file-imports";
 import {
   cancelCurrentUserImport,
+  clearCurrentUserCancelledImports,
   configureCurrentUserImport,
   confirmCurrentUserImport,
   createCurrentUserImport,
@@ -52,7 +53,7 @@ export async function uploadFinancialFile(
   }
 
   const csvConfig =
-    fileType.data === "csv"
+    fileType.data === "csv" && formData.get("csvMode") === "manual"
       ? csvImportConfigSchema.safeParse(csvConfigFrom(formData))
       : null;
   if (csvConfig && !csvConfig.success) {
@@ -66,7 +67,7 @@ export async function uploadFinancialFile(
   if (!(file instanceof File)) {
     return {
       status: "error",
-      fieldErrors: { file: ["Selecione um arquivo CSV ou OFX."] },
+      fieldErrors: { file: ["Selecione um arquivo CSV, OFX ou PDF."] },
     };
   }
 
@@ -161,5 +162,13 @@ export async function cancelFinancialImport(formData: FormData) {
   revalidatePath("/imports");
   redirect(
     `/imports?message=${result.ok ? "cancelled" : "cancel-error"}`,
+  );
+}
+
+export async function clearCancelledFinancialImports() {
+  const result = await clearCurrentUserCancelledImports();
+  revalidatePath("/imports");
+  redirect(
+    `/imports?message=${result.ok ? "cancelled-cleared" : "clear-error"}`,
   );
 }

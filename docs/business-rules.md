@@ -120,7 +120,8 @@
 ## Importação CSV e OFX — Sprint 10
 
 - Upload nunca cria lançamentos diretamente. O fluxo obrigatório é leitura, normalização, prévia, associação, correção e confirmação explícita.
-- CSV aceita separador, cabeçalho, linhas iniciais ignoradas, posição das colunas, formato de data, separador decimal e inversão de sinal configuráveis.
+- CSV usa autodetecção por cabeçalho como padrão, com presets versionados de Bradesco e Nubank. Configuração manual de separador, cabeçalho, linhas ignoradas, colunas, data, decimal e sinal permanece disponível.
+- Linhas CSV detectadas automaticamente com valor zero são descartadas porque não representam movimentação.
 - OFX exige blocos estruturados `STMTTRN`; data, valor, identificador, nome e memorando são normalizados quando disponíveis.
 - O valor com sinal no staging define a natureza: positivo é Receita e negativo é Despesa. O lançamento final mantém valor positivo inteiro e usa o tipo para definir o efeito financeiro.
 - Conta e categoria devem estar ativas, pertencer ao usuário e ter natureza compatível com a linha.
@@ -129,7 +130,20 @@
 - A confirmação insere somente linhas válidas e selecionadas, sempre como lançamentos realizados. Qualquer falha reverte todos os lançamentos daquele job.
 - O arquivo original é descartado imediatamente após a leitura em memória. Conteúdo financeiro não pode ser enviado a logs.
 - Staging é apagado ao confirmar ou cancelar. O job preserva apenas metadados e contadores de auditoria.
+- O usuário pode limpar definitivamente os metadados dos próprios jobs cancelados. A operação nunca alcança jobs em revisão, prontos, concluídos ou pertencentes a outro usuário.
 - CSV e OFX são limitados a 5 MB e 1.000 movimentações por job no MVP.
+
+## Importação assistida por PDF — Sprint 11
+
+- PDF segue obrigatoriamente o mesmo fluxo de staging, correção e confirmação explícita usado por CSV e OFX. A extração nunca cria lançamentos diretamente.
+- Somente PDFs com texto pesquisável e layout reconhecido por um adaptador versionado são aceitos. Arquivos protegidos, digitalizados, inválidos ou incompatíveis recebem mensagem amigável.
+- Cada adaptador declara banco, tipo de documento e versão de layout. Um banco só pode ser anunciado como suportado quando houver fixture anônima representativa e teste de regressão correspondente.
+- A descrição original extraída, as páginas de origem e o nível de confiança permanecem no staging para auditoria e revisão humana.
+- Confiança é evidência de extração, não autorização financeira. Nenhuma linha é realizada automaticamente por causa da confiança.
+- Os bytes originais são processados somente em memória e descartados antes da persistência do job; confirmar ou cancelar também remove todo o staging.
+- Bradesco e Nubank são suportados somente nos layouts versionados cobertos por fixtures anônimas. A posição das colunas define crédito e débito no Bradesco; o bloco de entradas ou saídas define o sinal no Nubank.
+- Totais, saldos e valores zero não são tratados como movimentações.
+- OCR, PDFs protegidos por senha, tabelas baseadas apenas em imagem e treinamento automático de layouts estão fora do escopo.
 
 ## Regras financeiras futuras
 

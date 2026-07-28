@@ -5,7 +5,7 @@ import {
   configureFinancialImport,
   confirmFinancialImport,
 } from "@/app/actions/file-imports";
-import { inputClass } from "@/components/forms/form-controls";
+import { inputClass } from "@/components/forms/form-control-styles";
 import { ImportStagingRowForm } from "@/components/forms/import-staging-row-form";
 import { getCurrentUserImportReview } from "@/services/finance/file-imports-service";
 
@@ -69,6 +69,14 @@ export default async function ImportReviewPage({
           {job.file_type.toUpperCase()} · {job.source_row_count} linhas ·
           arquivo original descartado após a leitura
         </p>
+        {job.source_adapter_id ? (
+          <p className="mt-1 text-sm text-slate-500">
+            Adaptador: {job.source_adapter_id}
+            {job.source_document_type
+              ? ` · ${job.source_document_type}`
+              : ""}
+          </p>
+        ) : null}
       </div>
 
       {feedback ? (
@@ -89,8 +97,8 @@ export default async function ImportReviewPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Parte da prévia não pôde ser carregada. Confirme a migration da
-          Sprint 10 no Supabase.
+          Parte da prévia não pôde ser carregada. Confirme as migrations das
+          Sprints 10 e 11 no Supabase.
         </p>
       ) : null}
 

@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { inputClass } from "./form-control-styles";
+
+export { inputClass } from "./form-control-styles";
 
 export function FormMessage({ tone = "error", children }: { tone?: "error" | "success" | "info"; children: ReactNode }) {
   const colors = tone === "error" ? "border-red-200 bg-red-50 text-red-800" : tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-blue-200 bg-blue-50 text-blue-800";
@@ -9,10 +12,6 @@ export function FormMessage({ tone = "error", children }: { tone?: "error" | "su
 
 export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return <label className="grid gap-2 text-sm font-medium text-slate-800"><span>{label}</span>{children}{error ? <span className="text-xs font-normal text-red-700">{error}</span> : null}</label>;
-}
-
-export function inputClass(hasError = false) {
-  return `min-h-12 w-full rounded-xl border bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 ${hasError ? "border-red-400 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-blue-600 focus:ring-blue-100"}`;
 }
 
 export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {

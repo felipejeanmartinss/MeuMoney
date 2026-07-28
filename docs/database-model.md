@@ -117,12 +117,15 @@ e privilégios mínimos. As views usam `security_invoker`.
 `public.import_jobs` guarda proprietário, conta associada, nome saneado, formato,
 impressão SHA-256 do arquivo, configuração do CSV, estado, contadores e
 timestamps de descarte, confirmação ou cancelamento. Não contém os bytes do
-arquivo.
+arquivo. Para PDF, `source_adapter_id` e `source_document_type` identificam o
+adaptador versionado que produziu o staging.
 
 `public.import_staging_rows` guarda somente a representação temporária
-normalizada e os campos originais mínimos necessários para correção. Valor com
-sinal define receita ou despesa; `amount_minor` permanece positivo. Status
-separa linhas pendentes, válidas, duplicadas, ignoradas e com erro.
+normalizada e os campos originais mínimos necessários para correção. Em PDFs,
+`source_description_original`, `source_pages` e `confidence` preservam a
+proveniência da extração. Valor com sinal define receita ou despesa;
+`amount_minor` permanece positivo. Status separa linhas pendentes, válidas,
+duplicadas, ignoradas e com erro.
 
 `public.imported_transaction_signatures` vincula uma assinatura estável ao
 lançamento criado. A chave única `(user_id, signature)` impede que dois jobs
@@ -150,6 +153,7 @@ confirmação também cria todos os lançamentos e assinaturas de forma atômica
 - valores importados são convertidos para inteiro com sinal no staging e inteiro positivo no lançamento final;
 - a combinação usuário e assinatura importada é única;
 - cada linha de origem é única dentro de um job;
+- páginas de origem de PDF são inteiros positivos e confiança fica entre zero e um;
 - uma posição possui no máximo uma fotografia por data;
 - natureza e tipo patrimonial devem ser compatíveis, e moeda e natureza são imutáveis após o cadastro;
 - um item possui no máximo uma avaliação por data;

@@ -59,7 +59,7 @@ export type InvestmentCashFlowType =
   | "contribution"
   | "redemption"
   | "income";
-export type ImportFileType = "csv" | "ofx";
+export type ImportFileType = "csv" | "ofx" | "pdf";
 export type ImportJobStatus =
   | "review"
   | "ready"
@@ -435,6 +435,8 @@ export type ImportJob = {
   file_type: ImportFileType;
   file_sha256: string;
   csv_config: Json | null;
+  source_adapter_id: string | null;
+  source_document_type: string | null;
   status: ImportJobStatus;
   source_row_count: number;
   valid_row_count: number;
@@ -455,6 +457,9 @@ export type ImportStagingRow = {
   source_external_id: string | null;
   source_date_text: string;
   source_amount_text: string;
+  source_description_original: string | null;
+  source_pages: number[];
+  confidence: number | null;
   transaction_date: string | null;
   description: string | null;
   normalized_description: string | null;
@@ -989,6 +994,10 @@ export type Database = {
       cancel_import_job: {
         Args: { target_job_id: string };
         Returns: boolean;
+      };
+      clear_cancelled_import_jobs: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
     };
     Enums: {
