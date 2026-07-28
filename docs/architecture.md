@@ -1,5 +1,18 @@
 # Arquitetura
 
+## Segurança operacional — Sprint 12
+
+A rota `/settings/security` usa Server Components e Server Actions. Exportação
+e restauração passam pelo serviço de dados pessoais; somente a exclusão da
+identidade cria um cliente administrativo, sempre no servidor.
+
+O backup é serializado por RPC `security invoker`. A restauração usa função
+privada `security definer`, `search_path` vazio, validação de `auth.uid()` e
+privilégios revogados. O navegador não recebe escrita no histórico crítico.
+
+`instrumentation.ts` registra somente erro sanitizado. O service worker guarda
+shell estático; navegações privadas usam rede e APIs nunca entram no cache.
+
 ## Camadas
 
 - `src/app`: rotas, Server Components, Route Handlers e Server Actions.

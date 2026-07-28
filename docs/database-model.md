@@ -1,5 +1,20 @@
 # Modelo de dados
 
+## Segurança e backup — Sprint 12
+
+`critical_operation_events` é um histórico imutável para o cliente. RLS permite
+somente leitura do proprietário; escrita ocorre por funções ou triggers
+restritos. O registro contém apenas evento, resultado, recurso e horário.
+
+`import_jobs.expires_at` limita staging em revisão a sete dias.
+`apply_import_retention` cancela jobs vencidos, remove staging e elimina
+metadados terminais após noventa dias.
+
+`export_personal_backup` produz JSON versionado de todas as tabelas do
+proprietário. `restore_personal_backup` valida, substitui o proprietário,
+restaura relações em ordem e rejeita referências entre tenants. Qualquer erro
+reverte toda a operação.
+
 ## Perfis
 
 `public.profiles` contém `id`, `full_name`, `preferred_currency`, `created_at` e `updated_at`. `id` referencia `auth.users(id)` com exclusão em cascata.

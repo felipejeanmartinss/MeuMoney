@@ -1,5 +1,12 @@
 # Roadmap
 
+## Sprint 12 — Segurança e beta pessoal
+
+Exportação completa, backup restaurável e transacional, exclusão de conta com
+reautenticação, retenção de importações, histórico mínimo das operações
+críticas, revisão de RLS, monitoramento sem dados financeiros, recuperação de
+erros, acessibilidade básica e PWA segura para um beta privado.
+
 ## Sprint 0 — Fundação
 
 Estrutura Next.js, PWA inicial, Supabase, documentação, domínio monetário mínimo e qualidade automatizada.

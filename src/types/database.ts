@@ -443,6 +443,7 @@ export type ImportJob = {
   duplicate_row_count: number;
   imported_row_count: number;
   original_file_discarded_at: string;
+  expires_at: string | null;
   confirmed_at: string | null;
   cancelled_at: string | null;
   created_at: string;
@@ -489,6 +490,24 @@ export type ImportedTransactionSignature = {
   transaction_id: string;
   source_job_id: string | null;
   signature: string;
+  created_at: string;
+};
+
+export type CriticalOperationEventType =
+  | "data_exported"
+  | "backup_restored"
+  | "account_deletion_requested"
+  | "account_deletion_failed"
+  | "import_confirmed"
+  | "import_cancelled"
+  | "import_retention_applied";
+
+export type CriticalOperationEvent = {
+  id: string;
+  user_id: string;
+  event_type: CriticalOperationEventType;
+  outcome: "success" | "failure";
+  resource_type: string | null;
   created_at: string;
 };
 
@@ -802,6 +821,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      critical_operation_events: {
+        Row: CriticalOperationEvent;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       account_balances: {
@@ -998,6 +1023,26 @@ export type Database = {
       clear_cancelled_import_jobs: {
         Args: Record<PropertyKey, never>;
         Returns: number;
+      };
+      record_critical_operation: {
+        Args: {
+          target_event_type: string;
+          target_outcome: string;
+          target_resource_type?: string | null;
+        };
+        Returns: string;
+      };
+      export_personal_backup: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      restore_personal_backup: {
+        Args: { target_backup: Json };
+        Returns: Json;
+      };
+      apply_import_retention: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
       };
     };
     Enums: {

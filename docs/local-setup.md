@@ -16,7 +16,10 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Preencha `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. A chave de serviço não é usada pela aplicação web.
+Preencha `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Para testar a exclusão definitiva,
+adicione também `SUPABASE_SECRET_KEY`; ela é estritamente server-only e nunca
+deve possuir prefixo `NEXT_PUBLIC_`.
 
 ## Supabase Auth
 
