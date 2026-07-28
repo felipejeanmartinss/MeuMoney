@@ -1,56 +1,59 @@
 # Importação assistida por PDF
 
-## Suporte declarado
+## Matriz de suporte
 
-| Banco | Documento | Layout | Fixture de regressão | Situação |
+| Banco | Documento | Layout | Fixture | Situação |
 | --- | --- | --- | --- | --- |
-| Banco Exemplo (fixture) | Extrato de conta | 1 | `anonymous-fixture-bank-statement-v1.pdf` | Apenas validação técnica |
+| Bradesco | Extrato de conta | 1 | `anonymous-bradesco-account-statement-v1.pdf` | Suportado |
+| Nubank | Extrato de conta | 1 | `anonymous-nubank-account-statement-v1.pdf` | Suportado |
+| Banco Exemplo | Extrato fictício | 1 | `anonymous-fixture-bank-statement-v1.pdf` | Validação técnica |
 
-`Banco Exemplo` é fictício. Nenhum banco real é suportado nesta entrega porque
-o repositório não contém PDFs anonimizados representativos de bancos reais.
+O suporte vale somente para os layouts cobertos pelas fixtures e pelos testes.
+Uma mudança visual relevante exige nova versão do adaptador.
 
 ## Contrato dos adaptadores
 
-Cada adaptador implementa `PdfImportAdapter` e declara:
+Cada `PdfImportAdapter` declara identificador, banco, documento e versão. Sua
+detecção usa marcadores estruturais do emissor, evitando selecionar um banco
+apenas porque seu nome aparece na descrição de uma movimentação.
 
-- identificador estável;
-- banco;
-- tipo de documento;
-- versão do layout;
-- detecção determinística do documento;
-- normalização de data, descrição e valor inteiro;
-- descrição original;
-- páginas de origem;
-- confiança entre zero e um.
+O extrator preserva texto, página e posição `x/y`. Isso permite:
 
-Um novo adaptador só deve entrar no registro quando sua fixture anônima cobrir
-o layout declarado e houver teste de regressão com datas, valores, páginas e
-descrições esperadas.
+- distinguir crédito, débito e saldo no extrato Bradesco;
+- manter a data enquanto o emissor omite repetições;
+- herdar o sinal dos blocos de entradas e saídas do Nubank;
+- juntar descrições quebradas em mais de uma linha;
+- excluir totais e saldos que não são movimentações.
 
-## Fluxo
+O resultado contém valor inteiro, data, descrição normalizada, descrição
+original, páginas e confiança.
 
-1. O Server Action recebe o PDF e aplica os mesmos limites do pipeline existente.
-2. O extrator recupera somente texto pesquisável, com a página de cada trecho.
-3. O registro escolhe um adaptador compatível; layouts desconhecidos são rejeitados.
-4. As linhas entram no mesmo staging usado por CSV e OFX.
-5. O usuário associa conta e categorias, corrige ou ignora linhas.
-6. A confirmação explícita e atômica cria os lançamentos.
-7. Os bytes do PDF são descartados antes da criação do job; o staging é apagado ao confirmar ou cancelar.
+## Segurança do fluxo
+
+1. O Server Action recebe no máximo 5 MB.
+2. O extrator trabalha exclusivamente no servidor e sem OCR.
+3. Um adaptador reconhecido produz staging, nunca lançamentos diretos.
+4. O usuário revisa conta, categorias, datas, descrições e valores.
+5. A confirmação explícita e atômica cria os lançamentos.
+6. O arquivo original é descartado antes da criação do job.
+7. O staging é apagado ao confirmar ou cancelar.
 
 ## Erros esperados
 
-- **Protegido:** o arquivo exige senha; deve ser exportada uma cópia sem proteção.
-- **Digitalizado:** não há texto pesquisável suficiente; OCR não está disponível.
-- **Incompatível:** o arquivo não é um PDF válido ou usa recursos que o extrator não processa.
-- **Layout não suportado:** existe texto, mas nenhum adaptador testado reconhece o documento.
+- **Protegido:** exportar uma cópia sem senha.
+- **Digitalizado:** não há texto pesquisável; OCR está fora do escopo.
+- **Incompatível:** o arquivo não pôde ser processado.
+- **Layout não suportado:** o PDF tem texto, mas não corresponde a uma fixture.
 
-As mensagens não incluem conteúdo financeiro nem detalhes internos do parser.
+Mensagens públicas não incluem conteúdo financeiro nem detalhes internos.
 
-## Limitações
+## Regressão
 
-- OCR e PDFs compostos somente por imagens estão fora do escopo;
-- senhas não são solicitadas, armazenadas ou registradas;
-- tabelas complexas podem exigir um adaptador específico por versão de layout;
-- uma alteração visual do emissor exige nova fixture e regressão;
-- confiança não substitui revisão humana;
-- não há suporte genérico ou presumido para qualquer banco real.
+Cada banco suportado possui fixture totalmente anônima e teste de:
+
+- seleção do adaptador;
+- datas e sinais;
+- valores em unidades monetárias inteiras;
+- descrições multilinha;
+- páginas de origem;
+- exclusão de saldos e totais.

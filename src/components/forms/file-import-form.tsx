@@ -11,6 +11,7 @@ const initialState: FileImportFormState = { status: "idle" };
 
 export function FileImportForm() {
   const [fileType, setFileType] = useState<"csv" | "ofx" | "pdf">("csv");
+  const [csvMode, setCsvMode] = useState<"automatic" | "manual">("automatic");
   const [state, formAction, pending] = useActionState(
     uploadFinancialFile,
     initialState,
@@ -65,6 +66,33 @@ export function FileImportForm() {
       </div>
 
       {fileType === "csv" ? (
+        <div className="grid gap-4">
+          <Field label="Leitura do CSV">
+            <select
+              className={inputClass(false)}
+              name="csvMode"
+              value={csvMode}
+              onChange={(event) =>
+                setCsvMode(event.target.value as "automatic" | "manual")
+              }
+            >
+              <option value="automatic">
+                Automática — recomendada
+              </option>
+              <option value="manual">Configurar colunas manualmente</option>
+            </select>
+          </Field>
+          {csvMode === "automatic" ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">
+              O MeuMoney identifica automaticamente os layouts testados do
+              Bradesco e Nubank. Outros CSVs com cabeçalhos claros também são
+              reconhecidos; se a detecção falhar, use a configuração manual.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {fileType === "csv" && csvMode === "manual" ? (
         <fieldset className="grid gap-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <legend className="font-bold text-slate-950">
             Como ler este CSV
@@ -216,13 +244,18 @@ export function FileImportForm() {
             </label>
           </div>
         </fieldset>
-      ) : (
+      ) : fileType === "ofx" ? (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">
           O leitor aceita blocos estruturados <code>STMTTRN</code>, incluindo
           OFX SGML e XML. Data, valor, identificador e descrição serão
           normalizados para a prévia.
         </div>
-      )}
+      ) : fileType === "pdf" ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">
+          O PDF pesquisável será reconhecido por um adaptador versionado. Todos
+          os lançamentos continuam sujeitos à revisão antes da confirmação.
+        </div>
+      ) : null}
 
       <SubmitButton pending={pending}>
         Ler arquivo e preparar prévia

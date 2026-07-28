@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildAtomicImportPlan,
   buildImportSignatureMaterial,
+  detectCsvImportConfig,
   markDuplicateSignatures,
   normalizeImportDescription,
   parseConfiguredCsv,
+  parseDetectedCsv,
   parseImportAmountToMinor,
   parseImportDate,
   parseStructuredOfx,
@@ -42,6 +44,62 @@ describe("file imports", () => {
       transactionDate: null,
       validationCode: "invalid_date",
     });
+  });
+
+  it("detects and parses the tested Bradesco CSV layout", () => {
+    const content = fixture("anonymous-bradesco-account-statement-v1.csv");
+    const detection = detectCsvImportConfig(content);
+    const rows = parseConfiguredCsv(content, detection.config);
+
+    expect(detection).toMatchObject({
+      presetId: "bradesco-account-statement-v1",
+      bankName: "Bradesco",
+      confidence: 1,
+      config: {
+        delimiter: ";",
+        dateColumn: 1,
+        descriptionColumn: 2,
+        amountColumn: 7,
+        externalIdColumn: 3,
+        decimalSeparator: ",",
+      },
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({
+      sourceExternalId: "100001",
+      transactionDate: "2026-07-01",
+      signedAmountMinor: 125000,
+      validationCode: null,
+    });
+    expect(rows[1].signedAmountMinor).toBe(-24590);
+    expect(rows[2].validationCode).toBe("invalid_amount");
+    expect(parseDetectedCsv(content).rows).toHaveLength(2);
+  });
+
+  it("detects and parses the tested Nubank CSV layout", () => {
+    const content = fixture("anonymous-nubank-account-statement-v1.csv");
+    const detection = detectCsvImportConfig(content);
+    const rows = parseConfiguredCsv(content, detection.config);
+
+    expect(detection).toMatchObject({
+      presetId: "nubank-account-statement-v1",
+      bankName: "Nubank",
+      confidence: 1,
+      config: {
+        delimiter: ",",
+        descriptionColumn: 4,
+        amountColumn: 2,
+        externalIdColumn: 3,
+        decimalSeparator: ".",
+      },
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({
+      sourceExternalId: "anon-nu-001",
+      signedAmountMinor: 250000,
+    });
+    expect(rows[1].signedAmountMinor).toBe(-12345);
+    expect(rows.every((row) => row.validationCode === null)).toBe(true);
   });
 
   it("parses valid dates and rejects impossible calendar dates", () => {

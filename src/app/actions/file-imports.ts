@@ -52,7 +52,7 @@ export async function uploadFinancialFile(
   }
 
   const csvConfig =
-    fileType.data === "csv"
+    fileType.data === "csv" && formData.get("csvMode") === "manual"
       ? csvImportConfigSchema.safeParse(csvConfigFrom(formData))
       : null;
   if (csvConfig && !csvConfig.success) {

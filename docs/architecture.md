@@ -59,13 +59,19 @@ No plano gratuito do Supabase, a verificação de senhas contra bases de credenc
 
 As rotas `/imports`, `/imports/new` e `/imports/[id]` usam Server Components para leitura e Server Actions para mutações. O arquivo chega ao servidor, é limitado a 5 MB, decodificado em memória e normalizado por parsers puros de CSV ou OFX, ou pelo extrator PDF executado exclusivamente no servidor. O byte original nunca é persistido nem enviado a logs; apenas uma impressão SHA-256, metadados mínimos e linhas temporárias entram no banco.
 
-PDFs passam primeiro por `pdf-text-extractor`, que recupera texto posicionado e
-o agrupa por página, sem OCR. Em seguida, o registro de adaptadores em
+PDFs passam primeiro por `pdf-text-extractor`, que recupera texto, coordenadas
+`x/y` e página, sem OCR. Em seguida, o registro de adaptadores em
 `src/domain/pdf-imports.ts` seleciona somente layouts reconhecidos. O contrato
 do adaptador devolve linhas normalizadas e metadados de banco, documento,
 versão, descrição original, páginas e confiança. Adicionar um adaptador exige
-fixture anônima representativa e teste de regressão; o registro inicial é
-deliberadamente fictício e não declara suporte comercial.
+fixture anônima representativa e teste de regressão. Os adaptadores Bradesco e
+Nubank usam essas coordenadas e o contexto das seções para separar
+movimentações de saldos e totais.
+
+CSV é autodetectado no servidor por cabeçalhos e amostras. Presets conhecidos
+fixam as convenções de Bradesco e Nubank; um detector genérico exige colunas
+inequívocas e amostra predominantemente válida. A configuração efetiva é
+persistida no job para rastreabilidade, sem armazenar o arquivo original.
 
 `import_jobs` controla o fluxo; `import_staging_rows` contém a prévia corrigível; `imported_transaction_signatures` mantém a barreira de idempotência. Conta e categorias são associadas antes da confirmação. A assinatura usa usuário, conta, data, valor com sinal e descrição normalizada.
 

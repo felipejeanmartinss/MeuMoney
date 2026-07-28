@@ -120,7 +120,8 @@
 ## Importação CSV e OFX — Sprint 10
 
 - Upload nunca cria lançamentos diretamente. O fluxo obrigatório é leitura, normalização, prévia, associação, correção e confirmação explícita.
-- CSV aceita separador, cabeçalho, linhas iniciais ignoradas, posição das colunas, formato de data, separador decimal e inversão de sinal configuráveis.
+- CSV usa autodetecção por cabeçalho como padrão, com presets versionados de Bradesco e Nubank. Configuração manual de separador, cabeçalho, linhas ignoradas, colunas, data, decimal e sinal permanece disponível.
+- Linhas CSV detectadas automaticamente com valor zero são descartadas porque não representam movimentação.
 - OFX exige blocos estruturados `STMTTRN`; data, valor, identificador, nome e memorando são normalizados quando disponíveis.
 - O valor com sinal no staging define a natureza: positivo é Receita e negativo é Despesa. O lançamento final mantém valor positivo inteiro e usa o tipo para definir o efeito financeiro.
 - Conta e categoria devem estar ativas, pertencer ao usuário e ter natureza compatível com a linha.
@@ -139,7 +140,8 @@
 - A descrição original extraída, as páginas de origem e o nível de confiança permanecem no staging para auditoria e revisão humana.
 - Confiança é evidência de extração, não autorização financeira. Nenhuma linha é realizada automaticamente por causa da confiança.
 - Os bytes originais são processados somente em memória e descartados antes da persistência do job; confirmar ou cancelar também remove todo o staging.
-- O adaptador `Banco Exemplo (fixture)` é sintético e comprova apenas o contrato técnico. Nenhum banco real é declarado como suportado nesta sprint.
+- Bradesco e Nubank são suportados somente nos layouts versionados cobertos por fixtures anônimas. A posição das colunas define crédito e débito no Bradesco; o bloco de entradas ou saídas define o sinal no Nubank.
+- Totais, saldos e valores zero não são tratados como movimentações.
 - OCR, PDFs protegidos por senha, tabelas baseadas apenas em imagem e treinamento automático de layouts estão fora do escopo.
 
 ## Regras financeiras futuras

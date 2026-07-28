@@ -1,4 +1,8 @@
-import type { PdfTextDocument, PdfTextPage } from "../../domain/pdf-imports";
+import type {
+  PdfPositionedTextLine,
+  PdfTextDocument,
+  PdfTextPage,
+} from "../../domain/pdf-imports";
 import { PdfImportError } from "../../domain/pdf-imports";
 
 type PositionedText = {
@@ -7,7 +11,9 @@ type PositionedText = {
   y: number;
 };
 
-function linesFromPositionedText(items: PositionedText[]): string[] {
+function linesFromPositionedText(
+  items: PositionedText[],
+): PdfPositionedTextLine[] {
   const rows: Array<{ y: number; items: PositionedText[] }> = [];
 
   for (const item of [...items].sort(
@@ -23,16 +29,19 @@ function linesFromPositionedText(items: PositionedText[]): string[] {
 
   return rows
     .sort((left, right) => right.y - left.y)
-    .map((row) =>
-      row.items
+    .map((row) => {
+      const orderedItems = row.items
         .sort((left, right) => left.x - right.x)
-        .map((item) => item.text.trim())
-        .filter(Boolean)
+        .map((item) => ({ ...item, text: item.text.trim() }))
+        .filter((item) => Boolean(item.text));
+      const text = orderedItems
+        .map((item) => item.text)
         .join(" ")
         .replace(/\s+/g, " ")
-        .trim(),
-    )
-    .filter(Boolean);
+        .trim();
+      return { text, y: row.y, items: orderedItems };
+    })
+    .filter((line) => Boolean(line.text));
 }
 
 export function classifyPdfExtractionError(error: unknown) {
@@ -93,9 +102,11 @@ export async function extractSearchablePdfText(
             },
           ];
         });
+        const positionedLines = linesFromPositionedText(positioned);
         pages.push({
           pageNumber,
-          lines: linesFromPositionedText(positioned),
+          lines: positionedLines.map((line) => line.text),
+          positionedLines,
         });
         page.cleanup();
       }

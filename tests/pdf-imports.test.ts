@@ -73,6 +73,73 @@ describe("PDF imports", () => {
     ]);
   });
 
+  it("parses the tested Bradesco statement columns without importing balances", async () => {
+    const result = parseSupportedPdf(
+      await extractSearchablePdfText(
+        pdfFixture("anonymous-bradesco-account-statement-v1.pdf"),
+      ),
+    );
+
+    expect(result.adapter).toMatchObject({
+      id: "bradesco-account-statement-v1",
+      bankName: "Bradesco",
+      layoutVersion: "1",
+    });
+    expect(
+      result.rows.map((row) => ({
+        date: row.transactionDate,
+        description: row.description,
+        amount: row.signedAmountMinor,
+        externalId: row.sourceExternalId,
+      })),
+    ).toEqual([
+      {
+        date: "2026-07-01",
+        description: "TRANSFERENCIA RECEBIDA",
+        amount: 125000,
+        externalId: "100001",
+      },
+      {
+        date: "2026-07-02",
+        description: "PAGAMENTO DE CONTA",
+        amount: -24590,
+        externalId: "100002",
+      },
+    ]);
+  });
+
+  it("parses Nubank entries and exits using the current section direction", async () => {
+    const result = parseSupportedPdf(
+      await extractSearchablePdfText(
+        pdfFixture("anonymous-nubank-account-statement-v1.pdf"),
+      ),
+    );
+
+    expect(result.adapter).toMatchObject({
+      id: "nubank-account-statement-v1",
+      bankName: "Nubank",
+      layoutVersion: "1",
+    });
+    expect(
+      result.rows.map((row) => [
+        row.transactionDate,
+        row.description,
+        row.signedAmountMinor,
+        row.sourcePages,
+      ]),
+    ).toEqual([
+      ["2026-07-01", "PIX RECEBIDO", 125000, [1]],
+      [
+        "2026-07-01",
+        "TRANSFERENCIA ENVIADA VIA PIX DESTINATARIO ANONIMO",
+        -9870,
+        [1],
+      ],
+      ["2026-07-02", "TRANSFERENCIA RECEBIDA", 30000, [2]],
+      ["2026-07-02", "PAGAMENTO DE BOLETO", -7590, [2]],
+    ]);
+  });
+
   it("rejects a PDF without searchable text as scanned", async () => {
     const document = await extractSearchablePdfText(
       pdfFixture("anonymous-scanned-placeholder.pdf"),

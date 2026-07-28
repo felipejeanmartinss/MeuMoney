@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import {
+  parseDetectedCsv,
   parseConfiguredCsv,
   parseStructuredOfx,
   type CsvImportConfig,
@@ -57,9 +58,6 @@ function validateFile(input: CreateImportInput) {
   if (extension !== input.fileType) {
     return `Selecione um arquivo .${input.fileType}.`;
   }
-  if (input.fileType === "csv" && !input.csvConfig) {
-    return "Revise a configuração das colunas do CSV.";
-  }
   return null;
 }
 
@@ -70,15 +68,30 @@ async function parseFileRows(
 ) {
   if (fileType === "pdf") {
     const document = await extractSearchablePdfText(bytes);
-    return parseSupportedPdf(document);
+    return { ...parseSupportedPdf(document), csvConfig: null };
   }
 
   const content = decodeFinancialFile(bytes);
   if (fileType === "csv") {
-    if (!csvConfig) throw new Error("Configuração CSV ausente.");
-    return { rows: parseConfiguredCsv(content, csvConfig), adapter: null };
+    if (!csvConfig) {
+      const detected = parseDetectedCsv(content);
+      return {
+        rows: detected.rows,
+        adapter: null,
+        csvConfig: detected.detection.config,
+      };
+    }
+    return {
+      rows: parseConfiguredCsv(content, csvConfig),
+      adapter: null,
+      csvConfig,
+    };
   }
-  return { rows: parseStructuredOfx(content), adapter: null };
+  return {
+    rows: parseStructuredOfx(content),
+    adapter: null,
+    csvConfig: null,
+  };
 }
 
 function rowsToJson(rows: ParsedImportRow[]): Json {
@@ -130,7 +143,7 @@ export async function createCurrentUserImport(input: CreateImportInput) {
     const { supabase } = await requireUser();
     const buffer = await input.file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-    const { rows } = await parseFileRows(
+    const { rows, csvConfig } = await parseFileRows(
       bytes,
       input.fileType,
       input.csvConfig,
@@ -148,7 +161,7 @@ export async function createCurrentUserImport(input: CreateImportInput) {
       target_file_name: safeFileName(input.file.name),
       target_file_type: input.fileType,
       target_file_sha256: fileSha256,
-      target_csv_config: input.csvConfig as Json | null,
+      target_csv_config: csvConfig as Json | null,
       target_rows: rowsToJson(rows),
     });
 

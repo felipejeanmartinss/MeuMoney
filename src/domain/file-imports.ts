@@ -38,9 +38,17 @@ export type CsvImportConfig = {
   dateColumn: number;
   descriptionColumn: number;
   amountColumn: number;
+  externalIdColumn?: number | null;
   dateFormat: CsvDateFormat;
   decimalSeparator: CsvDecimalSeparator;
   invertAmountSign: boolean;
+};
+
+export type CsvImportDetection = {
+  presetId: string;
+  bankName: string | null;
+  confidence: number;
+  config: CsvImportConfig;
 };
 
 export type ParsedImportRow = {
@@ -93,6 +101,7 @@ export const csvImportConfigSchema = z.object({
   dateColumn: columnNumber,
   descriptionColumn: columnNumber,
   amountColumn: columnNumber,
+  externalIdColumn: columnNumber.nullable().optional(),
   dateFormat: z.enum(CSV_DATE_FORMATS, {
     error: "Selecione o formato da data.",
   }),
@@ -365,11 +374,16 @@ export function parseConfiguredCsv(
   const dateIndex = config.dateColumn - 1;
   const descriptionIndex = config.descriptionColumn - 1;
   const amountIndex = config.amountColumn - 1;
+  const externalIdIndex = config.externalIdColumn
+    ? config.externalIdColumn - 1
+    : null;
 
   return dataRows.map((columns, rowIndex) => {
     const sourceDateText = columns[dateIndex]?.trim() ?? "";
     const sourceAmountText = columns[amountIndex]?.trim() ?? "";
     const rawDescription = columns[descriptionIndex]?.trim() ?? "";
+    const rawExternalId =
+      externalIdIndex === null ? "" : columns[externalIdIndex]?.trim() ?? "";
     const description = rawDescription
       ? rawDescription.replace(/\s+/g, " ").slice(0, 180)
       : null;
@@ -390,7 +404,9 @@ export function parseConfiguredCsv(
 
     return {
       sourceRowNumber: dataStart + rowIndex + 1,
-      sourceExternalId: null,
+      sourceExternalId: rawExternalId
+        ? rawExternalId.slice(0, 180)
+        : null,
       sourceDateText: sourceDateText.slice(0, 80),
       sourceAmountText: sourceAmountText.slice(0, 80),
       transactionDate,
@@ -403,6 +419,208 @@ export function parseConfiguredCsv(
       ),
     };
   });
+}
+
+function normalizeCsvHeader(value: string) {
+  return value
+    .replace(/^\uFEFF/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function bestDelimitedRows(content: string) {
+  const candidates = CSV_DELIMITERS.flatMap((delimiter) => {
+    try {
+      const rows = parseDelimitedText(content.replace(/^\uFEFF/, ""), delimiter);
+      if (rows.length < 2 || rows[0].length < 2) return [];
+      const expectedColumns = rows[0].length;
+      const sample = rows.slice(0, 20);
+      const consistentRows = sample.filter(
+        (row) => row.length === expectedColumns,
+      ).length;
+      return [
+        {
+          delimiter,
+          rows,
+          score: consistentRows / sample.length + expectedColumns / 100,
+        },
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  return candidates.sort((left, right) => right.score - left.score)[0] ?? null;
+}
+
+function inferCsvDateFormat(values: string[]): CsvDateFormat {
+  if (values.some((value) => /^\d{4}-\d{1,2}-\d{1,2}$/.test(value.trim()))) {
+    return "YYYY-MM-DD";
+  }
+  return "DD/MM/YYYY";
+}
+
+function inferCsvDecimalSeparator(values: string[]): CsvDecimalSeparator {
+  const commaScore = values.filter((value) =>
+    /,\d{2}\s*$/.test(value.trim()),
+  ).length;
+  const dotScore = values.filter((value) =>
+    /\.\d{2}\s*$/.test(value.trim()),
+  ).length;
+  return commaScore >= dotScore ? "," : ".";
+}
+
+function headerColumn(
+  headers: string[],
+  aliases: readonly string[],
+): number | null {
+  const index = headers.findIndex((header) => aliases.includes(header));
+  return index === -1 ? null : index + 1;
+}
+
+export function detectCsvImportConfig(content: string): CsvImportDetection {
+  const candidate = bestDelimitedRows(content);
+  if (!candidate) {
+    throw new Error("Não foi possível identificar as colunas deste CSV.");
+  }
+
+  const headers = candidate.rows[0].map(normalizeCsvHeader);
+  const dataRows = candidate.rows.slice(1, 21);
+  const isBradescoStatement =
+    headers.includes("data") &&
+    headers.includes("historico") &&
+    headers.includes("docto") &&
+    headers.includes("credito") &&
+    headers.includes("debito") &&
+    headers.includes("saldo") &&
+    headers.includes("valor");
+  const isNubankStatement =
+    headers.length === 4 &&
+    headers.includes("data") &&
+    headers.includes("valor") &&
+    headers.includes("identificador") &&
+    headers.includes("descricao");
+
+  if (isBradescoStatement) {
+    return {
+      presetId: "bradesco-account-statement-v1",
+      bankName: "Bradesco",
+      confidence: 1,
+      config: {
+        delimiter: candidate.delimiter,
+        hasHeader: true,
+        skipRows: 0,
+        dateColumn: headers.indexOf("data") + 1,
+        descriptionColumn: headers.indexOf("historico") + 1,
+        amountColumn: headers.indexOf("valor") + 1,
+        externalIdColumn: headers.indexOf("docto") + 1,
+        dateFormat: "DD/MM/YYYY",
+        decimalSeparator: ",",
+        invertAmountSign: false,
+      },
+    };
+  }
+
+  if (isNubankStatement) {
+    return {
+      presetId: "nubank-account-statement-v1",
+      bankName: "Nubank",
+      confidence: 1,
+      config: {
+        delimiter: candidate.delimiter,
+        hasHeader: true,
+        skipRows: 0,
+        dateColumn: headers.indexOf("data") + 1,
+        descriptionColumn: headers.indexOf("descricao") + 1,
+        amountColumn: headers.indexOf("valor") + 1,
+        externalIdColumn: headers.indexOf("identificador") + 1,
+        dateFormat: "DD/MM/YYYY",
+        decimalSeparator: ".",
+        invertAmountSign: false,
+      },
+    };
+  }
+
+  const dateColumn = headerColumn(headers, [
+    "data",
+    "date",
+    "data lancamento",
+    "data da transacao",
+  ]);
+  const descriptionColumn = headerColumn(headers, [
+    "descricao",
+    "historico",
+    "memo",
+    "lancamento",
+    "detalhes",
+  ]);
+  const amountColumn = headerColumn(headers, [
+    "valor",
+    "amount",
+    "quantia",
+  ]);
+  const externalIdColumn = headerColumn(headers, [
+    "identificador",
+    "fitid",
+    "id",
+    "documento",
+    "docto",
+  ]);
+
+  if (!dateColumn || !descriptionColumn || !amountColumn) {
+    throw new Error(
+      "Não foi possível identificar data, descrição e valor neste CSV.",
+    );
+  }
+
+  const dateValues = dataRows.map((row) => row[dateColumn - 1] ?? "");
+  const amountValues = dataRows.map((row) => row[amountColumn - 1] ?? "");
+  const config: CsvImportConfig = {
+    delimiter: candidate.delimiter,
+    hasHeader: true,
+    skipRows: 0,
+    dateColumn,
+    descriptionColumn,
+    amountColumn,
+    externalIdColumn,
+    dateFormat: inferCsvDateFormat(dateValues),
+    decimalSeparator: inferCsvDecimalSeparator(amountValues),
+    invertAmountSign: false,
+  };
+  const parsed = parseConfiguredCsv(content, config);
+  const validRatio =
+    parsed.length === 0
+      ? 0
+      : parsed.filter((row) => row.validationCode === null).length /
+        parsed.length;
+
+  if (validRatio < 0.6) {
+    throw new Error(
+      "O layout foi reconhecido, mas os valores precisam de configuração manual.",
+    );
+  }
+
+  return {
+    presetId: "generic-header-v1",
+    bankName: null,
+    confidence: Math.min(0.95, 0.7 + validRatio * 0.25),
+    config,
+  };
+}
+
+export function parseDetectedCsv(content: string) {
+  const detection = detectCsvImportConfig(content);
+  return {
+    detection,
+    rows: parseConfiguredCsv(content, detection.config).filter(
+      (row) => row.signedAmountMinor !== 0,
+    ),
+  };
 }
 
 function ofxField(block: string, tag: string) {

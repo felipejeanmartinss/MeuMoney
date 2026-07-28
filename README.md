@@ -47,8 +47,9 @@ rentabilidade sem histórico suficiente permanecem fora da Sprint 9.
 
 ## Importação de arquivos
 
-- CSV configurável e OFX estruturado;
-- PDF com texto pesquisável por adaptadores versionados e testados;
+- CSV com autodetecção de Bradesco e Nubank, além de configuração manual;
+- OFX estruturado;
+- PDF pesquisável de Bradesco e Nubank por adaptadores versionados e testados;
 - arquivo original lido em memória e descartado antes da criação do job;
 - prévia com associação de conta e categoria, correção e linhas ignoradas;
 - assinatura estável e duplicidades verificadas antes da confirmação;
@@ -56,9 +57,9 @@ rentabilidade sem histórico suficiente permanecem fora da Sprint 9.
 - descrição original, páginas de origem e confiança preservadas para revisão;
 - fixtures anônimas e testes de datas, valores, layouts, duplicidades e rollback.
 
-O adaptador PDF desta branch usa somente um banco fictício de fixture e não
-representa suporte a bancos reais. XLS, OCR e categorização automática
-permanecem fora do escopo. Consulte
+O suporte declarado é restrito aos layouts cobertos pelas fixtures anônimas;
+mudanças nos documentos dos emissores exigem nova regressão. XLS, OCR e
+categorização automática permanecem fora do escopo. Consulte
 [docs/file-imports.md](docs/file-imports.md) e
 [docs/pdf-imports.md](docs/pdf-imports.md).
 
