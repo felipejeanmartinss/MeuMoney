@@ -5,10 +5,22 @@ import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Nova recorrência" };
 
-export default async function NewRecurringTransactionPage() {
+export default async function NewRecurringTransactionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ accountId?: string }>;
+}) {
+  const { accountId } = await searchParams;
   const { accounts, categories, hasError } =
-    await getRecurringTransactionFormOptions();
+    await getRecurringTransactionFormOptions(
+      accountId ? { accountId } : undefined,
+    );
   const today = toIsoDate(new Date());
+  const selectedAccountId = accounts.some(
+    (account) => account.id === accountId,
+  )
+    ? accountId
+    : undefined;
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -37,6 +49,7 @@ export default async function NewRecurringTransactionPage() {
             accounts={accounts}
             categories={categories}
             values={{
+              accountId: selectedAccountId,
               amountMinor: "0,00",
               frequency: "monthly",
               startDate: today,

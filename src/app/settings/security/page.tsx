@@ -2,6 +2,7 @@ import { AccountDeletionForm } from "@/components/forms/account-deletion-form";
 import { BackupRestoreForm } from "@/components/forms/backup-restore-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { listCriticalOperations } from "@/services/security/personal-data-service";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Segurança e dados" };
@@ -23,11 +24,17 @@ export default async function SecurityPage() {
     <AppShell>
       <main className="mx-auto grid max-w-4xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
         <header>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
-            Controle pessoal
+          <Link
+            href="/settings"
+            className="text-sm font-bold text-emerald-700 hover:underline"
+          >
+            ← Voltar para Perfil
+          </Link>
+          <p className="mt-6 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+            Segurança e dados
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">
-            Segurança e seus dados
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            Backup, privacidade e conta
           </h1>
           <p className="mt-2 text-slate-600">
             Exporte, restaure e controle a permanência dos seus dados.
@@ -42,7 +49,7 @@ export default async function SecurityPage() {
           </p>
           <a
             href="/api/account/export"
-            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-700 px-5 font-semibold text-white hover:bg-emerald-800"
           >
             Baixar backup JSON
           </a>
@@ -87,7 +94,10 @@ export default async function SecurityPage() {
           )}
         </section>
 
-        <section className="grid gap-4 rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
+        <section className="grid gap-4 rounded-2xl border-2 border-red-200 bg-red-50/40 p-6 shadow-sm">
+          <p className="text-xs font-extrabold uppercase tracking-[0.15em] text-red-700">
+            Zona sensível
+          </p>
           <h2 className="text-xl font-bold text-red-800">Excluir conta</h2>
           <p className="text-slate-700">
             A exclusão é definitiva e remove autenticação, perfil e todos os

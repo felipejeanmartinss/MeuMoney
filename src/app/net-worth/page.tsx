@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { toggleNetWorthItemStatus } from "@/app/actions/net-worth";
+import { SavingsSimulator } from "@/components/net-worth/savings-simulator";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import { formatMoney } from "@/domain/money";
 import {
+  calculateExecutiveNetWorthByCurrency,
   NET_WORTH_ITEM_TYPE_LABELS,
-  NET_WORTH_KIND_LABELS,
 } from "@/domain/net-worth";
 import { listCurrentUserNetWorth } from "@/services/finance/net-worth-service";
+import type {
+  ExecutiveNetWorthCurrencySummary,
+} from "@/domain/net-worth";
 import type { NetWorthItem } from "@/types/database";
 
-export const metadata = { title: "Patrimônio líquido" };
+export const metadata = { title: "Patrimônio" };
 
 const messages: Record<string, string> = {
   created: "Item patrimonial cadastrado com sucesso.",
@@ -19,107 +23,171 @@ const messages: Record<string, string> = {
   "status-error": "Não foi possível alterar o estado do item patrimonial.",
 };
 
-function formatValuationDate(value: string) {
+function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(
     new Date(`${value}T12:00:00`),
   );
 }
 
-function NetWorthItemSection({
+function Composition({
+  summary,
+}: {
+  summary: ExecutiveNetWorthCurrencySummary;
+}) {
+  const components = [
+    {
+      label: "Contas transacionais",
+      value: summary.transactionalAssetsMinor,
+      kind: "asset",
+    },
+    {
+      label: "Investimentos",
+      value: summary.investmentsMinor,
+      kind: "asset",
+    },
+    {
+      label: "Bens manuais",
+      value: summary.manualAssetsMinor,
+      kind: "asset",
+    },
+    {
+      label: "Faturas pendentes",
+      value: summary.pendingInvoicesMinor,
+      kind: "liability",
+    },
+    {
+      label: "Financiamentos e dívidas",
+      value:
+        summary.otherLiabilitiesMinor +
+        summary.transactionalLiabilitiesMinor,
+      kind: "liability",
+    },
+  ] as const;
+  const maximum = Math.max(1, ...components.map((row) => row.value));
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-black text-slate-950">
+        Composição patrimonial
+      </h3>
+      <p className="mt-1 text-sm text-slate-600">
+        Cada componente entra uma única vez no cálculo.
+      </p>
+      <div className="mt-5 grid gap-4">
+        {components.map((component) => (
+          <article key={component.label}>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-bold text-slate-700">
+                {component.label}
+              </span>
+              <span
+                className={`font-extrabold ${
+                  component.kind === "asset"
+                    ? "text-emerald-700"
+                    : "text-rose-700"
+                }`}
+              >
+                {formatMoney(
+                  component.value,
+                  summary.currency,
+                  CURRENCY_LOCALES[summary.currency],
+                )}
+              </span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full ${
+                  component.kind === "asset"
+                    ? "bg-emerald-600"
+                    : "bg-rose-500"
+                }`}
+                style={{
+                  width: `${Number(
+                    (BigInt(component.value) * 100n) / BigInt(maximum),
+                  )}%`,
+                }}
+              />
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ItemsList({
   title,
-  description,
   items,
 }: {
   title: string;
-  description: string;
   items: NetWorthItem[];
 }) {
   return (
-    <section className="grid gap-4">
-      <div>
-        <h2 className="text-2xl font-extrabold text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
+    <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <h3 className="text-lg font-black text-slate-950">{title}</h3>
       </div>
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
+        <p className="px-5 py-8 text-sm text-slate-500">
           Nenhum item neste grupo.
-        </div>
+        </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid divide-y divide-slate-100">
           {items.map((item) => {
             const archived = !item.is_active;
             return (
               <article
                 key={item.id}
-                className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${
-                  archived ? "opacity-70" : ""
+                className={`grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-6 ${
+                  archived ? "opacity-60" : ""
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                      {NET_WORTH_ITEM_TYPE_LABELS[item.item_type]} ·{" "}
-                      {CONTEXT_LABELS[item.context]}
-                    </p>
-                    <h3 className="mt-1 text-xl font-bold text-slate-950">
-                      {item.name}
-                    </h3>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      archived
-                        ? "bg-slate-100 text-slate-600"
-                        : "bg-emerald-100 text-emerald-800"
-                    }`}
-                  >
-                    {archived ? "Arquivado" : "Ativo"}
-                  </span>
+                <div className="min-w-0">
+                  <h4 className="truncate font-extrabold text-slate-950">
+                    {item.name}
+                  </h4>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {NET_WORTH_ITEM_TYPE_LABELS[item.item_type]} ·{" "}
+                    {CONTEXT_LABELS[item.context]} · {formatDate(item.valuation_date)}
+                  </p>
                 </div>
-
-                <p className="mt-5 text-2xl font-extrabold text-slate-950">
+                <p className="font-black text-slate-950">
                   {formatMoney(
                     item.current_value_minor,
                     item.currency,
                     CURRENCY_LOCALES[item.currency],
                   )}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Avaliação de {formatValuationDate(item.valuation_date)}
-                </p>
-                {item.notes ? (
-                  <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">
-                    {item.notes}
-                  </p>
-                ) : null}
-
-                <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                  <Link
-                    href={`/net-worth/${item.id}/edit`}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Editar
-                  </Link>
-                  <Link
-                    href={`/net-worth/${item.id}/history`}
-                    className="inline-flex min-h-10 items-center rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                  >
-                    Histórico
-                  </Link>
-                  <form action={toggleNetWorthItemStatus}>
-                    <input type="hidden" name="id" value={item.id} />
-                    <input
-                      type="hidden"
-                      name="archive"
-                      value={archived ? "false" : "true"}
-                    />
-                    <button
-                      type="submit"
-                      className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                <details className="relative">
+                  <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-slate-300 px-3 text-sm font-bold">
+                    Ações
+                  </summary>
+                  <div className="z-10 mt-2 grid min-w-36 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl sm:absolute sm:right-0">
+                    <Link
+                      href={`/net-worth/${item.id}/edit`}
+                      className="rounded-lg px-3 py-2 text-sm font-bold hover:bg-slate-100"
                     >
-                      {archived ? "Reativar" : "Arquivar"}
-                    </button>
-                  </form>
-                </div>
+                      Editar
+                    </Link>
+                    <Link
+                      href={`/net-worth/${item.id}/history`}
+                      className="rounded-lg px-3 py-2 text-sm font-bold hover:bg-slate-100"
+                    >
+                      Histórico
+                    </Link>
+                    <form action={toggleNetWorthItemStatus}>
+                      <input type="hidden" name="id" value={item.id} />
+                      <input
+                        type="hidden"
+                        name="archive"
+                        value={archived ? "false" : "true"}
+                      />
+                      <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-slate-100">
+                        {archived ? "Reativar" : "Arquivar"}
+                      </button>
+                    </form>
+                  </div>
+                </details>
               </article>
             );
           })}
@@ -132,39 +200,91 @@ function NetWorthItemSection({
 export default async function NetWorthPage({
   searchParams,
 }: {
-  searchParams: Promise<{ message?: string }>;
+  searchParams: Promise<{ message?: string; tab?: string }>;
 }) {
-  const [{ items, summaries, hasError }, params] = await Promise.all([
+  const [result, params] = await Promise.all([
     listCurrentUserNetWorth(),
     searchParams,
   ]);
+  const activeTab = params.tab === "simulator" ? "simulator" : "overview";
   const feedback = params.message ? messages[params.message] : undefined;
   const feedbackIsError = params.message === "status-error";
-  const assets = items.filter((item) => item.kind === "asset");
-  const liabilities = items.filter((item) => item.kind === "liability");
+  const executive = calculateExecutiveNetWorthByCurrency({
+    currentUserId: result.userId,
+    accounts: result.accounts.map((account) => ({
+      userId: account.user_id,
+      currency: account.currency,
+      currentBalanceMinor: account.current_balance_minor,
+      active: !account.archived_at,
+    })),
+    summaries: result.summaries.map((summary) => ({
+      userId: summary.user_id,
+      currency: summary.currency,
+      manualAssetsMinor: summary.manual_assets_minor,
+      investmentsMinor: summary.investments_minor,
+      liabilitiesMinor: summary.liabilities_minor,
+    })),
+    invoices: result.invoices.map((invoice) => ({
+      userId: invoice.user_id,
+      currency: invoice.currency,
+      outstandingMinor: invoice.outstanding_amount_minor,
+    })),
+  });
+  const assets = result.items.filter((item) => item.kind === "asset");
+  const liabilities = result.items.filter((item) => item.kind === "liability");
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
+          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Visão patrimonial
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-            Patrimônio líquido
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            Patrimônio
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Acompanhe bens e dívidas manuais por moeda, sem misturá-los às
-            contas usadas nas movimentações.
+            Contas, investimentos, bens e passivos consolidados separadamente
+            por moeda.
           </p>
         </div>
+        {activeTab === "overview" ? (
+          <Link
+            href="/net-worth/new"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+          >
+            Novo item
+          </Link>
+        ) : null}
+      </header>
+
+      <nav
+        aria-label="Seções do patrimônio"
+        className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
+      >
         <Link
-          href="/net-worth/new"
-          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm hover:bg-blue-800"
+          href="/net-worth"
+          aria-current={activeTab === "overview" ? "page" : undefined}
+          className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold ${
+            activeTab === "overview"
+              ? "bg-emerald-700 text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
         >
-          Novo item
+          Visão geral
         </Link>
-      </div>
+        <Link
+          href="/net-worth?tab=simulator"
+          aria-current={activeTab === "simulator" ? "page" : undefined}
+          className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold ${
+            activeTab === "simulator"
+              ? "bg-emerald-700 text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Simulador de poupança
+        </Link>
+      </nav>
 
       {feedback ? (
         <p
@@ -178,138 +298,115 @@ export default async function NetWorthPage({
           {feedback}
         </p>
       ) : null}
-
-      {hasError ? (
+      {result.hasError ? (
         <p
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Não foi possível carregar seu patrimônio. Confirme se a migration da
-          Sprint 8 foi aplicada ao Supabase deste ambiente.
+          Parte do patrimônio não pôde ser carregada. Tente novamente.
         </p>
       ) : null}
 
-      {!hasError && items.length === 0 ? (
+      {activeTab === "simulator" ? <SavingsSimulator /> : null}
+
+      {activeTab === "overview" && executive.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-          <h2 className="text-xl font-bold text-slate-950">
-            Nenhum item patrimonial cadastrado
+          <h2 className="text-xl font-black text-slate-950">
+            Seu patrimônio começará aqui
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-slate-600">
-            Comece por um imóvel, veículo, outro bem, financiamento, empréstimo
-            ou outra dívida.
+            Cadastre uma conta, investimento, bem ou passivo para compor a
+            visão executiva.
           </p>
-          <Link
-            href="/net-worth/new"
-            className="mt-6 inline-flex min-h-11 items-center rounded-xl border border-blue-700 px-4 font-semibold text-blue-700 hover:bg-blue-50"
-          >
-            Cadastrar primeiro item
-          </Link>
         </section>
       ) : null}
 
-      {!hasError && summaries.length > 0 ? (
-        <section aria-labelledby="net-worth-summary-title">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2
-                id="net-worth-summary-title"
-                className="text-2xl font-extrabold text-slate-950"
-              >
-                Resumo por moeda
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Nenhuma conversão cambial é aplicada entre os grupos.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            {summaries.map((summary) => (
-              <article
-                key={summary.currency}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <p className="text-sm font-bold text-blue-700">
-                  {summary.currency}
+      {activeTab === "overview"
+        ? executive.map((summary) => (
+            <section
+              key={summary.currency}
+              aria-labelledby={`net-worth-${summary.currency}`}
+              className="grid gap-5"
+            >
+              <header className="flex items-end justify-between gap-4 border-b border-slate-200 pb-4">
+                <div>
+                  <p className="text-sm font-extrabold text-emerald-700">
+                    {summary.currency}
+                  </p>
+                  <h2
+                    id={`net-worth-${summary.currency}`}
+                    className="mt-1 text-2xl font-black text-slate-950"
+                  >
+                    Resumo patrimonial
+                  </h2>
+                </div>
+                <p className="text-sm text-slate-500">
+                  Sem conversão cambial implícita
                 </p>
-                <dl className="mt-4 grid gap-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-sm text-slate-600">Ativos manuais</dt>
-                    <dd className="font-semibold text-emerald-700">
-                      {formatMoney(
-                        summary.manual_assets_minor,
-                        summary.currency,
-                        CURRENCY_LOCALES[summary.currency],
-                      )}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-sm text-slate-600">Investimentos</dt>
-                    <dd className="font-semibold text-emerald-700">
-                      {formatMoney(
-                        summary.investments_minor,
-                        summary.currency,
-                        CURRENCY_LOCALES[summary.currency],
-                      )}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-sm text-slate-600">Ativos totais</dt>
-                    <dd className="font-semibold text-emerald-700">
-                      {formatMoney(
-                        summary.assets_minor,
-                        summary.currency,
-                        CURRENCY_LOCALES[summary.currency],
-                      )}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-sm text-slate-600">Passivos</dt>
-                    <dd className="font-semibold text-red-700">
-                      {formatMoney(
-                        summary.liabilities_minor,
-                        summary.currency,
-                        CURRENCY_LOCALES[summary.currency],
-                      )}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                    <dt className="font-semibold text-slate-950">
-                      Patrimônio líquido
-                    </dt>
-                    <dd
-                      className={`text-lg font-extrabold ${
-                        summary.net_worth_minor < 0
-                          ? "text-red-700"
-                          : "text-slate-950"
-                      }`}
-                    >
-                      {formatMoney(
-                        summary.net_worth_minor,
-                        summary.currency,
-                        CURRENCY_LOCALES[summary.currency],
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
+              </header>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-bold text-slate-500">Ativos</p>
+                  <p className="mt-2 text-2xl font-black text-emerald-700">
+                    {formatMoney(
+                      summary.assetsMinor,
+                      summary.currency,
+                      CURRENCY_LOCALES[summary.currency],
+                    )}
+                  </p>
+                </article>
+                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-bold text-slate-500">Passivos</p>
+                  <p className="mt-2 text-2xl font-black text-rose-700">
+                    {formatMoney(
+                      summary.liabilitiesMinor,
+                      summary.currency,
+                      CURRENCY_LOCALES[summary.currency],
+                    )}
+                  </p>
+                </article>
+                <article className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
+                  <p className="text-sm font-bold text-slate-300">
+                    Patrimônio líquido
+                  </p>
+                  <p
+                    className={`mt-2 text-2xl font-black ${
+                      summary.netWorthMinor < 0
+                        ? "text-rose-300"
+                        : "text-white"
+                    }`}
+                  >
+                    {formatMoney(
+                      summary.netWorthMinor,
+                      summary.currency,
+                      CURRENCY_LOCALES[summary.currency],
+                    )}
+                  </p>
+                </article>
+              </div>
+              <Composition summary={summary} />
+            </section>
+          ))
+        : null}
 
-      {!hasError && items.length > 0 ? (
-        <div className="grid gap-10">
-          <NetWorthItemSection
-            title={NET_WORTH_KIND_LABELS.asset + "s"}
-            description="Imóveis, veículos e outros bens avaliados manualmente."
-            items={assets}
-          />
-          <NetWorthItemSection
-            title={NET_WORTH_KIND_LABELS.liability + "s"}
-            description="Financiamentos, empréstimos e outras dívidas."
+      {activeTab === "overview" && result.items.length > 0 ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <ItemsList title="Bens manuais" items={assets} />
+          <ItemsList
+            title="Financiamentos e demais passivos"
             items={liabilities}
           />
         </div>
+      ) : null}
+
+      {activeTab === "overview" ? (
+        <aside className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+          Regra de consolidação: saldos positivos de contas, investimentos e
+          bens manuais formam os ativos. Saldos negativos, faturas pendentes,
+          financiamentos e outras dívidas formam os passivos. O total
+          patrimonial pré-calculado não é somado novamente, evitando dupla
+          contagem.
+        </aside>
       ) : null}
     </main>
   );

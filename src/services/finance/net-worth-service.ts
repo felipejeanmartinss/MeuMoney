@@ -19,7 +19,8 @@ export type NetWorthItemMutationInput = {
 
 export async function listCurrentUserNetWorth() {
   const { supabase, user } = await requireUser();
-  const [itemsResult, summaryResult] = await Promise.all([
+  const [itemsResult, summaryResult, accountsResult, invoicesResult] =
+    await Promise.all([
     supabase
       .from("net_worth_items")
       .select(
@@ -35,12 +36,35 @@ export async function listCurrentUserNetWorth() {
       )
       .eq("user_id", user.id)
       .order("currency", { ascending: true }),
-  ]);
+    supabase
+      .from("account_balances")
+      .select(
+        "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor",
+      )
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .order("name"),
+    supabase
+      .from("financial_dashboard_invoices")
+      .select(
+        "id, user_id, credit_card_id, credit_card_name, currency, reference_month, due_date, status, effective_status, total_amount_minor, outstanding_amount_minor",
+      )
+      .eq("user_id", user.id)
+      .order("due_date"),
+    ]);
 
   return {
+    userId: user.id,
     items: itemsResult.data ?? [],
     summaries: summaryResult.data ?? [],
-    hasError: Boolean(itemsResult.error || summaryResult.error),
+    accounts: accountsResult.data ?? [],
+    invoices: invoicesResult.data ?? [],
+    hasError: Boolean(
+      itemsResult.error ||
+        summaryResult.error ||
+        accountsResult.error ||
+        invoicesResult.error,
+    ),
   };
 }
 

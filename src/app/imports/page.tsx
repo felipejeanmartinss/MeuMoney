@@ -49,10 +49,10 @@ export default async function ImportsPage({
     <main className="mx-auto grid max-w-6xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
+          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Entrada assistida
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             Importações
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
@@ -70,7 +70,7 @@ export default async function ImportsPage({
           ) : null}
           <Link
             href="/imports/new"
-            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm hover:bg-blue-800"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-700 px-5 font-semibold text-white shadow-sm hover:bg-emerald-800"
           >
             Nova importação
           </Link>
@@ -95,8 +95,7 @@ export default async function ImportsPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Não foi possível carregar as importações. Confirme se a migration da
-          Sprint 10 foi aplicada ao Supabase deste ambiente.
+          Não foi possível carregar as importações. Tente novamente.
         </p>
       ) : null}
 

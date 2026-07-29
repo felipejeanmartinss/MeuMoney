@@ -82,3 +82,18 @@ Novas versões e novos bancos com fixtures representativas, lançamentos QIF
 divididos, OCR, importação XLS,
 relatórios analíticos, avaliações automáticas de mercado e recursos avançados
 de cartão serão planejados separadamente.
+
+## Incremento visual consolidado — MeuMoney moderno
+
+- shell responsivo com cinco destinos principais e submenus contextuais;
+- dashboard executivo mensal, controlado por um único filtro e separado por moeda;
+- central de contas com extrato, recorrências e importação contextual;
+- agenda de recorrências com filtros, indicadores e linha do tempo;
+- central de investimentos com posições e financiamentos;
+- patrimônio executivo com regra explícita contra dupla contagem;
+- simulador educativo de poupança sem persistência;
+- central de Perfil para informações pessoais, importações e segurança;
+- padronização visual, acessibilidade, estados de erro, PWA e regressão responsiva.
+
+O incremento é exclusivamente de experiência e composição de dados já
+autorizados. Não altera as regras financeiras existentes nem exige migration.

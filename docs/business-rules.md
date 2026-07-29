@@ -171,3 +171,13 @@
 ## Regras financeiras futuras
 
 Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.
+
+## Consolidação patrimonial executiva
+
+- A visão executiva de patrimônio mantém uma seção independente para cada moeda.
+- Saldos positivos de contas transacionais, investimentos ativos e bens manuais compõem os ativos.
+- Saldos negativos de contas, faturas não pagas, financiamentos, empréstimos e outras dívidas compõem os passivos.
+- A coluna agregada `assets_minor` da view patrimonial não é somada novamente: a interface usa explicitamente ativos manuais e investimentos para impedir dupla contagem.
+- Cartões aparecem pelo valor pendente das faturas, nunca pelo limite de crédito.
+- O simulador de poupança é educativo, não persiste dados e usa capitalização mensal com aritmética inteira em unidades monetárias menores.
+- A taxa anual nominal é convertida para pontos-base. Impostos, inflação, custos e variações reais não são inferidos.

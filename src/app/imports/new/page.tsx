@@ -1,9 +1,31 @@
 import Link from "next/link";
 import { FileImportForm } from "@/components/forms/file-import-form";
+import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
 
 export const metadata = { title: "Nova importação" };
 
-export default function NewImportPage() {
+export default async function NewImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ accountId?: string }>;
+}) {
+  const [{ accountId }, { accounts }] = await Promise.all([
+    searchParams,
+    listCurrentUserAccounts(),
+  ]);
+  const activeAccounts = accounts
+    .filter((account) => !account.archived_at)
+    .map((account) => ({
+      id: account.id,
+      name: account.name,
+      currency: account.currency,
+    }));
+  const selectedAccountId = activeAccounts.some(
+    (account) => account.id === accountId,
+  )
+    ? accountId
+    : undefined;
+
   return (
     <main className="mx-auto grid max-w-4xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
       <div>
@@ -26,7 +48,10 @@ export default function NewImportPage() {
       </div>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-        <FileImportForm />
+        <FileImportForm
+          accounts={activeAccounts}
+          defaultAccountId={selectedAccountId}
+        />
       </section>
     </main>
   );

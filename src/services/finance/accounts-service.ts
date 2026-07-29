@@ -39,6 +39,73 @@ export async function getCurrentUserAccount(id: string) {
   return { account: data, hasError: Boolean(error) };
 }
 
+export async function getCurrentUserAccountHub(id: string) {
+  const { supabase, user } = await requireUser();
+  const [
+    accountResult,
+    transactionsResult,
+    recurrencesResult,
+    importsResult,
+    categoriesResult,
+  ] = await Promise.all([
+    supabase
+      .from("account_balances")
+      .select(
+        "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor",
+      )
+      .eq("user_id", user.id)
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("transactions")
+      .select(
+        "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .eq("account_id", id)
+      .order("transaction_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("recurring_transactions")
+      .select(
+        "id, user_id, account_id, category_id, transaction_type, description, amount_minor, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .eq("account_id", id)
+      .order("next_occurrence")
+      .limit(50),
+    supabase
+      .from("import_jobs")
+      .select(
+        "id, user_id, account_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .eq("account_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("categories")
+      .select("id, name")
+      .eq("user_id", user.id),
+  ]);
+
+  return {
+    account: accountResult.data,
+    transactions: transactionsResult.data ?? [],
+    recurrences: recurrencesResult.data ?? [],
+    imports: importsResult.data ?? [],
+    categories: categoriesResult.data ?? [],
+    hasError: Boolean(
+      accountResult.error ||
+        transactionsResult.error ||
+        recurrencesResult.error ||
+        importsResult.error ||
+        categoriesResult.error,
+    ),
+  };
+}
+
 export async function createCurrentUserAccount(input: AccountMutationInput) {
   const { supabase, user } = await requireUser();
   const { error } = await supabase.from("accounts").insert({

@@ -1,6 +1,8 @@
 import "server-only";
 import {
+  calculateExecutiveDashboardNetWorth,
   fillMonthlyEvolution,
+  limitExpenseCategories,
   referenceMonthsEndingAt,
   type DashboardMonthlySummary,
 } from "@/domain/financial-dashboard";
@@ -13,6 +15,8 @@ import type {
   FinancialDashboardInvoice,
   FinancialDashboardMonthlySummary,
   FinancialDashboardUpcomingRecurrence,
+  MonthlyBudgetProgress,
+  NetWorthSummary,
   Profile,
   SupportedCurrency,
 } from "@/types/database";
@@ -27,6 +31,10 @@ const invoiceColumns =
   "id, user_id, credit_card_id, credit_card_name, currency, reference_month, due_date, status, effective_status, total_amount_minor, outstanding_amount_minor";
 const accountColumns =
   "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor";
+const budgetProgressColumns =
+  "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed";
+const netWorthColumns =
+  "user_id, currency, assets_minor, manual_assets_minor, investments_minor, liabilities_minor, net_worth_minor";
 
 function normalizeMonthlySummary(
   row: FinancialDashboardMonthlySummary,
@@ -77,6 +85,32 @@ function normalizeInvoice(
   };
 }
 
+function normalizeBudgetProgress(
+  row: MonthlyBudgetProgress,
+): MonthlyBudgetProgress {
+  return {
+    ...row,
+    planned_amount_minor: coerceMinorUnits(row.planned_amount_minor),
+    realized_amount_minor: coerceMinorUnits(row.realized_amount_minor),
+    available_amount_minor: coerceMinorUnits(row.available_amount_minor),
+    percentage_consumed:
+      row.percentage_consumed === null
+        ? null
+        : Number(row.percentage_consumed),
+  };
+}
+
+function normalizeNetWorth(row: NetWorthSummary): NetWorthSummary {
+  return {
+    ...row,
+    assets_minor: coerceMinorUnits(row.assets_minor),
+    manual_assets_minor: coerceMinorUnits(row.manual_assets_minor),
+    investments_minor: coerceMinorUnits(row.investments_minor),
+    liabilities_minor: coerceMinorUnits(row.liabilities_minor),
+    net_worth_minor: coerceMinorUnits(row.net_worth_minor),
+  };
+}
+
 function todayInSaoPaulo(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
@@ -95,6 +129,8 @@ export type FinancialDashboardCurrencyData = {
   categories: FinancialDashboardExpenseCategory[];
   recurrences: FinancialDashboardUpcomingRecurrence[];
   invoices: FinancialDashboardInvoice[];
+  spendingTracker: MonthlyBudgetProgress[];
+  netWorthMinor: number;
 };
 
 export type FinancialDashboardData = {
@@ -118,6 +154,8 @@ export async function getFinancialDashboard(
     accountsResult,
     summariesResult,
     categoriesResult,
+    budgetsResult,
+    netWorthResult,
     recurrenceResults,
     invoiceResults,
   ] = await Promise.all([
@@ -145,6 +183,16 @@ export async function getFinancialDashboard(
       .eq("user_id", user.id)
       .eq("reference_month", selectedReferenceMonth)
       .order("expense_amount_minor", { ascending: false }),
+    supabase
+      .from("monthly_budget_progress")
+      .select(budgetProgressColumns)
+      .eq("user_id", user.id)
+      .eq("reference_month", selectedReferenceMonth)
+      .order("percentage_consumed", { ascending: false }),
+    supabase
+      .from("net_worth_summary")
+      .select(netWorthColumns)
+      .eq("user_id", user.id),
     Promise.all(
       SUPPORTED_CURRENCIES.map((currency) =>
         supabase
@@ -175,6 +223,8 @@ export async function getFinancialDashboard(
     normalizeMonthlySummary,
   );
   const categories = (categoriesResult.data ?? []).map(normalizeCategory);
+  const budgets = (budgetsResult.data ?? []).map(normalizeBudgetProgress);
+  const netWorth = (netWorthResult.data ?? []).map(normalizeNetWorth);
   const recurrences = recurrenceResults.flatMap((result) =>
     (result.data ?? []).map(normalizeRecurrence),
   );
@@ -188,6 +238,8 @@ export async function getFinancialDashboard(
     ...accounts.map((row) => row.currency),
     ...summaries.map((row) => row.currency),
     ...categories.map((row) => row.currency),
+    ...budgets.map((row) => row.currency),
+    ...netWorth.map((row) => row.currency),
     ...recurrences.map((row) => row.currency),
     ...invoices.map((row) => row.currency),
   ]);
@@ -212,15 +264,26 @@ export async function getFinancialDashboard(
       planned_amount_minor: 0,
       budget_percentage_consumed: null,
     };
+    const currencyInvoices = invoices.filter(
+      (row) => row.currency === currency,
+    );
+    const manualNetWorthMinor =
+      netWorth.find((row) => row.currency === currency)?.net_worth_minor ?? 0;
+    const outstandingInvoicesMinor = currencyInvoices.reduce(
+      (total, invoice) =>
+        coerceMinorUnits(total + invoice.outstanding_amount_minor),
+      0,
+    );
+    const accountBalanceMinor = currencyAccounts.reduce(
+      (total, account) =>
+        coerceMinorUnits(total + account.current_balance_minor),
+      0,
+    );
 
     return {
       currency,
       accounts: currencyAccounts,
-      accountBalanceMinor: currencyAccounts.reduce(
-        (total, account) =>
-          coerceMinorUnits(total + account.current_balance_minor),
-        0,
-      ),
+      accountBalanceMinor,
       selectedMonth,
       evolution: fillMonthlyEvolution(
         currency,
@@ -235,9 +298,32 @@ export async function getFinancialDashboard(
           budgetPercentageConsumed: row.budget_percentage_consumed,
         })),
       ),
-      categories: categories.filter((row) => row.currency === currency),
+      categories: limitExpenseCategories(
+        categories
+          .filter((row) => row.currency === currency)
+          .map((row) => ({
+            categoryId: row.category_id,
+            categoryName: row.category_name,
+            context: row.context,
+            amountMinor: row.expense_amount_minor,
+          })),
+      ).map((row) => ({
+        user_id: user.id,
+        reference_month: selectedReferenceMonth,
+        currency,
+        category_id: row.categoryId,
+        category_name: row.categoryName,
+        context: row.context,
+        expense_amount_minor: row.amountMinor,
+      })),
       recurrences: recurrences.filter((row) => row.currency === currency),
-      invoices: invoices.filter((row) => row.currency === currency),
+      invoices: currencyInvoices,
+      spendingTracker: budgets.filter((row) => row.currency === currency),
+      netWorthMinor: calculateExecutiveDashboardNetWorth({
+        accountBalanceMinor,
+        manualNetWorthMinor,
+        outstandingInvoicesMinor,
+      }),
     };
   });
 
@@ -250,6 +336,8 @@ export async function getFinancialDashboard(
         accountsResult.error ||
         summariesResult.error ||
         categoriesResult.error ||
+        budgetsResult.error ||
+        netWorthResult.error ||
         recurrenceResults.some((result) => result.error) ||
         invoiceResults.some((result) => result.error),
     ),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateExecutiveNetWorthByCurrency,
   kindForNetWorthItemType,
   netWorthItemFormSchema,
   summarizeNetWorthByCurrency,
@@ -162,5 +163,62 @@ describe("net worth rules", () => {
         "user-a",
       ),
     ).toThrow("safe integer");
+  });
+
+  it("consolidates every component once and isolates users", () => {
+    const result = calculateExecutiveNetWorthByCurrency({
+      currentUserId: "user-a",
+      accounts: [
+        {
+          userId: "user-a",
+          currency: "BRL",
+          currentBalanceMinor: 20_000,
+          active: true,
+        },
+        {
+          userId: "user-a",
+          currency: "BRL",
+          currentBalanceMinor: -5_000,
+          active: true,
+        },
+        {
+          userId: "user-b",
+          currency: "BRL",
+          currentBalanceMinor: 999_000,
+          active: true,
+        },
+      ],
+      summaries: [
+        {
+          userId: "user-a",
+          currency: "BRL",
+          manualAssetsMinor: 100_000,
+          investmentsMinor: 30_000,
+          liabilitiesMinor: 40_000,
+        },
+      ],
+      invoices: [
+        {
+          userId: "user-a",
+          currency: "BRL",
+          outstandingMinor: 10_000,
+        },
+      ],
+    });
+
+    expect(result).toEqual([
+      {
+        currency: "BRL",
+        transactionalAssetsMinor: 20_000,
+        transactionalLiabilitiesMinor: 5_000,
+        manualAssetsMinor: 100_000,
+        investmentsMinor: 30_000,
+        pendingInvoicesMinor: 10_000,
+        otherLiabilitiesMinor: 40_000,
+        assetsMinor: 150_000,
+        liabilitiesMinor: 55_000,
+        netWorthMinor: 95_000,
+      },
+    ]);
   });
 });
