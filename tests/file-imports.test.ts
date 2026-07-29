@@ -13,6 +13,7 @@ import {
   parseImportAmountToMinor,
   parseImportDate,
   parseStructuredOfx,
+  parseStructuredQif,
 } from "../src/domain/file-imports";
 
 const fixture = (name: string) =>
@@ -130,6 +131,86 @@ describe("file imports", () => {
       transactionDate: "2026-03-01",
       signedAmountMinor: 250000,
     });
+  });
+
+  it("parses Microsoft Money QIF dates, amounts and source categories", () => {
+    const rows = parseStructuredQif(
+      fixture("anonymous-money-bank.qif"),
+    );
+
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toMatchObject({
+      transactionDate: "2026-01-31",
+      signedAmountMinor: 125075,
+      recordKind: "transaction",
+      sourceCategoryName: "Salário:Renda principal",
+      validationCode: null,
+    });
+    expect(rows[1]).toMatchObject({
+      transactionDate: "2026-02-28",
+      signedAmountMinor: -8990,
+      sourceCategoryName: "Alimentação:Mercado",
+    });
+    expect(rows[2].transactionDate).toBe("2024-02-29");
+  });
+
+  it("keeps bracketed QIF accounts as transfers for explicit mapping", () => {
+    const rows = parseStructuredQif(
+      fixture("anonymous-money-bank.qif"),
+    );
+
+    expect(rows[2]).toMatchObject({
+      recordKind: "transfer",
+      transferAccountName: "Reserva",
+      sourceCategoryName: null,
+    });
+    expect(rows[3]).toMatchObject({
+      recordKind: "transfer",
+      transferAccountName: "Conta Principal",
+      signedAmountMinor: 50000,
+    });
+  });
+
+  it("does not silently flatten QIF split transactions", () => {
+    const rows = parseStructuredQif(
+      fixture("anonymous-money-bank.qif"),
+    );
+    expect(rows[4].validationCode).toBe("unsupported_record");
+  });
+
+  it("rejects QIF files without a compatible account section", () => {
+    expect(() =>
+      parseStructuredQif("!Type:Cat\nNAlimentação\n^"),
+    ).toThrow(/não contém movimentações/i);
+  });
+
+  it("keeps QIF confirmation atomic and owner-scoped in the database", () => {
+    const migration = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260728215713_qif_imports.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "current_user_id uuid := (select auth.uid());",
+    );
+    expect(migration).toContain("private.import_transfer_signature");
+    expect(migration).toContain("new_transfer_id := private.create_transfer");
+    expect(migration).toContain("imported_signature_single_target_check");
+    expect(migration).toContain(
+      "signatures.signature = computed.computed_signature",
+    );
+    expect(migration).toContain("import_staging_rows_validate_owner");
+    expect(migration).toContain("imported_signatures_validate_owner");
+    expect(migration).toContain(
+      "grant execute on function public.map_import_qif_category",
+    );
+    expect(migration).not.toContain(
+      "grant insert on table public.import_staging_rows",
+    );
   });
 
   it("builds a stable signature material from normalized financial fields", () => {

@@ -10,7 +10,9 @@ import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 const initialState: FileImportFormState = { status: "idle" };
 
 export function FileImportForm() {
-  const [fileType, setFileType] = useState<"csv" | "ofx" | "pdf">("csv");
+  const [fileType, setFileType] = useState<
+    "csv" | "ofx" | "qif" | "pdf"
+  >("csv");
   const [csvMode, setCsvMode] = useState<"automatic" | "manual">("automatic");
   const [state, formAction, pending] = useActionState(
     uploadFinancialFile,
@@ -28,11 +30,14 @@ export function FileImportForm() {
             name="fileType"
             value={fileType}
             onChange={(event) =>
-              setFileType(event.target.value as "csv" | "ofx" | "pdf")
+              setFileType(
+                event.target.value as "csv" | "ofx" | "qif" | "pdf",
+              )
             }
           >
             <option value="csv">CSV configurável</option>
             <option value="ofx">OFX estruturado</option>
+            <option value="qif">QIF do Microsoft Money</option>
             <option value="pdf">PDF pesquisável</option>
           </select>
         </Field>
@@ -47,12 +52,14 @@ export function FileImportForm() {
                 ? ".csv,text/csv"
                 : fileType === "ofx"
                   ? ".ofx"
-                  : ".pdf,application/pdf"
+                  : fileType === "qif"
+                    ? ".qif,application/qif"
+                    : ".pdf,application/pdf"
             }
             required
           />
           <span className="text-xs font-normal text-slate-500">
-            Até 5 MB e 1.000 movimentações. O arquivo original não é
+            Até 5 MB e 5.000 movimentações. O arquivo original não é
             armazenado.
           </span>
           {fileType === "pdf" ? (
@@ -249,6 +256,13 @@ export function FileImportForm() {
           O leitor aceita blocos estruturados <code>STMTTRN</code>, incluindo
           OFX SGML e XML. Data, valor, identificador e descrição serão
           normalizados para a prévia.
+        </div>
+      ) : fileType === "qif" ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">
+          O QIF será lido diretamente. Categorias serão preservadas como
+          sugestões e referências entre colchetes, como{" "}
+          <code>[Poupança]</code>, serão revisadas como transferências entre
+          contas. Lançamentos divididos precisam ser tratados manualmente.
         </div>
       ) : fileType === "pdf" ? (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">

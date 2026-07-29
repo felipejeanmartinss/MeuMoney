@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   parseDetectedCsv,
   parseConfiguredCsv,
+  parseStructuredQif,
   parseStructuredOfx,
   type CsvImportConfig,
   type ImportFileType,
@@ -17,7 +18,8 @@ import { extractSearchablePdfText } from "./pdf-text-extractor";
 import type { Json } from "@/types/database";
 
 const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
-const MAX_IMPORT_ROWS = 1000;
+const MAX_IMPORT_ROWS = 5000;
+export const IMPORT_REVIEW_PAGE_SIZE = 50;
 
 export type CreateImportInput = {
   file: File;
@@ -30,6 +32,13 @@ export type ImportRowMutationInput = {
   description: string;
   signedAmountMinor: number;
   categoryId: string;
+};
+
+export type ImportTransferRowMutationInput = Omit<
+  ImportRowMutationInput,
+  "categoryId"
+> & {
+  transferAccountId: string;
 };
 
 function safeFileName(value: string) {
@@ -48,7 +57,7 @@ function decodeFinancialFile(bytes: Uint8Array) {
 
 function validateFile(input: CreateImportInput) {
   if (!(input.file instanceof File) || input.file.size === 0) {
-    return "Selecione um arquivo CSV, OFX ou PDF.";
+    return "Selecione um arquivo CSV, OFX, QIF ou PDF.";
   }
   if (input.file.size > MAX_IMPORT_FILE_BYTES) {
     return "O arquivo deve ter no máximo 5 MB.";
@@ -87,6 +96,13 @@ async function parseFileRows(
       csvConfig,
     };
   }
+  if (fileType === "qif") {
+    return {
+      rows: parseStructuredQif(content),
+      adapter: null,
+      csvConfig: null,
+    };
+  }
   return {
     rows: parseStructuredOfx(content),
     adapter: null,
@@ -109,6 +125,9 @@ function rowsToJson(rows: ParsedImportRow[]): Json {
     confidence: row.confidence ?? null,
     source_adapter_id: row.sourceAdapterId ?? null,
     source_document_type: row.sourceDocumentType ?? null,
+    record_kind: row.recordKind ?? "transaction",
+    source_category_name: row.sourceCategoryName ?? null,
+    transfer_account_name: row.transferAccountName ?? null,
   }));
 }
 
@@ -203,7 +222,7 @@ export async function listCurrentUserImportJobs() {
   return { jobs: data ?? [], hasError: Boolean(error) };
 }
 
-export async function getCurrentUserImportReview(jobId: string) {
+export async function getCurrentUserImportReview(jobId: string, page = 1) {
   const { supabase, user } = await requireUser();
   const jobResult = await supabase
     .from("import_jobs")
@@ -220,19 +239,25 @@ export async function getCurrentUserImportReview(jobId: string) {
       rows: [],
       accounts: [],
       categories: [],
+      pagination: { page: 1, totalRows: 0, totalPages: 1 },
       hasError: Boolean(jobResult.error),
     };
   }
 
+  const safePage = Math.max(1, Math.trunc(page) || 1);
+  const start = (safePage - 1) * IMPORT_REVIEW_PAGE_SIZE;
+  const end = start + IMPORT_REVIEW_PAGE_SIZE - 1;
   const [rowsResult, accountsResult, categoriesResult] = await Promise.all([
     supabase
       .from("import_staging_rows")
       .select(
-        "id, job_id, user_id, source_row_number, source_external_id, source_date_text, source_amount_text, source_description_original, source_pages, confidence, transaction_date, description, normalized_description, signed_amount_minor, transaction_type, amount_minor, account_id, category_id, signature, status, validation_code, duplicate_transaction_id, is_selected, created_at, updated_at",
+        "id, job_id, user_id, source_row_number, source_external_id, source_date_text, source_amount_text, source_description_original, source_pages, confidence, record_kind, source_category_name, transfer_account_name, transfer_account_id, transaction_date, description, normalized_description, signed_amount_minor, transaction_type, amount_minor, account_id, category_id, signature, status, validation_code, duplicate_transaction_id, duplicate_transfer_id, is_selected, created_at, updated_at",
+        { count: "exact" },
       )
       .eq("user_id", user.id)
       .eq("job_id", jobId)
-      .order("source_row_number"),
+      .order("source_row_number")
+      .range(start, end),
     supabase
       .from("accounts")
       .select("id, name, currency, context")
@@ -254,6 +279,14 @@ export async function getCurrentUserImportReview(jobId: string) {
     rows: rowsResult.data ?? [],
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
+    pagination: {
+      page: safePage,
+      totalRows: rowsResult.count ?? 0,
+      totalPages: Math.max(
+        1,
+        Math.ceil((rowsResult.count ?? 0) / IMPORT_REVIEW_PAGE_SIZE),
+      ),
+    },
     hasError: Boolean(
       jobResult.error ||
         rowsResult.error ||
@@ -261,6 +294,72 @@ export async function getCurrentUserImportReview(jobId: string) {
         categoriesResult.error,
     ),
   };
+}
+
+export async function updateCurrentUserImportTransferRow(
+  rowId: string,
+  input: ImportTransferRowMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("update_import_transfer_row", {
+    target_row_id: rowId,
+    target_transaction_date: input.transactionDate,
+    target_description: input.description,
+    target_signed_amount_minor: input.signedAmountMinor,
+    target_transfer_account_id: input.transferAccountId,
+  });
+  return error || !data
+    ? {
+        ok: false as const,
+        message: mutationErrorMessage(
+          error,
+          "Não foi possível corrigir esta transferência.",
+        ),
+      }
+    : { ok: true as const };
+}
+
+export async function mapCurrentUserQifCategory(
+  jobId: string,
+  sourceCategoryName: string,
+  transactionType: "income" | "expense",
+  categoryId: string,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("map_import_qif_category", {
+    target_job_id: jobId,
+    target_source_category_name: sourceCategoryName,
+    target_transaction_type: transactionType,
+    target_category_id: categoryId,
+  });
+  return error
+    ? {
+        ok: false as const,
+        message: "Não foi possível aplicar este mapeamento de categoria.",
+      }
+    : { ok: true as const, updatedCount: data };
+}
+
+export async function mapCurrentUserQifTransferAccount(
+  jobId: string,
+  sourceAccountName: string,
+  accountId: string,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "map_import_qif_transfer_account",
+    {
+      target_job_id: jobId,
+      target_source_account_name: sourceAccountName,
+      target_account_id: accountId,
+    },
+  );
+  return error
+    ? {
+        ok: false as const,
+        message: "Não foi possível aplicar este mapeamento de conta.",
+      }
+    : { ok: true as const, updatedCount: data };
 }
 
 export async function configureCurrentUserImport(

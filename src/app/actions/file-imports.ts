@@ -8,6 +8,9 @@ import {
   importJobIdSchema,
   importRowCorrectionSchema,
   importRowIdSchema,
+  importTransferRowCorrectionSchema,
+  qifCategoryMappingSchema,
+  qifTransferAccountMappingSchema,
 } from "@/domain/file-imports";
 import {
   cancelCurrentUserImport,
@@ -15,8 +18,11 @@ import {
   configureCurrentUserImport,
   confirmCurrentUserImport,
   createCurrentUserImport,
+  mapCurrentUserQifCategory,
+  mapCurrentUserQifTransferAccount,
   setCurrentUserImportRowIgnored,
   updateCurrentUserImportRow,
+  updateCurrentUserImportTransferRow,
 } from "@/services/finance/file-imports-service";
 
 export type FileImportFormState = {
@@ -67,7 +73,7 @@ export async function uploadFinancialFile(
   if (!(file instanceof File)) {
     return {
       status: "error",
-      fieldErrors: { file: ["Selecione um arquivo CSV, OFX ou PDF."] },
+      fieldErrors: { file: ["Selecione um arquivo CSV, OFX, QIF ou PDF."] },
     };
   }
 
@@ -105,9 +111,10 @@ export async function correctFinancialImportRow(formData: FormData) {
     categoryId: formData.get("categoryId"),
   });
   const jobId = importJobIdSchema.safeParse(formData.get("jobId"));
+  const page = Math.max(1, Number(formData.get("page")) || 1);
   if (!parsed.success || !jobId.success) {
     redirect(
-      `/imports/${jobId.success ? jobId.data : ""}?message=row-error`,
+      `/imports/${jobId.success ? jobId.data : ""}?message=row-error&page=${page}`,
     );
   }
 
@@ -119,13 +126,89 @@ export async function correctFinancialImportRow(formData: FormData) {
   });
   revalidatePath(`/imports/${jobId.data}`);
   redirect(
-    `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}`,
+    `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}&page=${page}`,
+  );
+}
+
+export async function correctFinancialImportTransferRow(formData: FormData) {
+  const parsed = importTransferRowCorrectionSchema.safeParse({
+    rowId: formData.get("rowId"),
+    transactionDate: formData.get("transactionDate"),
+    description: formData.get("description"),
+    signedAmountMinor: formData.get("signedAmountMinor"),
+    transferAccountId: formData.get("transferAccountId"),
+  });
+  const jobId = importJobIdSchema.safeParse(formData.get("jobId"));
+  const page = Math.max(1, Number(formData.get("page")) || 1);
+  if (!parsed.success || !jobId.success) {
+    redirect(
+      `/imports/${jobId.success ? jobId.data : ""}?message=row-error&page=${page}`,
+    );
+  }
+
+  const result = await updateCurrentUserImportTransferRow(
+    parsed.data.rowId,
+    {
+      transactionDate: parsed.data.transactionDate,
+      description: parsed.data.description,
+      signedAmountMinor: parsed.data.signedAmountMinor,
+      transferAccountId: parsed.data.transferAccountId,
+    },
+  );
+  revalidatePath(`/imports/${jobId.data}`);
+  redirect(
+    `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}&page=${page}`,
+  );
+}
+
+export async function mapFinancialImportQifCategory(formData: FormData) {
+  const parsed = qifCategoryMappingSchema.safeParse({
+    jobId: formData.get("jobId"),
+    sourceCategoryName: formData.get("sourceCategoryName"),
+    transactionType: formData.get("transactionType"),
+    categoryId: formData.get("categoryId"),
+  });
+  const page = Math.max(1, Number(formData.get("page")) || 1);
+  if (!parsed.success) redirect("/imports?message=row-error");
+
+  const result = await mapCurrentUserQifCategory(
+    parsed.data.jobId,
+    parsed.data.sourceCategoryName,
+    parsed.data.transactionType,
+    parsed.data.categoryId,
+  );
+  revalidatePath(`/imports/${parsed.data.jobId}`);
+  redirect(
+    `/imports/${parsed.data.jobId}?message=${result.ok ? "mapping-updated" : "row-error"}&page=${page}`,
+  );
+}
+
+export async function mapFinancialImportQifTransferAccount(
+  formData: FormData,
+) {
+  const parsed = qifTransferAccountMappingSchema.safeParse({
+    jobId: formData.get("jobId"),
+    sourceAccountName: formData.get("sourceAccountName"),
+    accountId: formData.get("accountId"),
+  });
+  const page = Math.max(1, Number(formData.get("page")) || 1);
+  if (!parsed.success) redirect("/imports?message=row-error");
+
+  const result = await mapCurrentUserQifTransferAccount(
+    parsed.data.jobId,
+    parsed.data.sourceAccountName,
+    parsed.data.accountId,
+  );
+  revalidatePath(`/imports/${parsed.data.jobId}`);
+  redirect(
+    `/imports/${parsed.data.jobId}?message=${result.ok ? "mapping-updated" : "row-error"}&page=${page}`,
   );
 }
 
 export async function toggleFinancialImportRow(formData: FormData) {
   const rowId = importRowIdSchema.safeParse(formData.get("rowId"));
   const jobId = importJobIdSchema.safeParse(formData.get("jobId"));
+  const page = Math.max(1, Number(formData.get("page")) || 1);
   if (!rowId.success || !jobId.success) {
     redirect("/imports?message=row-error");
   }
@@ -134,7 +217,7 @@ export async function toggleFinancialImportRow(formData: FormData) {
   const result = await setCurrentUserImportRowIgnored(rowId.data, ignored);
   revalidatePath(`/imports/${jobId.data}`);
   redirect(
-    `/imports/${jobId.data}?message=${result.ok ? "selection-updated" : "row-error"}`,
+    `/imports/${jobId.data}?message=${result.ok ? "selection-updated" : "row-error"}&page=${page}`,
   );
 }
 
