@@ -852,6 +852,9 @@ export function parseStructuredQif(content: string): ParsedImportRow[] {
         sourceAmountText,
         qifDecimalSeparator(sourceAmountText),
       );
+      // Money exports balance/opening markers with T0.00. Staging rejects
+      // persisted zero amounts, so keep the row reviewable as invalid instead.
+      if (signedAmountMinor === 0) signedAmountMinor = null;
     } catch {
       signedAmountMinor = null;
     }
