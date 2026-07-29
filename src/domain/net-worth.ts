@@ -166,3 +166,115 @@ export function summarizeNetWorthByCurrency(
     ];
   });
 }
+
+export type ExecutiveNetWorthCurrencySummary = {
+  currency: SupportedCurrency;
+  transactionalAssetsMinor: number;
+  transactionalLiabilitiesMinor: number;
+  manualAssetsMinor: number;
+  investmentsMinor: number;
+  pendingInvoicesMinor: number;
+  otherLiabilitiesMinor: number;
+  assetsMinor: number;
+  liabilitiesMinor: number;
+  netWorthMinor: number;
+};
+
+export function calculateExecutiveNetWorthByCurrency(input: {
+  currentUserId: string;
+  accounts: Array<{
+    userId: string;
+    currency: SupportedCurrency;
+    currentBalanceMinor: number;
+    active: boolean;
+  }>;
+  summaries: Array<{
+    userId: string;
+    currency: SupportedCurrency;
+    manualAssetsMinor: number;
+    investmentsMinor: number;
+    liabilitiesMinor: number;
+  }>;
+  invoices: Array<{
+    userId: string;
+    currency: SupportedCurrency;
+    outstandingMinor: number;
+  }>;
+}): ExecutiveNetWorthCurrencySummary[] {
+  const currencies = new Set<SupportedCurrency>();
+  for (const row of [...input.accounts, ...input.summaries, ...input.invoices]) {
+    if (row.userId === input.currentUserId) currencies.add(row.currency);
+  }
+
+  return [...currencies]
+    .sort()
+    .map((currency) => {
+      let transactionalAssetsMinor = 0;
+      let transactionalLiabilitiesMinor = 0;
+      for (const account of input.accounts) {
+        if (
+          account.userId !== input.currentUserId ||
+          account.currency !== currency ||
+          !account.active
+        ) {
+          continue;
+        }
+        const balance = assertMinorUnits(account.currentBalanceMinor);
+        if (balance >= 0) {
+          transactionalAssetsMinor = assertMinorUnits(
+            transactionalAssetsMinor + balance,
+          );
+        } else {
+          transactionalLiabilitiesMinor = assertMinorUnits(
+            transactionalLiabilitiesMinor + Math.abs(balance),
+          );
+        }
+      }
+      const sourceSummary = input.summaries.find(
+        (row) =>
+          row.userId === input.currentUserId && row.currency === currency,
+      );
+      const manualAssetsMinor = assertMinorUnits(
+        sourceSummary?.manualAssetsMinor ?? 0,
+      );
+      const investmentsMinor = assertMinorUnits(
+        sourceSummary?.investmentsMinor ?? 0,
+      );
+      const otherLiabilitiesMinor = assertMinorUnits(
+        sourceSummary?.liabilitiesMinor ?? 0,
+      );
+      const pendingInvoicesMinor = input.invoices
+        .filter(
+          (row) =>
+            row.userId === input.currentUserId && row.currency === currency,
+        )
+        .reduce(
+          (total, row) =>
+            assertMinorUnits(
+              total + assertMinorUnits(row.outstandingMinor),
+            ),
+          0,
+        );
+      const assetsMinor = assertMinorUnits(
+        transactionalAssetsMinor + manualAssetsMinor + investmentsMinor,
+      );
+      const liabilitiesMinor = assertMinorUnits(
+        transactionalLiabilitiesMinor +
+          pendingInvoicesMinor +
+          otherLiabilitiesMinor,
+      );
+
+      return {
+        currency,
+        transactionalAssetsMinor,
+        transactionalLiabilitiesMinor,
+        manualAssetsMinor,
+        investmentsMinor,
+        pendingInvoicesMinor,
+        otherLiabilitiesMinor,
+        assetsMinor,
+        liabilitiesMinor,
+        netWorthMinor: assertMinorUnits(assetsMinor - liabilitiesMinor),
+      };
+    });
+}

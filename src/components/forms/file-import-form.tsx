@@ -6,10 +6,21 @@ import {
   type FileImportFormState,
 } from "@/app/actions/file-imports";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
+import type { SupportedCurrency } from "@/types/database";
 
 const initialState: FileImportFormState = { status: "idle" };
 
-export function FileImportForm() {
+export function FileImportForm({
+  accounts = [],
+  defaultAccountId,
+}: {
+  accounts?: Array<{
+    id: string;
+    name: string;
+    currency: SupportedCurrency;
+  }>;
+  defaultAccountId?: string;
+}) {
   const [fileType, setFileType] = useState<
     "csv" | "ofx" | "qif" | "pdf"
   >("csv");
@@ -22,6 +33,29 @@ export function FileImportForm() {
   return (
     <form action={formAction} className="grid gap-6">
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
+
+      {accounts.length > 0 ? (
+        <Field
+          label="Conta de destino"
+          error={state.fieldErrors?.accountId?.[0]}
+        >
+          <select
+            className={inputClass(Boolean(state.fieldErrors?.accountId))}
+            name="accountId"
+            defaultValue={defaultAccountId ?? ""}
+          >
+            <option value="">Selecionar durante a revisão</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} · {account.currency}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs font-normal text-slate-500">
+            A associação pode ser alterada na revisão antes da confirmação.
+          </span>
+        </Field>
+      ) : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Formato" error={state.fieldErrors?.fileType?.[0]}>

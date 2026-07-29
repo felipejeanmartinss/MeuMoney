@@ -50,6 +50,18 @@ export async function uploadFinancialFile(
   _previousState: FileImportFormState,
   formData: FormData,
 ): Promise<FileImportFormState> {
+  const rawAccountId = formData.get("accountId");
+  const accountId =
+    typeof rawAccountId === "string" && rawAccountId
+      ? importJobIdSchema.safeParse(rawAccountId)
+      : null;
+  if (accountId && !accountId.success) {
+    return {
+      status: "error",
+      fieldErrors: { accountId: ["Selecione uma conta válida."] },
+    };
+  }
+
   const fileType = importFileTypeSchema.safeParse(formData.get("fileType"));
   if (!fileType.success) {
     return {
@@ -83,6 +95,19 @@ export async function uploadFinancialFile(
     csvConfig: csvConfig?.success ? csvConfig.data : null,
   });
   if (!result.ok) return { status: "error", message: result.message };
+  if (accountId?.success) {
+    const configuration = await configureCurrentUserImport(
+      result.id,
+      accountId.data,
+    );
+    if (!configuration.ok) {
+      return {
+        status: "error",
+        message:
+          "O arquivo foi preparado, mas a conta não pôde ser associada. Abra o histórico de importações para continuar a revisão.",
+      };
+    }
+  }
   redirect(`/imports/${result.id}?message=uploaded`);
 }
 

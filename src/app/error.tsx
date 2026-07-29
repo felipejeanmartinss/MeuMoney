@@ -15,7 +15,7 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <button
           onClick={reset}
-          className="rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white"
+          className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white hover:bg-emerald-800"
         >
           Tentar novamente
         </button>

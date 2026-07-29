@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateFinancialDashboardMonth,
+  calculateExecutiveDashboardNetWorth,
   fillMonthlyEvolution,
+  limitExpenseCategories,
   referenceMonthsEndingAt,
   sumAccountBalancesByCurrency,
   type DashboardEntry,
@@ -215,5 +217,32 @@ describe("financial dashboard aggregations", () => {
       ["BRL", 10_000],
       ["USD", 2_000],
     ]);
+  });
+
+  it("limits category noise and consolidates the remainder as Outras", () => {
+    const rows = Array.from({ length: 7 }, (_, index) => ({
+      categoryId: `category-${index}`,
+      categoryName: `Categoria ${index}`,
+      context: "personal" as const,
+      amountMinor: 7_000 - index * 1_000,
+    }));
+    const result = limitExpenseCategories(rows, 5);
+
+    expect(result).toHaveLength(5);
+    expect(result.at(-1)).toMatchObject({
+      categoryId: "other-categories",
+      categoryName: "Outras",
+      amountMinor: 6_000,
+    });
+  });
+
+  it("adds transactional balance and subtracts pending invoices from net worth", () => {
+    expect(
+      calculateExecutiveDashboardNetWorth({
+        accountBalanceMinor: 50_000,
+        manualNetWorthMinor: 300_000,
+        outstandingInvoicesMinor: 20_000,
+      }),
+    ).toBe(330_000);
   });
 });

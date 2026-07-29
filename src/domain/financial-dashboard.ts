@@ -276,3 +276,45 @@ export function sumAccountBalancesByCurrency(
   }
   return totals;
 }
+
+export function limitExpenseCategories(
+  rows: DashboardCategoryExpense[],
+  maximumVisible = 5,
+): DashboardCategoryExpense[] {
+  if (!Number.isSafeInteger(maximumVisible) || maximumVisible < 2) {
+    throw new Error("O limite de categorias deve ser um inteiro maior que um.");
+  }
+  const sorted = [...rows].sort(
+    (left, right) =>
+      right.amountMinor - left.amountMinor ||
+      left.categoryName.localeCompare(right.categoryName, "pt-BR"),
+  );
+  if (sorted.length <= maximumVisible) return sorted;
+
+  const visible = sorted.slice(0, maximumVisible - 1);
+  const remaining = sorted.slice(maximumVisible - 1);
+  return [
+    ...visible,
+    {
+      categoryId: "other-categories",
+      categoryName: "Outras",
+      context: remaining[0]?.context ?? "personal",
+      amountMinor: remaining.reduce(
+        (total, row) => addMinorUnits(total, row.amountMinor),
+        0,
+      ),
+    },
+  ];
+}
+
+export function calculateExecutiveDashboardNetWorth(input: {
+  accountBalanceMinor: number;
+  manualNetWorthMinor: number;
+  outstandingInvoicesMinor: number;
+}) {
+  return assertMinorUnits(
+    assertMinorUnits(input.accountBalanceMinor) +
+      assertMinorUnits(input.manualNetWorthMinor) -
+      assertMinorUnits(input.outstandingInvoicesMinor),
+  );
+}

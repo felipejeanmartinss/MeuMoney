@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExpenseDistribution } from "@/components/dashboard/expense-distribution";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { MonthlyEvolution } from "@/components/dashboard/monthly-evolution";
+import { SpendingTracker } from "@/components/dashboard/spending-tracker";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import {
   currentReferenceMonth,
@@ -58,16 +59,16 @@ export default async function DashboardPage({
     data.profile?.full_name?.trim().split(/\s+/)[0] || "bem-vindo";
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
-      <section className="grid gap-5 rounded-3xl bg-gradient-to-br from-blue-800 to-indigo-950 p-6 text-white shadow-xl shadow-blue-950/10 sm:p-9 md:grid-cols-[1fr_auto] md:items-end">
+    <main className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <section className="grid gap-5 rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-900 to-slate-950 p-6 text-white shadow-xl shadow-emerald-950/10 sm:p-9 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-200">
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-200">
             Visão financeira
           </p>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-5xl">
             Olá, {firstName}.
           </h1>
-          <p className="mt-3 max-w-2xl leading-7 text-blue-100">
+          <p className="mt-3 max-w-2xl leading-7 text-emerald-100">
             Uma leitura consolidada de {formatReferenceMonth(referenceMonth)},
             sempre separada por moeda.
           </p>
@@ -78,7 +79,7 @@ export default async function DashboardPage({
         >
           <label
             htmlFor="dashboard-month"
-            className="text-xs font-bold uppercase tracking-wider text-blue-100"
+            className="text-xs font-bold uppercase tracking-wider text-emerald-100"
           >
             Mês de referência
           </label>
@@ -90,7 +91,7 @@ export default async function DashboardPage({
               defaultValue={referenceMonth}
               className="min-h-11 rounded-xl border border-white/30 bg-white px-3 text-slate-950"
             />
-            <button className="min-h-11 rounded-xl bg-white px-4 font-bold text-blue-800 hover:bg-blue-50">
+            <button className="min-h-11 rounded-xl bg-white px-4 font-bold text-emerald-800 hover:bg-emerald-50">
               Atualizar
             </button>
           </div>
@@ -118,7 +119,7 @@ export default async function DashboardPage({
           </p>
           <Link
             href="/accounts"
-            className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-blue-700 px-4 font-semibold text-white hover:bg-blue-800"
+            className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-semibold text-white hover:bg-emerald-800"
           >
             Cadastrar conta
           </Link>
@@ -151,7 +152,7 @@ export default async function DashboardPage({
           >
             <header className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
+                <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
                   {section.currency}
                 </p>
                 <h2
@@ -210,14 +211,14 @@ export default async function DashboardPage({
                 tone={resultTone}
               />
               <MetricCard
-                label="Orçamento consumido"
-                value={formatPercentage(month.budget_percentage_consumed)}
-                helper={budgetHelper}
-                tone={
-                  (month.budget_percentage_consumed ?? 0) > 100
-                    ? "negative"
-                    : "neutral"
-                }
+                label="Patrimônio líquido"
+                value={formatMoney(
+                  section.netWorthMinor,
+                  section.currency,
+                  locale,
+                )}
+                helper="Contas + patrimônio e investimentos − passivos e faturas"
+                tone={section.netWorthMinor < 0 ? "negative" : "positive"}
               />
             </div>
 
@@ -233,7 +234,7 @@ export default async function DashboardPage({
                 </div>
                 <Link
                   href="/accounts"
-                  className="text-sm font-semibold text-blue-700 hover:underline"
+                  className="text-sm font-semibold text-emerald-700 hover:underline"
                 >
                   Ver contas
                 </Link>
@@ -291,6 +292,27 @@ export default async function DashboardPage({
               />
             </div>
 
+            <SpendingTracker
+              rows={section.spendingTracker}
+              currency={section.currency}
+              locale={locale}
+            />
+
+            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+              Orçamento consumido no mês:{" "}
+              <strong
+                className={
+                  (month.budget_percentage_consumed ?? 0) > 100
+                    ? "text-rose-700"
+                    : "text-slate-950"
+                }
+              >
+                {formatPercentage(month.budget_percentage_consumed)}
+              </strong>
+              {" · "}
+              {budgetHelper}
+            </p>
+
             <div className="grid gap-5 lg:grid-cols-2">
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
@@ -304,7 +326,7 @@ export default async function DashboardPage({
                   </div>
                   <Link
                     href="/recurring-transactions"
-                    className="text-sm font-semibold text-blue-700 hover:underline"
+                    className="text-sm font-semibold text-emerald-700 hover:underline"
                   >
                     Ver todas
                   </Link>
@@ -364,7 +386,7 @@ export default async function DashboardPage({
                   </div>
                   <Link
                     href="/credit-cards"
-                    className="text-sm font-semibold text-blue-700 hover:underline"
+                    className="text-sm font-semibold text-emerald-700 hover:underline"
                   >
                     Ver cartões
                   </Link>

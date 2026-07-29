@@ -5,9 +5,20 @@ import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Novo lançamento" };
 
-export default async function NewTransactionPage() {
-  const { accounts, categories, hasError } =
-    await getTransactionFormOptions();
+export default async function NewTransactionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ accountId?: string }>;
+}) {
+  const { accountId } = await searchParams;
+  const { accounts, categories, hasError } = await getTransactionFormOptions(
+    accountId ? { accountId } : undefined,
+  );
+  const selectedAccountId = accounts.some(
+    (account) => account.id === accountId,
+  )
+    ? accountId
+    : undefined;
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -37,6 +48,7 @@ export default async function NewTransactionPage() {
             accounts={accounts}
             categories={categories}
             values={{
+              accountId: selectedAccountId,
               transactionDate: toIsoDate(new Date()),
               amountMinor: "0,00",
             }}

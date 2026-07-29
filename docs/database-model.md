@@ -185,3 +185,15 @@ confirmação também cria todos os lançamentos e assinaturas de forma atômica
 - cada transferência possui no máximo uma entrada e uma saída, garantidas por restrição única;
 - triggers mantêm `updated_at`;
 - chaves estrangeiras para o usuário usam exclusão em cascata, executada apenas quando o usuário é removido pelo fluxo administrativo de identidade.
+
+## Incremento visual consolidado
+
+O incremento visual não adiciona tabelas nem altera contratos persistidos. As
+centrais de navegação, contas, investimentos, perfil e patrimônio reutilizam
+as tabelas, views e RPCs existentes. A consolidação patrimonial executiva lê
+separadamente `account_balances`, `net_worth_summary` e
+`financial_dashboard_invoices`; não grava um novo total e não cria risco de
+divergência entre valores derivados.
+
+O simulador de poupança é não persistente. Nenhuma migration é necessária para
+essa funcionalidade.

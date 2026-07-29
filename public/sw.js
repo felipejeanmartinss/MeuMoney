@@ -1,4 +1,4 @@
-const CACHE_NAME = "meumoney-static-v1";
+const CACHE_NAME = "meumoney-static-v2";
 const STATIC_SHELL = ["/offline", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {

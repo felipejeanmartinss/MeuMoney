@@ -138,3 +138,27 @@ As views `investment_position_summary` e `net_worth_summary` usam
 histórico declarado completo. A segunda incorpora o valor atual das posições
 ativas como ativos, mantendo investimentos, ativos manuais e passivos em
 colunas distintas e consolidação independente por moeda.
+
+## Camada de experiência moderna
+
+O shell autenticado possui cinco destinos estáveis: Início, Contas,
+Investimentos, Patrimônio e Perfil. No desktop, a navegação principal e o
+submenu contextual ficam em uma barra lateral; no celular, os cinco destinos
+ficam na navegação inferior e as ações secundárias são abertas pelo menu do
+cabeçalho. A resolução de seção e estado ativo está isolada em
+`src/components/layout/navigation-model.ts` e coberta por testes.
+
+As rotas históricas continuam sendo as rotas canônicas. As centrais apenas
+agrupam e encaminham para `/transactions`, `/recurring-transactions`,
+`/transfers`, `/categories`, `/credit-cards`, `/imports` e
+`/settings/security`, sem duplicar serviços ou regras financeiras.
+
+O detalhe de conta consulta no servidor somente o recorte da conta autenticada:
+até 100 lançamentos, 50 recorrências e 20 jobs de importação. Criar lançamento,
+recorrência ou importação a partir desse detalhe envia somente o identificador
+predefinido; o serviço e o banco continuam validando propriedade e RLS.
+
+O simulador patrimonial é o único novo Client Component com cálculo financeiro.
+A função pura `projectSavings` recebe dinheiro inteiro, taxa em pontos-base e
+prazo inteiro. O componente apenas coleta entradas e apresenta a projeção; não
+acessa o Supabase e não persiste simulações.
