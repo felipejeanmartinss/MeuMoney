@@ -178,6 +178,19 @@ describe("file imports", () => {
     expect(rows[4].validationCode).toBe("unsupported_record");
   });
 
+  it("keeps zero-value Money markers reviewable without violating staging", () => {
+    const rows = parseStructuredQif(
+      "!Type:Bank\nD21/01'2014\nT0.00\nPOpening marker\n^\n",
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      signedAmountMinor: null,
+      validationCode: "invalid_amount",
+      transactionDate: "2014-01-21",
+    });
+  });
+
   it("rejects QIF files without a compatible account section", () => {
     expect(() =>
       parseStructuredQif("!Type:Cat\nNAlimentação\n^"),

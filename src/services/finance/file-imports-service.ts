@@ -184,6 +184,15 @@ export async function createCurrentUserImport(input: CreateImportInput) {
       target_rows: rowsToJson(rows),
     });
 
+    if (error) {
+      // Keep production diagnostics useful without logging file names,
+      // descriptions, amounts, hashes or normalized financial rows.
+      console.error("[file-imports] create_import_job failed", {
+        code: error.code || "unknown",
+        fileType: input.fileType,
+      });
+    }
+
     // The original byte buffer is never persisted. Only normalized staging
     // rows and a one-way file fingerprint cross the database boundary.
     return error || !data
