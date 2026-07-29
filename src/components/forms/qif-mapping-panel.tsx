@@ -8,7 +8,7 @@ import type {
   ImportStagingRow,
   TransactionType,
 } from "@/types/database";
-import { inputClass } from "./form-controls";
+import { inputClass } from "@/components/forms/form-control-styles";
 
 type CategoryMapping = {
   sourceName: string;
