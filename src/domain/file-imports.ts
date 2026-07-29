@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isValidIsoDate } from "./dates";
 import { parseMoneyInputToMinor } from "./money";
 
-export const IMPORT_FILE_TYPES = ["csv", "ofx", "pdf"] as const;
+export const IMPORT_FILE_TYPES = ["csv", "ofx", "qif", "pdf"] as const;
 export const IMPORT_ROW_STATUSES = [
   "needs_review",
   "valid",
@@ -65,6 +65,9 @@ export type ParsedImportRow = {
   confidence?: number | null;
   sourceAdapterId?: string | null;
   sourceDocumentType?: string | null;
+  recordKind?: "transaction" | "transfer";
+  sourceCategoryName?: string | null;
+  transferAccountName?: string | null;
 };
 
 export type ImportSignatureInput = {
@@ -112,7 +115,7 @@ export const csvImportConfigSchema = z.object({
 });
 
 export const importFileTypeSchema = z.enum(IMPORT_FILE_TYPES, {
-  error: "Selecione CSV, OFX ou PDF.",
+  error: "Selecione CSV, OFX, QIF ou PDF.",
 });
 
 export const importJobIdSchema = z.uuid("Importação inválida.");
@@ -154,6 +157,33 @@ export const importRowCorrectionSchema = z.object({
     .max(180, "Use até 180 caracteres."),
   signedAmountMinor: signedAmountInput,
   categoryId: z.uuid("Selecione uma categoria válida."),
+});
+
+export const importTransferRowCorrectionSchema = z.object({
+  rowId: importRowIdSchema,
+  transactionDate: z
+    .string()
+    .refine(isValidIsoDate, "Informe uma data válida."),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Informe a descrição.")
+    .max(180, "Use até 180 caracteres."),
+  signedAmountMinor: signedAmountInput,
+  transferAccountId: z.uuid("Selecione a outra conta da transferência."),
+});
+
+export const qifCategoryMappingSchema = z.object({
+  jobId: importJobIdSchema,
+  sourceCategoryName: z.string().trim().min(1).max(180),
+  transactionType: z.enum(["income", "expense"]),
+  categoryId: z.uuid("Selecione uma categoria válida."),
+});
+
+export const qifTransferAccountMappingSchema = z.object({
+  jobId: importJobIdSchema,
+  sourceAccountName: z.string().trim().min(1).max(180),
+  accountId: z.uuid("Selecione uma conta válida."),
 });
 
 export function normalizeImportDescription(value: string): string {
@@ -681,6 +711,172 @@ export function parseStructuredOfx(content: string): ParsedImportRow[] {
         signedAmountMinor,
         description,
       ),
+    };
+  });
+}
+
+type QifDateOrder = "DMY" | "MDY";
+
+function qifDateOrder(records: Map<string, string[]>[]): QifDateOrder {
+  for (const record of records) {
+    const value = record.get("D")?.[0]?.trim() ?? "";
+    const match = /^(\d{1,2})\s*[/-]\s*(\d{1,2})/.exec(value);
+    if (!match) continue;
+    if (Number(match[1]) > 12) return "DMY";
+    if (Number(match[2]) > 12) return "MDY";
+  }
+  return "DMY";
+}
+
+function parseQifDate(rawValue: string, order: QifDateOrder) {
+  const match =
+    /^(\d{1,2})\s*[/-]\s*(\d{1,2})\s*(?:['/-])\s*(\d{4}|\d{2})/.exec(
+      rawValue.trim(),
+    );
+  if (!match) return null;
+
+  const first = Number(match[1]);
+  const second = Number(match[2]);
+  const rawYear = Number(match[3]);
+  const year =
+    match[3].length === 2
+      ? rawYear >= 70
+        ? 1900 + rawYear
+        : 2000 + rawYear
+      : rawYear;
+  return buildIsoDate(
+    year,
+    order === "DMY" ? second : first,
+    order === "DMY" ? first : second,
+  );
+}
+
+function qifDecimalSeparator(value: string): CsvDecimalSeparator {
+  const comma = value.lastIndexOf(",");
+  const dot = value.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) return comma > dot ? "," : ".";
+  if (comma >= 0 && /,\d{1,2}\s*$/.test(value)) return ",";
+  return ".";
+}
+
+function qifDescription(record: Map<string, string[]>) {
+  const descriptiveFields = [record.get("P")?.[0], record.get("M")?.[0]];
+  const values = descriptiveFields.some((value) => value?.trim())
+    ? descriptiveFields
+    : [record.get("N")?.[0]];
+  const parts = values
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean)
+    .filter(
+      (value, index, values) =>
+        values.findIndex(
+          (candidate) =>
+            normalizeImportDescription(candidate) ===
+            normalizeImportDescription(value),
+        ) === index,
+    );
+  return parts.length > 0
+    ? parts.join(" — ").replace(/\s+/g, " ").slice(0, 180)
+    : null;
+}
+
+function qifTransferAccount(value: string) {
+  const match = /^\[([^\]]+)\](?:\/.*)?$/.exec(value.trim());
+  return match?.[1]?.trim().slice(0, 180) || null;
+}
+
+/**
+ * Parses account transaction sections exported by Microsoft Money and other
+ * QIF producers. Split transactions stay visible as unsupported in staging
+ * instead of being silently flattened.
+ */
+export function parseStructuredQif(content: string): ParsedImportRow[] {
+  const lines = content
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n");
+  const records: Map<string, string[]>[] = [];
+  let currentType: string | null = null;
+  let current = new Map<string, string[]>();
+
+  const finishRecord = () => {
+    if (current.size > 0) records.push(current);
+    current = new Map<string, string[]>();
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    if (!line) continue;
+    if (line.startsWith("!Type:")) {
+      finishRecord();
+      currentType = line.slice("!Type:".length).trim().toLowerCase();
+      continue;
+    }
+    if (line.startsWith("!")) {
+      finishRecord();
+      currentType = null;
+      continue;
+    }
+    if (line === "^") {
+      finishRecord();
+      continue;
+    }
+    if (!currentType || !["bank", "cash", "ccard"].includes(currentType)) {
+      continue;
+    }
+
+    const field = line[0];
+    const value = line.slice(1);
+    current.set(field, [...(current.get(field) ?? []), value]);
+  }
+  finishRecord();
+
+  if (records.length === 0) {
+    throw new Error(
+      "O arquivo QIF não contém movimentações de conta compatíveis.",
+    );
+  }
+
+  const dateOrder = qifDateOrder(records);
+  return records.map((record, index) => {
+    const sourceDateText = record.get("D")?.[0]?.trim() ?? "";
+    const sourceAmountText = record.get("T")?.[0]?.trim() ?? "";
+    const sourceCategoryName = record.get("L")?.[0]?.trim().slice(0, 180) ?? "";
+    const transferAccountName = qifTransferAccount(sourceCategoryName);
+    const description = qifDescription(record);
+    const transactionDate = parseQifDate(sourceDateText, dateOrder);
+    const hasSplitFields = ["S", "E", "$"].some((field) => record.has(field));
+    let signedAmountMinor: number | null = null;
+    try {
+      signedAmountMinor = parseImportAmountToMinor(
+        sourceAmountText,
+        qifDecimalSeparator(sourceAmountText),
+      );
+    } catch {
+      signedAmountMinor = null;
+    }
+
+    return {
+      sourceRowNumber: index + 1,
+      sourceExternalId: record.get("N")?.[0]?.trim().slice(0, 180) || null,
+      sourceDateText: sourceDateText.slice(0, 80),
+      sourceAmountText: sourceAmountText.slice(0, 80),
+      transactionDate,
+      description,
+      signedAmountMinor,
+      validationCode: hasSplitFields
+        ? "unsupported_record"
+        : validationCodeFor(
+            transactionDate,
+            signedAmountMinor,
+            description,
+          ),
+      sourceDescriptionOriginal: description,
+      recordKind: transferAccountName ? "transfer" : "transaction",
+      sourceCategoryName: transferAccountName
+        ? null
+        : sourceCategoryName || null,
+      transferAccountName,
     };
   });
 }

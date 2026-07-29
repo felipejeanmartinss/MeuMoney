@@ -144,7 +144,17 @@
 - O arquivo original é descartado imediatamente após a leitura em memória. Conteúdo financeiro não pode ser enviado a logs.
 - Staging é apagado ao confirmar ou cancelar. O job preserva apenas metadados e contadores de auditoria.
 - O usuário pode limpar definitivamente os metadados dos próprios jobs cancelados. A operação nunca alcança jobs em revisão, prontos, concluídos ou pertencentes a outro usuário.
-- CSV e OFX são limitados a 5 MB e 1.000 movimentações por job no MVP.
+- CSV, OFX, QIF e PDF são limitados a 5 MB e 5.000 movimentações por job.
+
+## Importação QIF
+
+- QIF usa o mesmo staging, revisão e confirmação transacional dos demais formatos.
+- Categorias do arquivo são sugestões editáveis e nunca bypassam a validação de natureza e propriedade.
+- Referências `[Conta]` representam transferências e exigem uma conta diferente, ativa, do mesmo usuário e moeda.
+- Transferência QIF negativa sai da conta representada pelo arquivo; positiva entra nela.
+- A assinatura de transferência ordena as duas contas e impede duplicidade ao importar o extrato do outro lado.
+- Lançamentos divididos não são achatados: ficam bloqueados como não suportados.
+- O arquivo original é decodificado em UTF-8 ou Windows-1252, processado em memória e descartado.
 
 ## Importação assistida por PDF — Sprint 11
 

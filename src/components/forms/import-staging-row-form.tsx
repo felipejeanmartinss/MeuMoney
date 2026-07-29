@@ -3,12 +3,14 @@
 import { useState } from "react";
 import {
   correctFinancialImportRow,
+  correctFinancialImportTransferRow,
   toggleFinancialImportRow,
 } from "@/app/actions/file-imports";
 import { minorUnitsToInput } from "@/domain/money";
 import type {
   Category,
   ImportStagingRow,
+  Account,
   TransactionType,
 } from "@/types/database";
 import { inputClass } from "./form-controls";
@@ -48,10 +50,14 @@ export function ImportStagingRowForm({
   jobId,
   row,
   categories,
+  accounts,
+  page,
 }: {
   jobId: string;
   row: ImportStagingRow;
   categories: Pick<Category, "id" | "name" | "kind" | "context">[];
+  accounts: Pick<Account, "id" | "name" | "currency">[];
+  page: number;
 }) {
   const initialAmount =
     row.signed_amount_minor === null
@@ -64,6 +70,15 @@ export function ImportStagingRowForm({
   );
   const presentation = statusPresentation[row.status];
   const editable = !["imported"].includes(row.status);
+  const isTransfer = row.record_kind === "transfer";
+  const sourceAccount = accounts.find(
+    (account) => account.id === row.account_id,
+  );
+  const transferAccounts = accounts.filter(
+    (account) =>
+      account.id !== row.account_id &&
+      (!sourceAccount || account.currency === sourceAccount.currency),
+  );
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -108,10 +123,24 @@ export function ImportStagingRowForm({
         </p>
       ) : null}
 
+      {row.source_category_name ? (
+        <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <span className="font-semibold">Categoria no QIF:</span>{" "}
+          {row.source_category_name}
+        </p>
+      ) : null}
+      {row.transfer_account_name ? (
+        <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <span className="font-semibold">Conta indicada no QIF:</span>{" "}
+          {row.transfer_account_name}
+        </p>
+      ) : null}
+
       {row.status === "duplicate" ? (
         <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-sm text-violet-900">
-          Uma movimentação com a mesma conta, data, valor e descrição já
-          existe. Edite a linha se ela realmente for diferente.
+          {isTransfer
+            ? "Uma transferência com as mesmas contas, data e valor já existe."
+            : "Uma movimentação com a mesma conta, data, valor e descrição já existe. Edite a linha se ela realmente for diferente."}
         </p>
       ) : null}
       {row.validation_code ? (
@@ -122,13 +151,80 @@ export function ImportStagingRowForm({
         </p>
       ) : null}
 
-      {editable && row.status !== "ignored" ? (
+      {editable && row.status !== "ignored" && isTransfer ? (
+        <form
+          action={correctFinancialImportTransferRow}
+          className="mt-4 grid gap-4 lg:grid-cols-12"
+        >
+          <input type="hidden" name="jobId" value={jobId} />
+          <input type="hidden" name="rowId" value={row.id} />
+          <input type="hidden" name="page" value={page} />
+          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
+            Data
+            <input
+              className={inputClass()}
+              name="transactionDate"
+              type="date"
+              defaultValue={row.transaction_date ?? ""}
+              required
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-4">
+            Descrição
+            <input
+              className={inputClass()}
+              name="description"
+              defaultValue={row.description ?? ""}
+              maxLength={180}
+              required
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
+            Valor com sinal
+            <input
+              className={inputClass()}
+              name="signedAmountMinor"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              inputMode="decimal"
+              required
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-3">
+            Outra conta
+            <select
+              className={inputClass()}
+              name="transferAccountId"
+              defaultValue={row.transfer_account_id ?? ""}
+              required
+            >
+              <option value="">Selecione</option>
+              {transferAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} · {account.currency}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-end lg:col-span-1">
+            <button className="min-h-12 w-full rounded-xl bg-blue-700 px-3 text-sm font-semibold text-white hover:bg-blue-800">
+              Salvar
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 lg:col-span-12">
+            {amount.trim().startsWith("-")
+              ? "Saída da conta do arquivo para a conta selecionada."
+              : "Entrada na conta do arquivo vinda da conta selecionada."}
+          </p>
+        </form>
+      ) : editable && row.status !== "ignored" ? (
         <form
           action={correctFinancialImportRow}
           className="mt-4 grid gap-4 lg:grid-cols-12"
         >
           <input type="hidden" name="jobId" value={jobId} />
           <input type="hidden" name="rowId" value={row.id} />
+          <input type="hidden" name="page" value={page} />
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
             Data
             <input
@@ -200,6 +296,7 @@ export function ImportStagingRowForm({
         <form action={toggleFinancialImportRow} className="mt-3">
           <input type="hidden" name="jobId" value={jobId} />
           <input type="hidden" name="rowId" value={row.id} />
+          <input type="hidden" name="page" value={page} />
           <input
             type="hidden"
             name="ignored"

@@ -68,8 +68,17 @@ adaptadores de extrato versionados, fixtures anônimas e regressão contra os
 layouts fornecidos. PDFs protegidos, digitalizados, incompatíveis ou com layout
 desconhecido são rejeitados e o documento original é descartado.
 
+## Incremento — Importação QIF
+
+Importação direta de arquivos QIF do Microsoft Money usando o staging
+existente. Categorias originais são preservadas como sugestões; referências
+`[Conta]` são mapeadas e confirmadas como transferências reais, com assinatura
+idempotente independente do lado importado. A revisão passa a ser paginada e o
+limite sobe para 5.000 linhas. Lançamentos divididos permanecem fora do escopo.
+
 ## Próximas sprints
 
-Novas versões e novos bancos com fixtures representativas, OCR, importação XLS,
+Novas versões e novos bancos com fixtures representativas, lançamentos QIF
+divididos, OCR, importação XLS,
 relatórios analíticos, avaliações automáticas de mercado e recursos avançados
 de cartão serão planejados separadamente.

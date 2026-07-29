@@ -1,10 +1,10 @@
-# Importação CSV, OFX e PDF pesquisável
+# Importação CSV, OFX, QIF e PDF pesquisável
 
 ## Fluxo
 
 1. O usuário envia um arquivo de até 5 MB.
 2. O servidor lê o conteúdo em memória, calcula SHA-256 e descarta os bytes.
-3. O parser normaliza no máximo 1.000 movimentações em staging.
+3. O parser normaliza no máximo 5.000 movimentações em staging.
 4. O usuário associa conta e categorias, corrige dados ou ignora linhas.
 5. O banco recalcula assinaturas e duplicidades a cada alteração.
 6. A confirmação explícita cria todos os lançamentos em uma transação.
@@ -41,6 +41,27 @@ suportados.
 São aceitos documentos SGML ou XML com blocos fechados `STMTTRN`. Os campos
 lidos são `DTPOSTED`, `TRNAMT`, `FITID`, `NAME` e `MEMO`.
 
+## QIF
+
+São aceitas seções de conta `Bank`, `Cash` e `CCard`. O parser suporta datas
+do Microsoft Money como `31/01'2026`, anos com dois ou quatro dígitos e valores
+com ponto ou vírgula decimal. Na ausência de metadado regional, datas ambíguas
+seguem o padrão brasileiro dia/mês.
+
+O nome original da categoria é preservado como sugestão. O trecho após o
+último `:` pode ser associado automaticamente a uma categoria existente com
+mesma natureza; a tela também permite aplicar um mapeamento a todas as linhas
+de mesmo nome.
+
+Categorias entre colchetes, como `[Poupança]`, nunca viram receita ou despesa.
+Elas exigem associação a outra conta ativa, da mesma moeda, e são confirmadas
+como transferências. Valor negativo significa saída da conta representada pelo
+arquivo; valor positivo significa entrada. A assinatura usa as duas contas em
+ordem estável, data e valor absoluto, evitando reimportação pelo outro lado.
+
+Lançamentos QIF divididos (`S`, `E` e `$`) permanecem em erro para revisão e
+não são achatados silenciosamente.
+
 ## PDF
 
 PDFs precisam conter texto pesquisável e corresponder a um adaptador
@@ -67,6 +88,8 @@ user_id|account_id|transaction_date|signed_amount_minor|normalized_description
 
 O banco aplica SHA-256 e mantém restrição única por usuário. Isso protege
 contra duplicidades no histórico, em jobs anteriores e dentro do mesmo upload.
+Transferências usam uma assinatura própria, independente da direção em que as
+duas contas aparecem.
 
 ## Privacidade e descarte
 
@@ -83,6 +106,8 @@ contra duplicidades no histórico, em jobs anteriores e dentro do mesmo upload.
 - não há XLS nem OCR;
 - PDFs protegidos, digitalizados ou incompatíveis são rejeitados;
 - mudanças de layout do emissor exigem nova fixture e versão do adaptador;
-- não há categorização automática;
-- transferências e compras de cartão não são inferidas do arquivo;
+- o QIF apenas sugere categorias por nome; a decisão continua explícita;
+- transferências são reconhecidas somente pela sintaxe QIF `[Conta]`;
+- compras de cartão não são inferidas do arquivo;
+- lançamentos QIF divididos ainda não são suportados;
 - duplicidades com data, valor ou descrição diferentes exigem revisão humana.

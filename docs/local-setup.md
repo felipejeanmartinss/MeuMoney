@@ -54,3 +54,11 @@ camada em fachadas `security invoker` e move as implementações privilegiadas
 para `private`. A segunda cria jobs, staging, assinaturas, RLS e as operações
 atômicas de importação. Só faça deploy da aplicação depois que ambas forem
 aplicadas no Supabase do ambiente correspondente.
+
+Para habilitar QIF, aplique depois das migrations de CSV/OFX, PDF e beta:
+
+`20260728215713_qif_imports.sql`
+
+Ela adiciona o formato, os mapeamentos de categoria e conta, a assinatura de
+transferência e a confirmação atômica de lançamentos e transferências. A
+aplicação só deve ser implantada depois dessa migration no mesmo ambiente.

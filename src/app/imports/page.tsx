@@ -56,7 +56,7 @@ export default async function ImportsPage({
             Importações
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Revise CSV, OFX e PDF em uma área temporária antes de alterar seu
+            Revise CSV, OFX, QIF e PDF em uma área temporária antes de alterar seu
             histórico financeiro.
           </p>
         </div>

@@ -59,7 +59,7 @@ export type InvestmentCashFlowType =
   | "contribution"
   | "redemption"
   | "income";
-export type ImportFileType = "csv" | "ofx" | "pdf";
+export type ImportFileType = "csv" | "ofx" | "qif" | "pdf";
 export type ImportJobStatus =
   | "review"
   | "ready"
@@ -461,6 +461,10 @@ export type ImportStagingRow = {
   source_description_original: string | null;
   source_pages: number[];
   confidence: number | null;
+  record_kind: "transaction" | "transfer" | null;
+  source_category_name: string | null;
+  transfer_account_name: string | null;
+  transfer_account_id: string | null;
   transaction_date: string | null;
   description: string | null;
   normalized_description: string | null;
@@ -478,6 +482,7 @@ export type ImportStagingRow = {
     | "unsupported_record"
     | null;
   duplicate_transaction_id: string | null;
+  duplicate_transfer_id: string | null;
   is_selected: boolean;
   created_at: string;
   updated_at: string;
@@ -487,7 +492,8 @@ export type ImportedTransactionSignature = {
   id: string;
   user_id: string;
   account_id: string;
-  transaction_id: string;
+  transaction_id: string | null;
+  transfer_id: string | null;
   source_job_id: string | null;
   signature: string;
   created_at: string;
@@ -1004,6 +1010,33 @@ export type Database = {
           target_category_id: string;
         };
         Returns: boolean;
+      };
+      update_import_transfer_row: {
+        Args: {
+          target_row_id: string;
+          target_transaction_date: string;
+          target_description: string;
+          target_signed_amount_minor: number;
+          target_transfer_account_id: string;
+        };
+        Returns: boolean;
+      };
+      map_import_qif_category: {
+        Args: {
+          target_job_id: string;
+          target_source_category_name: string;
+          target_transaction_type: "income" | "expense";
+          target_category_id: string;
+        };
+        Returns: number;
+      };
+      map_import_qif_transfer_account: {
+        Args: {
+          target_job_id: string;
+          target_source_account_name: string;
+          target_account_id: string;
+        };
+        Returns: number;
       };
       set_import_staging_row_ignored: {
         Args: {

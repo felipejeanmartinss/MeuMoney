@@ -7,6 +7,7 @@ import {
 } from "@/app/actions/file-imports";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { ImportStagingRowForm } from "@/components/forms/import-staging-row-form";
+import { QifMappingPanel } from "@/components/forms/qif-mapping-panel";
 import { getCurrentUserImportReview } from "@/services/finance/file-imports-service";
 
 export const metadata = { title: "Revisar importação" };
@@ -17,6 +18,7 @@ const messages: Record<string, string> = {
     "Conta associada e duplicidades recalculadas com sucesso.",
   "row-updated": "Linha atualizada e validada novamente.",
   "selection-updated": "Seleção da linha atualizada.",
+  "mapping-updated": "Mapeamento aplicado às linhas correspondentes.",
   "row-error": "Não foi possível corrigir a linha.",
   "configuration-error": "Não foi possível associar a conta.",
   confirmed: "Importação concluída de forma atômica.",
@@ -29,11 +31,11 @@ export default async function ImportReviewPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ message?: string }>;
+  searchParams: Promise<{ message?: string; page?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const { job, rows, accounts, categories, hasError } =
-    await getCurrentUserImportReview(id);
+  const { job, rows, accounts, categories, pagination, hasError } =
+    await getCurrentUserImportReview(id, Number(query.page) || 1);
   if (!job && !hasError) notFound();
   const feedback = query.message ? messages[query.message] : undefined;
   const feedbackIsError = query.message?.endsWith("error");
@@ -97,8 +99,8 @@ export default async function ImportReviewPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Parte da prévia não pôde ser carregada. Confirme as migrations das
-          Sprints 10 e 11 no Supabase.
+          Parte da prévia não pôde ser carregada. Confirme todas as migrations
+          de importação no Supabase.
         </p>
       ) : null}
 
@@ -108,8 +110,11 @@ export default async function ImportReviewPage({
             Importação concluída
           </h2>
           <p className="mt-2 text-emerald-900">
-            {job.imported_row_count} lançamento
-            {job.imported_row_count === 1 ? "" : "s"} foram gravados em uma
+            {job.imported_row_count}{" "}
+            {job.imported_row_count === 1
+              ? "movimentação foi gravada"
+              : "movimentações foram gravadas"}{" "}
+            em uma
             única transação. Os dados de staging foram descartados.
           </p>
           <Link
@@ -142,7 +147,9 @@ export default async function ImportReviewPage({
             >
               <input type="hidden" name="jobId" value={job.id} />
               <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-                Conta de destino
+                {job.file_type === "qif"
+                  ? "Conta representada pelo arquivo"
+                  : "Conta de destino"}
                 <select
                   className={inputClass()}
                   name="accountId"
@@ -184,6 +191,17 @@ export default async function ImportReviewPage({
             </dl>
           </section>
 
+          {job.file_type === "qif" ? (
+            <QifMappingPanel
+              jobId={job.id}
+              rows={rows}
+              accounts={accounts}
+              categories={categories}
+              sourceAccountId={job.account_id}
+              page={pagination.page}
+            />
+          ) : null}
+
           <section className="grid gap-4">
             <div>
               <h2 className="text-2xl font-extrabold text-slate-950">
@@ -191,7 +209,9 @@ export default async function ImportReviewPage({
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Valor positivo gera receita; valor negativo gera despesa.
-                Corrija os dados e associe uma categoria compatível.
+                {job.file_type === "qif"
+                  ? " Referências entre colchetes são transferências e precisam da conta correspondente."
+                  : " Corrija os dados e associe uma categoria compatível."}
               </p>
             </div>
             {rows.map((row) => (
@@ -200,8 +220,46 @@ export default async function ImportReviewPage({
                 jobId={job.id}
                 row={row}
                 categories={categories}
+                accounts={accounts}
+                page={pagination.page}
               />
             ))}
+            {pagination.totalPages > 1 ? (
+              <nav
+                aria-label="Páginas da revisão"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+              >
+                <Link
+                  aria-disabled={pagination.page <= 1}
+                  className={`rounded-lg border px-4 py-2 text-sm font-semibold ${
+                    pagination.page <= 1
+                      ? "pointer-events-none border-slate-200 text-slate-400"
+                      : "border-blue-200 text-blue-700 hover:bg-blue-50"
+                  }`}
+                  href={`/imports/${job.id}?page=${Math.max(1, pagination.page - 1)}`}
+                >
+                  Página anterior
+                </Link>
+                <span className="text-sm text-slate-600">
+                  Página {pagination.page} de {pagination.totalPages} ·{" "}
+                  {pagination.totalRows} linhas em revisão
+                </span>
+                <Link
+                  aria-disabled={pagination.page >= pagination.totalPages}
+                  className={`rounded-lg border px-4 py-2 text-sm font-semibold ${
+                    pagination.page >= pagination.totalPages
+                      ? "pointer-events-none border-slate-200 text-slate-400"
+                      : "border-blue-200 text-blue-700 hover:bg-blue-50"
+                  }`}
+                  href={`/imports/${job.id}?page=${Math.min(
+                    pagination.totalPages,
+                    pagination.page + 1,
+                  )}`}
+                >
+                  Próxima página
+                </Link>
+              </nav>
+            ) : null}
           </section>
 
           <section className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">

@@ -133,7 +133,7 @@ e privilégios mínimos. As views usam `security_invoker`.
 impressão SHA-256 do arquivo, configuração do CSV, estado, contadores e
 timestamps de descarte, confirmação ou cancelamento. Não contém os bytes do
 arquivo. Para PDF, `source_adapter_id` e `source_document_type` identificam o
-adaptador versionado que produziu o staging.
+adaptador versionado que produziu o staging. O formato também aceita `qif`.
 
 `public.import_staging_rows` guarda somente a representação temporária
 normalizada e os campos originais mínimos necessários para correção. Em PDFs,
@@ -142,10 +142,17 @@ proveniência da extração. Valor com sinal define receita ou despesa;
 `amount_minor` permanece positivo. Status separa linhas pendentes, válidas,
 duplicadas, ignoradas e com erro.
 
+Para QIF, `record_kind` distingue lançamento e transferência;
+`source_category_name` preserva a categoria sugerida e
+`transfer_account_name`/`transfer_account_id` registram a associação explícita
+da conta entre colchetes. `duplicate_transfer_id` aponta uma transferência já
+existente quando aplicável.
+
 `public.imported_transaction_signatures` vincula uma assinatura estável ao
-lançamento criado. A chave única `(user_id, signature)` impede que dois jobs
-confirmados gravem a mesma movimentação. A assinatura inclui usuário, conta,
-data, valor com sinal e descrição normalizada.
+lançamento ou transferência criada. A chave única `(user_id, signature)`
+impede que dois jobs confirmados gravem a mesma movimentação. Lançamentos usam
+usuário, conta, data, valor com sinal e descrição normalizada; transferências
+usam usuário, as duas contas ordenadas, data e valor absoluto.
 
 As três tabelas possuem RLS de leitura por proprietário e não aceitam escrita
 direta do cliente. As fachadas públicas `security invoker` delegam a funções
