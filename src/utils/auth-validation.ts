@@ -1,11 +1,22 @@
 import { z } from "zod";
 import { SUPPORTED_CURRENCIES } from "../domain/currencies";
 
-export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_LENGTH = 12;
+const BLOCKED_MVP_PASSWORDS = new Set([
+  "123456789012",
+  "password1234",
+  "senha12345678",
+  "qwerty123456",
+  "meumoney1234",
+]);
 const email = z.email("Informe um e-mail válido.").trim().toLowerCase();
 const password = z
   .string()
-  .min(PASSWORD_MIN_LENGTH, `Use pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`);
+  .min(PASSWORD_MIN_LENGTH, `Use pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`)
+  .refine(
+    (value) => !BLOCKED_MVP_PASSWORDS.has(value.toLowerCase()),
+    "Esta senha é muito comum. Escolha uma frase longa e exclusiva.",
+  );
 
 export const loginSchema = z.object({
   email,

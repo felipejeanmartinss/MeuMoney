@@ -1,5 +1,18 @@
 # Regras de negócio
 
+## Segurança e ciclo de vida dos dados — Sprint 12
+
+- Todo backup é versionado, pertence à sessão autenticada e inclui todas as
+  tabelas funcionais sem incluir senha ou token.
+- A restauração substitui os dados do usuário em uma única transação, força o
+  proprietário atual e rejeita vínculos externos ou histórico inconsistente.
+- A exclusão exige senha atual e confirmação explícita; não existe recuperação.
+- Eventos críticos guardam apenas tipo, resultado, recurso e horário.
+- Arquivos importados nunca são persistidos. Staging expira em sete dias e
+  metadados terminais em noventa dias.
+- Dados autenticados e respostas de API nunca entram no cache da PWA.
+- Cada tabela do usuário mantém RLS, política de proprietário e privilégio mínimo.
+
 ## Identidade — Sprint 1
 
 - Senhas existem somente no Supabase Auth e nunca são persistidas ou registradas pela aplicação.
@@ -64,6 +77,107 @@
 - Conta e categoria devem estar ativas e pertencer ao usuário autenticado; a natureza da categoria deve coincidir com a natureza da recorrência.
 - Recorrências e ocorrências não são excluídas fisicamente pela interface.
 
+## Orçamento mensal — Sprint 6
+
+- Cada orçamento pertence a um usuário, mês de referência, categoria de Despesa e moeda. O contexto Pessoal ou Profissional é o contexto atual da categoria.
+- Valores planejados são inteiros não negativos em unidades monetárias menores. Moedas diferentes nunca são somadas no mesmo comparativo.
+- O realizado de lançamentos em conta considera somente despesas ativas e concluídas, com categoria, no mês da transação.
+- Transferências não são despesas e ficam fora do orçamento. Pagamentos técnicos de fatura também são excluídos para que uma compra no cartão não seja contada duas vezes.
+- O realizado de cartão é reconhecido pela competência de cada parcela. Parcelas de compras canceladas ou parcelas canceladas não participam do cálculo.
+- Uma compra parcelada pode comprometer orçamentos de meses futuros; o pagamento da fatura não altera o realizado de consumo.
+- Disponível é `planejado - realizado` e pode ser negativo. Percentual consumido é `realizado / planejado`; quando o planejado é zero, o percentual não é calculado.
+- Consumo sem orçamento aparece no comparativo com planejado zero, deixando gastos não planejados visíveis.
+- Copiar o mês anterior mantém contexto e moeda, ignora categorias inativas e não sobrescreve linhas que já existem no mês de destino. A operação é idempotente.
+- O cliente não exclui orçamentos fisicamente. Um valor planejado igual a zero representa uma categoria sem verba no mês.
+
+## Dashboard financeiro — Sprint 7
+
+- Todo indicador consolidado é calculado por mês e moeda. Valores em BRL, USD e EUR nunca são somados entre si e não há conversão cambial implícita.
+- Receita mensal considera apenas receitas ativas e realizadas na data do lançamento.
+- Despesa mensal considera somente consumo ativo e realizado: despesas categorizadas em conta e parcelas de cartão reconhecidas no mês de competência.
+- Transferências e pagamentos técnicos de fatura não compõem receitas, despesas, resultado, orçamento consumido ou distribuição por categoria.
+- Resultado mensal é `receitas realizadas - despesas de consumo`.
+- Orçamento consumido compara todas as despesas de consumo do mês com todo o valor planejado na mesma moeda, incluindo consumo sem orçamento no numerador.
+- Saldo por conta representa a posição atual, derivada do saldo inicial e de movimentações realizadas. Ele não é reconstruído para o encerramento do mês histórico selecionado.
+- A evolução apresenta o mês selecionado e os cinco meses anteriores, preenchendo meses sem movimento com zero.
+- Próximas recorrências exibem apenas modelos ativos, não encerrados e com próxima ocorrência a partir da data atual.
+- Faturas abertas, fechadas ou vencidas permanecem visíveis até o pagamento. Uma fatura aberta ou fechada cuja data de vencimento passou recebe estado visual Vencida.
+- O dashboard é somente leitura; suas consultas respeitam RLS e são limitadas no servidor antes da renderização.
+
+## Patrimônio líquido — Sprint 8
+
+- Ativos manuais podem ser imóveis, veículos ou outros bens. Passivos manuais podem ser financiamentos, empréstimos ou outras dívidas.
+- Itens patrimoniais são independentes de contas, lançamentos, transferências, cartões e investimentos. Cadastrar ou avaliar um item não altera saldo nem fluxo de caixa.
+- Cada item pertence a um único usuário e possui nome, natureza, tipo, contexto, moeda, valor atual, data de avaliação, observações e estado.
+- Valores são inteiros não negativos em unidades monetárias menores e limitados ao intervalo inteiro seguro do TypeScript.
+- Patrimônio líquido é `ativos ativos - passivos ativos`, calculado separadamente para BRL, USD e EUR. Não existe conversão cambial implícita.
+- A avaliação inicial é registrada automaticamente. Alterar valor ou data registra uma nova avaliação na mesma transação; corrigir a mesma data atualiza esse ponto sem criar duplicidade.
+- Uma nova avaliação deve usar data igual ou posterior à avaliação atual e não pode estar no futuro.
+- A moeda e a natureza Ativo/Passivo não mudam depois do cadastro, preservando o significado do histórico. O subtipo pode mudar somente dentro da mesma natureza.
+- Arquivar um item é uma operação lógica e o remove do resumo sem apagar seu cadastro ou histórico. Reativar volta a considerá-lo nos cálculos.
+- O histórico é somente leitura para o cliente. A interface não oferece exclusão física de itens nem avaliações.
+- Todos os acessos passam por serviços de servidor, filtros explícitos de proprietário e RLS no PostgreSQL.
+
+## Investimentos — Sprint 9
+
+- Classes aceitas: renda fixa, ação, fundo, ETF, fundo imobiliário, previdência e criptomoeda.
+- Posições são atualizadas manualmente; cotações e integrações bancárias não fazem parte do módulo.
+- Dinheiro usa unidades mínimas inteiras; quantidade usa decimal exato com até 12 casas e nunca é calculada com ponto flutuante.
+- Moeda é imutável após o cadastro e posições arquivadas não compõem o patrimônio.
+- Aportes, resgates e rendas são históricos independentes da fotografia atual.
+- A diferença sobre o custo usa somente custo acumulado e valor atual informados.
+- O resultado total só é calculado quando o usuário declara que todos os fluxos desde o início foram registrados.
+- Nenhuma taxa de rentabilidade, anualização ou valorização é inventada quando o histórico não sustenta o cálculo.
+- O patrimônio soma o valor atual das posições ativas como ativos, sempre por usuário e moeda.
+
+## Importação CSV e OFX — Sprint 10
+
+- Upload nunca cria lançamentos diretamente. O fluxo obrigatório é leitura, normalização, prévia, associação, correção e confirmação explícita.
+- CSV usa autodetecção por cabeçalho como padrão, com presets versionados de Bradesco e Nubank. Configuração manual de separador, cabeçalho, linhas ignoradas, colunas, data, decimal e sinal permanece disponível.
+- Linhas CSV detectadas automaticamente com valor zero são descartadas porque não representam movimentação.
+- OFX exige blocos estruturados `STMTTRN`; data, valor, identificador, nome e memorando são normalizados quando disponíveis.
+- O valor com sinal no staging define a natureza: positivo é Receita e negativo é Despesa. O lançamento final mantém valor positivo inteiro e usa o tipo para definir o efeito financeiro.
+- Conta e categoria devem estar ativas, pertencer ao usuário e ter natureza compatível com a linha.
+- A assinatura SHA-256 usa usuário, conta, data, valor com sinal e descrição normalizada. Ela não substitui as validações de propriedade ou RLS.
+- Duplicidades são detectadas no histórico, em jobs já confirmados e dentro do próprio arquivo. Uma linha duplicada nasce desmarcada e precisa ser corrigida para mudar sua assinatura.
+- A confirmação insere somente linhas válidas e selecionadas, sempre como lançamentos realizados. Qualquer falha reverte todos os lançamentos daquele job.
+- O arquivo original é descartado imediatamente após a leitura em memória. Conteúdo financeiro não pode ser enviado a logs.
+- Staging é apagado ao confirmar ou cancelar. O job preserva apenas metadados e contadores de auditoria.
+- O usuário pode limpar definitivamente os metadados dos próprios jobs cancelados. A operação nunca alcança jobs em revisão, prontos, concluídos ou pertencentes a outro usuário.
+- CSV, OFX, QIF e PDF são limitados a 5 MB e 5.000 movimentações por job.
+
+## Importação QIF
+
+- QIF usa o mesmo staging, revisão e confirmação transacional dos demais formatos.
+- Categorias do arquivo são sugestões editáveis e nunca bypassam a validação de natureza e propriedade.
+- Referências `[Conta]` representam transferências e exigem uma conta diferente, ativa, do mesmo usuário e moeda.
+- Transferência QIF negativa sai da conta representada pelo arquivo; positiva entra nela.
+- A assinatura de transferência ordena as duas contas e impede duplicidade ao importar o extrato do outro lado.
+- Lançamentos divididos não são achatados: ficam bloqueados como não suportados.
+- O arquivo original é decodificado em UTF-8 ou Windows-1252, processado em memória e descartado.
+
+## Importação assistida por PDF — Sprint 11
+
+- PDF segue obrigatoriamente o mesmo fluxo de staging, correção e confirmação explícita usado por CSV e OFX. A extração nunca cria lançamentos diretamente.
+- Somente PDFs com texto pesquisável e layout reconhecido por um adaptador versionado são aceitos. Arquivos protegidos, digitalizados, inválidos ou incompatíveis recebem mensagem amigável.
+- Cada adaptador declara banco, tipo de documento e versão de layout. Um banco só pode ser anunciado como suportado quando houver fixture anônima representativa e teste de regressão correspondente.
+- A descrição original extraída, as páginas de origem e o nível de confiança permanecem no staging para auditoria e revisão humana.
+- Confiança é evidência de extração, não autorização financeira. Nenhuma linha é realizada automaticamente por causa da confiança.
+- Os bytes originais são processados somente em memória e descartados antes da persistência do job; confirmar ou cancelar também remove todo o staging.
+- Bradesco e Nubank são suportados somente nos layouts versionados cobertos por fixtures anônimas. A posição das colunas define crédito e débito no Bradesco; o bloco de entradas ou saídas define o sinal no Nubank.
+- Totais, saldos e valores zero não são tratados como movimentações.
+- OCR, PDFs protegidos por senha, tabelas baseadas apenas em imagem e treinamento automático de layouts estão fora do escopo.
+
 ## Regras financeiras futuras
 
-Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, orçamentos e investimentos serão definidos em sprints posteriores.
+Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.
+
+## Consolidação patrimonial executiva
+
+- A visão executiva de patrimônio mantém uma seção independente para cada moeda.
+- Saldos positivos de contas transacionais, investimentos ativos e bens manuais compõem os ativos.
+- Saldos negativos de contas, faturas não pagas, financiamentos, empréstimos e outras dívidas compõem os passivos.
+- A coluna agregada `assets_minor` da view patrimonial não é somada novamente: a interface usa explicitamente ativos manuais e investimentos para impedir dupla contagem.
+- Cartões aparecem pelo valor pendente das faturas, nunca pelo limite de crédito.
+- O simulador de poupança é educativo, não persiste dados e usa capitalização mensal com aritmética inteira em unidades monetárias menores.
+- A taxa anual nominal é convertida para pontos-base. Impostos, inflação, custos e variações reais não são inferidos.

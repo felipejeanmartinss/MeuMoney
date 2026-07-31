@@ -1,0 +1,31 @@
+!Type:Bank
+D31/01'2026
+T1,250.75
+PAnonymous Employer
+LSalário:Renda principal
+N1001
+^
+D28/02'2026
+T-89.90
+PAnonymous Market
+MMonthly groceries
+LAlimentação:Mercado
+^
+D29/02'2024
+T-500.00
+PTransfer to savings
+L[Reserva]
+^
+D01/03'2026
+T500.00
+PTransfer from main account
+L[Conta Principal]
+^
+D15/03'2026
+T-42.00
+PSplit example
+SAlimentação
+$-20.00
+STransporte
+$-22.00
+^

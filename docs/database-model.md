@@ -1,5 +1,20 @@
 # Modelo de dados
 
+## Segurança e backup — Sprint 12
+
+`critical_operation_events` é um histórico imutável para o cliente. RLS permite
+somente leitura do proprietário; escrita ocorre por funções ou triggers
+restritos. O registro contém apenas evento, resultado, recurso e horário.
+
+`import_jobs.expires_at` limita staging em revisão a sete dias.
+`apply_import_retention` cancela jobs vencidos, remove staging e elimina
+metadados terminais após noventa dias.
+
+`export_personal_backup` produz JSON versionado de todas as tabelas do
+proprietário. `restore_personal_backup` valida, substitui o proprietário,
+restaura relações em ordem e rejeita referências entre tenants. Qualquer erro
+reverte toda a operação.
+
 ## Perfis
 
 `public.profiles` contém `id`, `full_name`, `preferred_currency`, `created_at` e `updated_at`. `id` referencia `auth.users(id)` com exclusão em cascata.
@@ -48,7 +63,101 @@ O cliente só escreve diretamente na configuração do cartão. Compras e fatura
 
 `generate_recurring_transactions(target_until)` processa somente recorrências ativas do usuário retornado por `auth.uid()`. A função bloqueia cada modelo com `FOR UPDATE SKIP LOCKED`, insere com `ON CONFLICT DO NOTHING`, avança `next_occurrence` e encerra calendários que ultrapassaram a data final, tudo na mesma transação PostgreSQL.
 
-`set_recurring_transaction_state` concentra as transições ativa, suspensa e encerrada. As RPCs são `security definer`, usam `search_path` vazio, validam o usuário chamador e possuem execução concedida somente a `authenticated`. A tabela mantém RLS por `user_id`, não expõe `DELETE` e restringe escrita a colunas do modelo.
+`set_recurring_transaction_state` concentra as transições ativa, suspensa e encerrada. A fachada pública usa `security invoker`; a implementação interna usa `security definer`, `search_path` vazio, valida o usuário chamador e só pode ser alcançada pelo papel autenticado. A tabela mantém RLS por `user_id`, não expõe `DELETE` e restringe escrita a colunas do modelo.
+
+## Orçamentos mensais
+
+`public.monthly_budgets` armazena o valor planejado por proprietário, categoria de Despesa, mês e moeda. `planned_amount_minor` usa `bigint` no intervalo inteiro seguro do TypeScript. O contexto é obtido da categoria, que já é a dimensão canônica Pessoal/Profissional, evitando duas fontes divergentes para a mesma classificação.
+
+RLS restringe leitura, inserção e atualização a `auth.uid() = user_id`. Um trigger confirma que a categoria está ativa, pertence ao usuário e possui natureza Despesa. O cliente recebe privilégios apenas de leitura, inserção das colunas do planejamento e atualização do valor; não recebe `DELETE`.
+
+`public.monthly_consumption` é uma view `security_invoker` que agrega duas fontes:
+
+- despesas categorizadas, ativas e concluídas em `transactions`, usando a moeda da conta e excluindo a origem técnica de pagamento de fatura;
+- parcelas em `credit_card_installments`, usando a moeda do cartão e `competence_date`, desde que compra e parcela não estejam canceladas.
+
+Transferências ficam fora naturalmente por usarem tabelas próprias. `public.monthly_budget_progress`, também `security_invoker`, combina orçamento e consumo com `FULL OUTER JOIN`, mantendo visível uma categoria com gasto realizado mesmo sem planejamento. Ela deriva planejado, realizado, disponível e percentual consumido sem persistir acumuladores mutáveis.
+
+`copy_previous_month_budgets` copia somente categorias ativas do contexto e moeda solicitados. A RPC valida `auth.uid()`, usa `search_path` vazio e `ON CONFLICT DO NOTHING`, tornando retries seguros e preservando valores já cadastrados no destino.
+
+## Visões do dashboard financeiro
+
+As quatro views da Sprint 7 são somente leitura e usam `security_invoker`, preservando as políticas RLS das tabelas de origem:
+
+- `public.financial_dashboard_monthly_summary`: agrega receitas, despesas de consumo, resultado, planejamento e percentual consumido por usuário, mês e moeda;
+- `public.financial_dashboard_expense_categories`: expõe o consumo do mês por categoria, contexto e moeda;
+- `public.financial_dashboard_upcoming_recurrences`: combina recorrências ativas com conta, categoria e moeda;
+- `public.financial_dashboard_invoices`: expõe faturas não pagas e deriva o status efetivo Vencida conforme `due_date`.
+
+O resumo mensal reutiliza `monthly_consumption`, portanto herda a exclusão de transferências e pagamentos técnicos e o reconhecimento das parcelas pela competência. Índices parciais cobrem receitas realizadas ativas e faturas não pagas. As permissões das views são revogadas de `anon` e concedidas explicitamente a `authenticated`.
+
+## Patrimônio líquido
+
+`public.net_worth_items` armazena ativos e passivos manuais fora do domínio transacional. `kind` separa Ativo e Passivo; `item_type` detalha imóvel, veículo, outro bem, financiamento, empréstimo ou outra dívida. Uma restrição impede combinações incompatíveis. Moeda, valor atual inteiro, data da avaliação, contexto, observações e estado de arquivamento completam a posição atual.
+
+`public.net_worth_valuations` guarda cada ponto histórico com proprietário, item, moeda, valor inteiro e data. A chave estrangeira composta `(item_id, user_id)` impede associar uma avaliação a item de outro usuário. A combinação item/data é única. O cliente recebe somente `SELECT`; triggers `security definer`, sem `search_path` implícito e sem permissão pública de execução, registram a avaliação inicial e mudanças posteriores atomicamente.
+
+`public.net_worth_summary` é uma view `security_invoker` que considera somente itens ativos e agrega ativos, passivos e sua diferença por usuário e moeda. Índices compostos atendem a RLS, listagem, histórico e resumo. Não há chave estrangeira ou trigger conectando essas tabelas a `accounts`, `transactions` ou estruturas de cartão.
+
+RLS permite ao proprietário ler, inserir e atualizar seus itens, mas não excluir. Avaliações só podem ser lidas pelo proprietário. Privilégios por coluna mantêm `user_id`, `kind` e `currency` imutáveis depois do cadastro e exigem que arquivamento atualize estado e timestamp de forma consistente.
+
+## Investimentos
+
+`public.investment_positions` guarda a posição manual atual. Quantidade usa
+`numeric(30,12)`; custo acumulado e valor atual usam `bigint` no intervalo
+inteiro seguro. Moeda é imutável e o arquivamento combina `is_active` com
+`archived_at`.
+
+`public.investment_position_snapshots` guarda fotografias automáticas da posição
+por data. A chave estrangeira composta `(position_id, user_id)` preserva o
+proprietário e a combinação posição/data é única. Clientes possuem somente
+`SELECT`; triggers internos fazem o `UPSERT` atômico.
+
+`public.investment_cash_flows` registra aportes, resgates e rendas com valor
+positivo, quantidade opcional e data. A chave estrangeira composta impede
+histórico entre usuários. A interface acrescenta eventos, sem `UPDATE` ou
+`DELETE`.
+
+`public.investment_position_summary` agrega os três tipos de fluxo e deriva a
+diferença não realizada entre valor atual e custo acumulado. O resultado total
+fica `NULL` quando `history_is_complete` é falso. `public.net_worth_summary`
+passa a combinar ativos manuais, investimentos ativos e passivos manuais em
+colunas distintas, por moeda.
+
+Todas as tabelas possuem RLS por `user_id`, índices iniciados pelo proprietário
+e privilégios mínimos. As views usam `security_invoker`.
+
+## Importações de arquivo
+
+`public.import_jobs` guarda proprietário, conta associada, nome saneado, formato,
+impressão SHA-256 do arquivo, configuração do CSV, estado, contadores e
+timestamps de descarte, confirmação ou cancelamento. Não contém os bytes do
+arquivo. Para PDF, `source_adapter_id` e `source_document_type` identificam o
+adaptador versionado que produziu o staging. O formato também aceita `qif`.
+
+`public.import_staging_rows` guarda somente a representação temporária
+normalizada e os campos originais mínimos necessários para correção. Em PDFs,
+`source_description_original`, `source_pages` e `confidence` preservam a
+proveniência da extração. Valor com sinal define receita ou despesa;
+`amount_minor` permanece positivo. Status separa linhas pendentes, válidas,
+duplicadas, ignoradas e com erro.
+
+Para QIF, `record_kind` distingue lançamento e transferência;
+`source_category_name` preserva a categoria sugerida e
+`transfer_account_name`/`transfer_account_id` registram a associação explícita
+da conta entre colchetes. `duplicate_transfer_id` aponta uma transferência já
+existente quando aplicável.
+
+`public.imported_transaction_signatures` vincula uma assinatura estável ao
+lançamento ou transferência criada. A chave única `(user_id, signature)`
+impede que dois jobs confirmados gravem a mesma movimentação. Lançamentos usam
+usuário, conta, data, valor com sinal e descrição normalizada; transferências
+usam usuário, as duas contas ordenadas, data e valor absoluto.
+
+As três tabelas possuem RLS de leitura por proprietário e não aceitam escrita
+direta do cliente. As fachadas públicas `security invoker` delegam a funções
+internas transacionais. Confirmação e cancelamento apagam o staging; a
+confirmação também cria todos os lançamentos e assinaturas de forma atômica.
 
 ## Integridade
 
@@ -59,8 +168,32 @@ O cliente só escreve diretamente na configuração do cartão. Compras e fatura
 - valores de lançamentos e transferências são positivos e limitados ao intervalo inteiro seguro do TypeScript;
 - valores de cartão usam `numeric(16,0)`, sem escala decimal, no mesmo intervalo seguro;
 - valores de recorrências usam `bigint` positivo no mesmo intervalo inteiro seguro;
+- valores de orçamento usam `bigint` não negativo no mesmo intervalo inteiro seguro;
+- valores patrimoniais e avaliações usam `bigint` não negativo no mesmo intervalo inteiro seguro;
+- quantidades de investimento usam `numeric(30,12)` não negativo e valores de posição usam `bigint` não negativo;
+- fluxos de investimento usam valor inteiro positivo e quantidade decimal positiva opcional;
+- valores importados são convertidos para inteiro com sinal no staging e inteiro positivo no lançamento final;
+- a combinação usuário e assinatura importada é única;
+- cada linha de origem é única dentro de um job;
+- páginas de origem de PDF são inteiros positivos e confiança fica entre zero e um;
+- uma posição possui no máximo uma fotografia por data;
+- natureza e tipo patrimonial devem ser compatíveis, e moeda e natureza são imutáveis após o cadastro;
+- um item possui no máximo uma avaliação por data;
+- a combinação usuário, mês, moeda e categoria de um orçamento é única;
 - uma recorrência possui no máximo uma ocorrência por data, garantida por índice parcial único;
 - parcelas somam exatamente o total da compra e nenhuma parcela pode ser zero;
 - cada transferência possui no máximo uma entrada e uma saída, garantidas por restrição única;
 - triggers mantêm `updated_at`;
 - chaves estrangeiras para o usuário usam exclusão em cascata, executada apenas quando o usuário é removido pelo fluxo administrativo de identidade.
+
+## Incremento visual consolidado
+
+O incremento visual não adiciona tabelas nem altera contratos persistidos. As
+centrais de navegação, contas, investimentos, perfil e patrimônio reutilizam
+as tabelas, views e RPCs existentes. A consolidação patrimonial executiva lê
+separadamente `account_balances`, `net_worth_summary` e
+`financial_dashboard_invoices`; não grava um novo total e não cria risco de
+divergência entre valores derivados.
+
+O simulador de poupança é não persistente. Nenhuma migration é necessária para
+essa funcionalidade.

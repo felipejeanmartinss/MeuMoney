@@ -1,5 +1,12 @@
 # Roadmap
 
+## Sprint 12 — Segurança e beta pessoal
+
+Exportação completa, backup restaurável e transacional, exclusão de conta com
+reautenticação, retenção de importações, histórico mínimo das operações
+críticas, revisão de RLS, monitoramento sem dados financeiros, recuperação de
+erros, acessibilidade básica e PWA segura para um beta privado.
+
 ## Sprint 0 — Fundação
 
 Estrutura Next.js, PWA inicial, Supabase, documentação, domínio monetário mínimo e qualidade automatizada.
@@ -24,6 +31,69 @@ Cartões, compras à vista ou parceladas, competência por fechamento, faturas, 
 
 Receitas e despesas semanais, mensais ou anuais, calendário ancorado para meses curtos, data final opcional, geração idempotente de lançamentos previstos e estados ativa, suspensa e encerrada.
 
+## Sprint 6 — Orçamento mensal
+
+Planejamento mensal por categoria, contexto e moeda, comparação entre planejado e realizado, reconhecimento das parcelas de cartão por competência, exclusão de transferências e pagamentos técnicos, cópia idempotente do mês anterior e isolamento por RLS.
+
+## Sprint 7 — Dashboard financeiro
+
+Visão mensal consolidada por moeda com saldos por conta, receitas, despesas de consumo, resultado, orçamento consumido, próximas recorrências e faturas não pagas. Evolução dos últimos seis meses e distribuição por categoria usam consultas agregadas seguras, estados vazios, carregamento e layout responsivo.
+
+## Sprint 8 — Patrimônio líquido
+
+Ativos e passivos manuais separados das contas transacionais, avaliações históricas, arquivamento lógico e resumo de patrimônio líquido por moeda. Serviços exclusivos do servidor, RLS e migrations cumulativas preservam isolamento e exatidão.
+
+## Sprint 9 — Investimentos
+
+Posições manuais de renda fixa, ações, fundos, ETFs, fundos imobiliários,
+previdência e criptomoedas. Quantidade decimal exata, custo, valor atual,
+fotografias históricas, aportes, resgates e rendas permanecem separados. O valor
+atual integra o patrimônio por moeda, sem cotações automáticas ou rentabilidade
+inventada.
+
+## Sprint 10 — Importação CSV e OFX
+
+Fluxo assistido com leitura temporária, normalização, staging, prévia,
+associação de conta e categoria, correção, assinatura estável, detecção de
+duplicidades e confirmação atômica. CSV possui autodetecção versionada para
+Bradesco e Nubank, detector genérico e modo manual; OFX permanece estruturado.
+Arquivos originais e staging possuem descarte explícito.
+
+## Sprint 11 — Importação assistida por PDF
+
+O pipeline de staging passa a aceitar PDFs com texto pesquisável por meio de
+adaptadores versionados. Descrição original, páginas e confiança acompanham
+cada linha até a revisão compartilhada com CSV/OFX. Bradesco e Nubank possuem
+adaptadores de extrato versionados, fixtures anônimas e regressão contra os
+layouts fornecidos. PDFs protegidos, digitalizados, incompatíveis ou com layout
+desconhecido são rejeitados e o documento original é descartado.
+
+## Incremento — Importação QIF
+
+Importação direta de arquivos QIF do Microsoft Money usando o staging
+existente. Categorias originais são preservadas como sugestões; referências
+`[Conta]` são mapeadas e confirmadas como transferências reais, com assinatura
+idempotente independente do lado importado. A revisão passa a ser paginada e o
+limite sobe para 5.000 linhas. Lançamentos divididos permanecem fora do escopo.
+
 ## Próximas sprints
 
-Orçamentos, patrimônio, investimentos, importações, relatórios e recursos avançados de cartão serão planejados separadamente.
+Novas versões e novos bancos com fixtures representativas, lançamentos QIF
+divididos, OCR, importação XLS,
+relatórios analíticos, avaliações automáticas de mercado e recursos avançados
+de cartão serão planejados separadamente.
+
+## Incremento visual consolidado — MeuMoney moderno
+
+- shell responsivo com cinco destinos principais e submenus contextuais;
+- dashboard executivo mensal, controlado por um único filtro e separado por moeda;
+- central de contas com extrato, recorrências e importação contextual;
+- agenda de recorrências com filtros, indicadores e linha do tempo;
+- central de investimentos com posições e financiamentos;
+- patrimônio executivo com regra explícita contra dupla contagem;
+- simulador educativo de poupança sem persistência;
+- central de Perfil para informações pessoais, importações e segurança;
+- padronização visual, acessibilidade, estados de erro, PWA e regressão responsiva.
+
+O incremento é exclusivamente de experiência e composição de dados já
+autorizados. Não altera as regras financeiras existentes nem exige migration.

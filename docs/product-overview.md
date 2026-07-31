@@ -2,11 +2,18 @@
 
 O MeuMoney será um painel de decisão financeira pessoal, responsivo e instalável, inspirado na amplitude do Microsoft Money sem reproduzir sua complexidade de uso.
 
-## Sprint 2
+## Estado atual
 
-Esta entrega cria a primeira estrutura financeira: contas básicas, saldos iniciais, categorias padrão e personalizadas, contextos Pessoal/Profissional e preferências monetárias. A identidade segura da Sprint 1 permanece como fundação.
+As Sprints 0 a 8 entregaram identidade segura, contas, categorias,
+movimentações, transferências, cartões, recorrências, orçamentos, dashboard e
+patrimônio líquido.
 
-Lançamentos, transferências, cartões, faturas, orçamentos, investimentos, saldos calculados, gráficos e relatórios permanecem fora do escopo.
+A Sprint 9 acrescenta investimentos atualizados manualmente, com quantidade
+decimal exata, custo, valor atual, fotografias históricas e fluxos separados de
+aporte, resgate e renda. O valor atual integra o patrimônio por moeda.
+
+Cotações automáticas, integração bancária, importações e conversão cambial
+permanecem fora do escopo.
 
 ## Princípios
 

@@ -1,12 +1,19 @@
 :root {
-  --color-bg: #f5f7f4;
+  --color-bg: #f4f7f5;
   --color-surface: #ffffff;
-  --color-text: #172522;
-  --color-muted: #687774;
-  --color-brand: #173f38;
-  --color-brand-soft: #dff1e5;
-  --color-border: #e2e8e4;
-  --radius-sm: 0.5rem;
+  --color-surface-subtle: #f8faf9;
+  --color-text: #12201d;
+  --color-muted: #64736f;
+  --color-brand: #12624f;
+  --color-brand-strong: #0d493c;
+  --color-brand-soft: #e4f4ed;
+  --color-border: #dfe7e3;
+  --color-income: #087f5b;
+  --color-expense: #c2414c;
+  --color-warning: #a16207;
+  --radius-sm: 0.625rem;
   --radius-md: 0.875rem;
-  --shadow-sm: 0 0.25rem 1.25rem rgb(23 63 56 / 8%);
+  --radius-lg: 1.25rem;
+  --shadow-sm: 0 0.25rem 1.25rem rgb(23 63 56 / 7%);
+  --shadow-md: 0 1rem 2.5rem rgb(23 63 56 / 9%);
 }
