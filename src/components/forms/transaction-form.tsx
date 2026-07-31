@@ -13,6 +13,7 @@ import {
   TRANSACTION_TYPE_LABELS,
 } from "@/domain/transactions";
 import { CONTEXT_LABELS } from "@/domain/accounts";
+import { getCategoryDisplayName } from "@/domain/categories";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import type {
   FinancialContext,
@@ -30,10 +31,12 @@ type AccountOption = {
 
 type CategoryOption = {
   id: string;
+  parent_id: string | null;
   name: string;
   kind: TransactionType;
   context: FinancialContext;
   is_system: boolean;
+  archived_at: string | null;
 };
 
 type TransactionFormValues = {
@@ -151,7 +154,8 @@ export function TransactionForm({
             </option>
             {filteredCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name} · {CONTEXT_LABELS[category.context]}
+                {getCategoryDisplayName(category, categories)} ·{" "}
+                {CONTEXT_LABELS[category.context]}
               </option>
             ))}
           </select>

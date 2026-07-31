@@ -2,6 +2,7 @@ import {
   mapFinancialImportQifCategory,
   mapFinancialImportQifTransferAccount,
 } from "@/app/actions/file-imports";
+import { getCategoryDisplayName } from "@/domain/categories";
 import type {
   Account,
   Category,
@@ -32,7 +33,10 @@ export function QifMappingPanel({
   jobId: string;
   rows: ImportStagingRow[];
   accounts: Pick<Account, "id" | "name" | "currency">[];
-  categories: Pick<Category, "id" | "name" | "kind" | "context">[];
+  categories: Pick<
+    Category,
+    "id" | "parent_id" | "name" | "kind" | "context"
+  >[];
   sourceAccountId: string | null;
   page: number;
 }) {
@@ -140,7 +144,7 @@ export function QifMappingPanel({
                         {category.context === "professional"
                           ? "Profissional"
                           : "Pessoal"}{" "}
-                        · {category.name}
+                        · {getCategoryDisplayName(category, categories)}
                       </option>
                     ))}
                 </select>

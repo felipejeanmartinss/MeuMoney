@@ -7,6 +7,7 @@ import {
 } from "@/app/actions/recurring-transactions";
 import type { FinancialFormState } from "@/app/actions/accounts";
 import { CONTEXT_LABELS } from "@/domain/accounts";
+import { getCategoryDisplayName } from "@/domain/categories";
 import {
   RECURRENCE_FREQUENCIES,
   RECURRENCE_FREQUENCY_LABELS,
@@ -32,6 +33,7 @@ type AccountOption = {
 
 type CategoryOption = {
   id: string;
+  parent_id: string | null;
   name: string;
   kind: TransactionType;
   context: FinancialContext;
@@ -164,7 +166,8 @@ export function RecurringTransactionForm({
             </option>
             {filteredCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name} · {CONTEXT_LABELS[category.context]}
+                {getCategoryDisplayName(category, categories)} ·{" "}
+                {CONTEXT_LABELS[category.context]}
               </option>
             ))}
           </select>

@@ -60,7 +60,7 @@ export async function listCurrentUserRecurringTransactions() {
         .order("name"),
       supabase
         .from("categories")
-        .select("id, name, kind, context, archived_at")
+        .select("id, parent_id, name, kind, context, archived_at")
         .eq("user_id", user.id)
         .order("name"),
     ]);
@@ -92,7 +92,7 @@ export async function getRecurringTransactionFormOptions(include?: {
 
   let categoriesQuery = supabase
     .from("categories")
-    .select("id, name, kind, context")
+    .select("id, parent_id, name, kind, context")
     .eq("user_id", user.id);
   categoriesQuery = include?.categoryId
     ? categoriesQuery.or(`archived_at.is.null,id.eq.${include.categoryId}`)
