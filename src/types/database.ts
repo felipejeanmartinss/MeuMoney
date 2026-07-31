@@ -121,6 +121,7 @@ export type Transaction = {
   status: TransactionStatus;
   notes: string | null;
   is_active: boolean;
+  reconciled_at: string | null;
   origin_type: TransactionOriginType;
   origin_id: string | null;
   credit_card_invoice_id: string | null;
@@ -245,6 +246,7 @@ export type TransferEntry = {
   transaction_date: string;
   status: TransactionStatus;
   is_active: boolean;
+  reconciled_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -910,6 +912,14 @@ export type Database = {
         Args: {
           target_transfer_id: string;
           active: boolean;
+        };
+        Returns: boolean;
+      };
+      set_account_entry_reconciled: {
+        Args: {
+          target_entry_type: "transaction" | "transfer_entry";
+          target_entry_id: string;
+          target_reconciled: boolean;
         };
         Returns: boolean;
       };

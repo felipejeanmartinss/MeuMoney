@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
+import { accountRegisterReconciliationSchema } from "@/domain/account-register";
 import {
   transactionFormSchema,
   transactionIdSchema,
 } from "@/domain/transactions";
 import {
   createCurrentUserTransaction,
+  setCurrentUserAccountEntryReconciled,
   setCurrentUserTransactionActive,
   updateCurrentUserTransaction,
 } from "@/services/finance/transactions-service";
@@ -87,5 +89,30 @@ export async function toggleTransactionActivity(formData: FormData) {
   revalidateFinancialPaths();
   redirect(
     `/transactions?message=${result.ok ? "status-updated" : "status-error"}`,
+  );
+}
+
+export async function toggleAccountEntryReconciliation(formData: FormData) {
+  const parsed = accountRegisterReconciliationSchema.safeParse({
+    accountId: formData.get("accountId"),
+    entryType: formData.get("entryType"),
+    entryId: formData.get("entryId"),
+    reconciled: formData.get("reconciled"),
+  });
+  if (!parsed.success) {
+    redirect("/accounts?message=reconciliation-error");
+  }
+
+  const result = await setCurrentUserAccountEntryReconciled(
+    parsed.data.entryType,
+    parsed.data.entryId,
+    parsed.data.reconciled,
+  );
+  revalidateFinancialPaths();
+  revalidatePath(`/accounts/${parsed.data.accountId}`);
+  redirect(
+    `/accounts/${parsed.data.accountId}?tab=statement&message=${
+      result.ok ? "reconciliation-updated" : "reconciliation-error"
+    }`,
   );
 }

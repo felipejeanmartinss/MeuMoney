@@ -6,6 +6,7 @@ export type CategoryMutationInput = {
   name: string;
   kind: CategoryKind;
   context: FinancialContext;
+  parentId: string | null;
 };
 
 export async function listCurrentUserCategories() {
@@ -36,13 +37,25 @@ export async function createCurrentUserCategory(input: CategoryMutationInput) {
   const { supabase, user } = await requireUser();
   const { error } = await supabase.from("categories").insert({
     user_id: user.id,
+    parent_id: input.parentId,
     name: input.name,
     kind: input.kind,
     context: input.context,
   });
 
   if (error?.code === "23505") {
-    return { ok: false as const, message: "Já existe uma categoria com esse nome, tipo e contexto." };
+    return {
+      ok: false as const,
+      message:
+        "Já existe uma categoria com esse nome nesta parte da estrutura.",
+    };
+  }
+  if (error?.message.includes("invalid_category_parent")) {
+    return {
+      ok: false as const,
+      message:
+        "A categoria principal precisa estar ativa e ter a mesma natureza e contexto.",
+    };
   }
   return error
     ? { ok: false as const, message: "Não foi possível cadastrar a categoria." }
@@ -53,14 +66,34 @@ export async function updateCurrentUserCategory(id: string, input: CategoryMutat
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("categories")
-    .update({ name: input.name, kind: input.kind, context: input.context })
+    .update({
+      parent_id: input.parentId,
+      name: input.name,
+      kind: input.kind,
+      context: input.context,
+    })
     .eq("user_id", user.id)
     .eq("id", id)
     .select("id")
     .maybeSingle();
 
   if (error?.code === "23505") {
-    return { ok: false as const, message: "Já existe uma categoria com esse nome, tipo e contexto." };
+    return {
+      ok: false as const,
+      message:
+        "Já existe uma categoria com esse nome nesta parte da estrutura.",
+    };
+  }
+  if (
+    error?.message.includes("invalid_category_parent") ||
+    error?.message.includes("category_cannot_parent_itself") ||
+    error?.message.includes("category_with_children_cannot_be_nested")
+  ) {
+    return {
+      ok: false as const,
+      message:
+        "A categoria principal precisa estar ativa e ter a mesma natureza e contexto.",
+    };
   }
   return error || !data
     ? { ok: false as const, message: "Não foi possível atualizar a categoria." }
@@ -76,6 +109,14 @@ export async function setCurrentUserCategoryArchived(id: string, archived: boole
     .eq("id", id)
     .select("id")
     .maybeSingle();
+
+  if (error?.message.includes("category_has_active_subcategories")) {
+    return {
+      ok: false as const,
+      message:
+        "Inative primeiro as subcategorias ativas desta categoria.",
+    };
+  }
 
   return error || !data
     ? { ok: false as const, message: "Não foi possível alterar o status da categoria." }

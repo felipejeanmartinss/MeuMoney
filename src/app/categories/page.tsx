@@ -20,15 +20,25 @@ const messages: Record<string, string> = {
   "status-error": "Não foi possível alterar o status da categoria.",
 };
 
-function CategoryItem({ category }: { category: Category }) {
+function CategoryItem({
+  category,
+  isSubcategory = false,
+}: {
+  category: Category;
+  isSubcategory?: boolean;
+}) {
   const archived = Boolean(category.archived_at);
 
   return (
-    <li className={`rounded-xl border border-slate-200 bg-white p-4 ${archived ? "opacity-65" : ""}`}>
+    <article className={`rounded-xl border border-slate-200 bg-white p-4 ${archived ? "opacity-65" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-slate-950">{category.name}</p>
+          <p className="font-semibold text-slate-950">
+            {isSubcategory ? "↳ " : ""}
+            {category.name}
+          </p>
           <p className="mt-1 text-xs text-slate-500">
+            {isSubcategory ? "Subcategoria" : "Categoria principal"} ·{" "}
             {category.is_system ? "Sugestão inicial" : "Personalizada"}
             {archived ? " · Inativa" : ""}
           </p>
@@ -56,7 +66,7 @@ function CategoryItem({ category }: { category: Category }) {
           </form>
         </div>
       </div>
-    </li>
+    </article>
   );
 }
 
@@ -144,6 +154,13 @@ export default async function CategoriesPage({
                   (category) =>
                     category.context === context && category.kind === kind,
                 );
+                const roots = group.filter(
+                  (category) =>
+                    category.parent_id === null ||
+                    !group.some(
+                      (candidate) => candidate.id === category.parent_id,
+                    ),
+                );
                 return (
                   <div key={kind}>
                     <h3
@@ -155,14 +172,34 @@ export default async function CategoriesPage({
                     >
                       {CATEGORY_KIND_LABELS[kind]}
                     </h3>
-                    {group.length ? (
+                    {roots.length ? (
                       <ul className="mt-3 grid gap-2">
-                        {group.map((category) => (
-                          <CategoryItem
-                            key={category.id}
-                            category={category}
-                          />
-                        ))}
+                        {roots.map((category) => {
+                          const children = group.filter(
+                            (candidate) =>
+                              candidate.parent_id === category.id,
+                          );
+                          return (
+                            <li key={category.id} className="grid gap-2">
+                              <CategoryItem category={category} />
+                              {children.length ? (
+                                <ul
+                                  aria-label={`Subcategorias de ${category.name}`}
+                                  className="ml-4 grid gap-2 border-l-2 border-blue-100 pl-3"
+                                >
+                                  {children.map((child) => (
+                                    <li key={child.id}>
+                                      <CategoryItem
+                                        category={child}
+                                        isSubcategory
+                                      />
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : (
                       <p className="mt-3 rounded-xl bg-white p-4 text-sm text-slate-500">

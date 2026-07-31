@@ -15,6 +15,7 @@ import {
   CURRENCY_LOCALES,
   SUPPORTED_CURRENCIES,
 } from "@/domain/currencies";
+import { getCategoryDisplayName } from "@/domain/categories";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserMonthlyBudget } from "@/services/finance/budgets-service";
 
@@ -68,9 +69,12 @@ export default async function BudgetsPage({
   const progressByCategory = new Map(
     progress.map((row) => [row.category_id, row]),
   );
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category]),
+  );
   const formCategories = categories.map((category) => ({
     id: category.id,
-    name: category.name,
+    name: getCategoryDisplayName(category, categories),
     plannedAmountMinor:
       progressByCategory.get(category.id)?.planned_amount_minor ?? 0,
   }));
@@ -253,6 +257,7 @@ export default async function BudgetsPage({
                   Math.max(row.percentage_consumed ?? 0, 0),
                   100,
                 );
+                const category = categoryById.get(row.category_id);
                 return (
                   <article
                     key={row.category_id}
@@ -260,7 +265,9 @@ export default async function BudgetsPage({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="font-bold text-slate-950">
-                        {row.category_name}
+                        {category
+                          ? getCategoryDisplayName(category, categories)
+                          : row.category_name}
                       </h3>
                       <span className="text-sm font-bold text-slate-700">
                         {formatPercentage(row.percentage_consumed)}

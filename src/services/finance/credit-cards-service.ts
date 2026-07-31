@@ -190,7 +190,7 @@ export async function getCreditCardPurchaseFormOptions(cardId: string) {
       .maybeSingle(),
     supabase
       .from("categories")
-      .select("id, name, context")
+      .select("id, parent_id, name, context")
       .eq("user_id", user.id)
       .eq("kind", "expense")
       .is("archived_at", null)
@@ -238,7 +238,7 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
         .order("reference_month"),
       supabase
         .from("categories")
-        .select("id, name")
+        .select("id, parent_id, name")
         .eq("user_id", user.id),
     ]);
   return {

@@ -27,7 +27,7 @@ export type TransactionFilters = {
 };
 
 const transactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
+  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
 
 export async function listCurrentUserTransactions(
   filters: TransactionFilters,
@@ -67,7 +67,9 @@ export async function listCurrentUserTransactions(
         .order("name"),
       supabase
         .from("categories")
-        .select("id, name, kind, context, is_system, archived_at")
+        .select(
+          "id, parent_id, name, kind, context, is_system, archived_at",
+        )
         .eq("user_id", user.id)
         .order("name"),
     ]);
@@ -101,7 +103,7 @@ export async function getTransactionFormOptions(include?: {
 
   let categoriesQuery = supabase
     .from("categories")
-    .select("id, name, kind, context, is_system")
+    .select("id, parent_id, name, kind, context, is_system, archived_at")
     .eq("user_id", user.id);
   categoriesQuery = include?.categoryId
     ? categoriesQuery.or(
@@ -212,6 +214,30 @@ export async function setCurrentUserTransactionActive(
     ? {
         ok: false as const,
         message: "Não foi possível alterar o status do lançamento.",
+      }
+    : { ok: true as const };
+}
+
+export async function setCurrentUserAccountEntryReconciled(
+  entryType: "transaction" | "transfer_entry",
+  entryId: string,
+  reconciled: boolean,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "set_account_entry_reconciled",
+    {
+      target_entry_type: entryType,
+      target_entry_id: entryId,
+      target_reconciled: reconciled,
+    },
+  );
+
+  return error || !data
+    ? {
+        ok: false as const,
+        message:
+          "Não foi possível atualizar a conciliação desta movimentação.",
       }
     : { ok: true as const };
 }

@@ -1,9 +1,18 @@
 import "server-only";
+import {
+  buildAccountRegister,
+  type AccountRegisterSourceEntry,
+} from "@/domain/account-register";
+import { getCategoryDisplayName } from "@/domain/categories";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   AccountType,
+  Category,
   FinancialContext,
   SupportedCurrency,
+  Transaction,
+  Transfer,
+  TransferEntry,
 } from "@/types/database";
 
 export type AccountMutationInput = {
@@ -41,9 +50,53 @@ export async function getCurrentUserAccount(id: string) {
 
 export async function getCurrentUserAccountHub(id: string) {
   const { supabase, user } = await requireUser();
+
+  async function getAllAccountTransactions() {
+    const rows: Transaction[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select(
+          "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
+        )
+        .eq("user_id", user.id)
+        .eq("account_id", id)
+        .order("transaction_date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) return { data: rows, error };
+      rows.push(...(data ?? []));
+      if (!data || data.length < pageSize) return { data: rows, error: null };
+    }
+  }
+
+  async function getAllAccountTransferEntries() {
+    const rows: TransferEntry[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("transfer_entries")
+        .select(
+          "id, transfer_id, user_id, account_id, direction, amount_minor, currency, transaction_date, status, is_active, reconciled_at, created_at, updated_at",
+        )
+        .eq("user_id", user.id)
+        .eq("account_id", id)
+        .order("transaction_date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) return { data: rows, error };
+      rows.push(...(data ?? []));
+      if (!data || data.length < pageSize) return { data: rows, error: null };
+    }
+  }
+
   const [
     accountResult,
     transactionsResult,
+    transferEntriesResult,
+    transfersResult,
+    accountsResult,
     recurrencesResult,
     importsResult,
     categoriesResult,
@@ -56,16 +109,19 @@ export async function getCurrentUserAccountHub(id: string) {
       .eq("user_id", user.id)
       .eq("id", id)
       .maybeSingle(),
+    getAllAccountTransactions(),
+    getAllAccountTransferEntries(),
     supabase
-      .from("transactions")
+      .from("transfers")
       .select(
-        "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
+        "id, user_id, source_account_id, destination_account_id, amount_minor, currency, transaction_date, status, description, notes, is_active, created_at, updated_at",
       )
       .eq("user_id", user.id)
-      .eq("account_id", id)
-      .order("transaction_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(100),
+      .or(`source_account_id.eq.${id},destination_account_id.eq.${id}`),
+    supabase
+      .from("accounts")
+      .select("id, name")
+      .eq("user_id", user.id),
     supabase
       .from("recurring_transactions")
       .select(
@@ -86,19 +142,102 @@ export async function getCurrentUserAccountHub(id: string) {
       .limit(20),
     supabase
       .from("categories")
-      .select("id, name")
+      .select(
+        "id, user_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+      )
       .eq("user_id", user.id),
   ]);
 
+  const categories = (categoriesResult.data ?? []) as Category[];
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category]),
+  );
+  const accountById = new Map(
+    (accountsResult.data ?? []).map((account) => [account.id, account.name]),
+  );
+  const transferById = new Map(
+    ((transfersResult.data ?? []) as Transfer[]).map((transfer) => [
+      transfer.id,
+      transfer,
+    ]),
+  );
+  const registerSource: AccountRegisterSourceEntry[] = [
+    ...transactionsResult.data.map((transaction) => {
+      const category = transaction.category_id
+        ? categoryById.get(transaction.category_id)
+        : undefined;
+      return {
+        id: transaction.id,
+        entryType: "transaction" as const,
+        transferId: null,
+        transactionDate: transaction.transaction_date,
+        createdAt: transaction.created_at,
+        description: transaction.description,
+        detail: category
+          ? getCategoryDisplayName(category, categories)
+          : transaction.origin_type === "credit_card_invoice_payment"
+            ? "Pagamento técnico de fatura"
+            : transaction.transaction_type === "income"
+              ? "Receita"
+              : "Despesa",
+        status: transaction.status,
+        isActive: transaction.is_active,
+        reconciledAt: transaction.reconciled_at,
+        direction: transaction.transaction_type,
+        amountMinor: transaction.amount_minor,
+        editHref:
+          transaction.origin_type === "manual"
+            ? `/transactions/${transaction.id}/edit`
+            : null,
+      };
+    }),
+    ...transferEntriesResult.data.map((entry) => {
+      const transfer = transferById.get(entry.transfer_id);
+      const counterpartId =
+        entry.direction === "outflow"
+          ? transfer?.destination_account_id
+          : transfer?.source_account_id;
+      const counterpartName = counterpartId
+        ? accountById.get(counterpartId)
+        : undefined;
+      const movement =
+        entry.direction === "outflow"
+          ? `Transferência para ${counterpartName ?? "outra conta"}`
+          : `Transferência de ${counterpartName ?? "outra conta"}`;
+      return {
+        id: entry.id,
+        entryType: "transfer_entry" as const,
+        transferId: entry.transfer_id,
+        transactionDate: entry.transaction_date,
+        createdAt: entry.created_at,
+        description: transfer?.description || movement,
+        detail: movement,
+        status: entry.status,
+        isActive: entry.is_active,
+        reconciledAt: entry.reconciled_at,
+        direction: entry.direction,
+        amountMinor: entry.amount_minor,
+        editHref: `/transfers/${entry.transfer_id}/edit`,
+      };
+    }),
+  ];
+  const registerEntries = buildAccountRegister(
+    registerSource,
+    accountResult.data?.opening_balance_minor ?? 0,
+  );
+
   return {
     account: accountResult.data,
-    transactions: transactionsResult.data ?? [],
+    registerEntries,
     recurrences: recurrencesResult.data ?? [],
     imports: importsResult.data ?? [],
-    categories: categoriesResult.data ?? [],
+    categories,
     hasError: Boolean(
       accountResult.error ||
         transactionsResult.error ||
+        transferEntriesResult.error ||
+        transfersResult.error ||
+        accountsResult.error ||
         recurrencesResult.error ||
         importsResult.error ||
         categoriesResult.error,

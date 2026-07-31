@@ -37,7 +37,7 @@ export async function getCurrentUserMonthlyBudget(input: {
   const [categoriesResult, progressResult] = await Promise.all([
     supabase
       .from("categories")
-      .select("id, name, context")
+      .select("id, parent_id, name, context")
       .eq("user_id", user.id)
       .eq("kind", "expense")
       .eq("context", input.context)

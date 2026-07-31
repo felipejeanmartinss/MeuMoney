@@ -15,6 +15,7 @@ const categoryInputFrom = (formData: FormData) => ({
   name: formData.get("name"),
   kind: formData.get("kind"),
   context: formData.get("context"),
+  parentId: formData.get("parentId"),
 });
 
 export async function createCategory(

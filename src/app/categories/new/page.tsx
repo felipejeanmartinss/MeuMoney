@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { CategoryForm } from "@/components/forms/category-form";
+import { listCurrentUserCategories } from "@/services/finance/categories-service";
 
 export const metadata = { title: "Nova categoria" };
 
-export default function NewCategoryPage() {
+export default async function NewCategoryPage() {
+  const { categories, hasError } = await listCurrentUserCategories();
+
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
       <div>
@@ -22,7 +25,13 @@ export default function NewCategoryPage() {
         </p>
       </div>
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <CategoryForm values={{}} />
+        {hasError ? (
+          <p role="alert" className="text-red-700">
+            Não foi possível carregar a estrutura de categorias.
+          </p>
+        ) : (
+          <CategoryForm categories={categories} values={{}} />
+        )}
       </section>
     </main>
   );
