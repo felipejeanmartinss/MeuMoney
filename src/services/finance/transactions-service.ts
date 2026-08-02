@@ -57,7 +57,7 @@ export async function listCurrentUserTransactions(
     query = query.eq("is_active", filters.activity === "active");
   }
 
-  const [transactionsResult, accountsResult, categoriesResult] =
+  const [transactionsResult, accountsResult, categoriesResult, groupsResult] =
     await Promise.all([
       query,
       supabase
@@ -68,8 +68,13 @@ export async function listCurrentUserTransactions(
       supabase
         .from("categories")
         .select(
-          "id, parent_id, name, kind, context, is_system, archived_at",
+          "id, group_id, parent_id, name, kind, context, is_system, archived_at",
         )
+        .eq("user_id", user.id)
+        .order("name"),
+      supabase
+        .from("category_groups")
+        .select("id, name, kind, context, archived_at")
         .eq("user_id", user.id)
         .order("name"),
     ]);
@@ -78,10 +83,12 @@ export async function listCurrentUserTransactions(
     transactions: transactionsResult.data ?? [],
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
+    groups: groupsResult.data ?? [],
     hasError: Boolean(
       transactionsResult.error ||
         accountsResult.error ||
-        categoriesResult.error,
+        categoriesResult.error ||
+        groupsResult.error,
     ),
   };
 }
@@ -103,7 +110,7 @@ export async function getTransactionFormOptions(include?: {
 
   let categoriesQuery = supabase
     .from("categories")
-    .select("id, parent_id, name, kind, context, is_system, archived_at")
+    .select("id, group_id, parent_id, name, kind, context, is_system, archived_at")
     .eq("user_id", user.id);
   categoriesQuery = include?.categoryId
     ? categoriesQuery.or(
@@ -111,15 +118,24 @@ export async function getTransactionFormOptions(include?: {
       )
     : categoriesQuery.is("archived_at", null);
 
-  const [accountsResult, categoriesResult] = await Promise.all([
+  const [accountsResult, categoriesResult, groupsResult] = await Promise.all([
     accountsQuery.order("name"),
     categoriesQuery.order("name"),
+    supabase
+      .from("category_groups")
+      .select("id, name, kind, context, archived_at")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .order("name"),
   ]);
 
   return {
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
-    hasError: Boolean(accountsResult.error || categoriesResult.error),
+    groups: groupsResult.data ?? [],
+    hasError: Boolean(
+      accountsResult.error || categoriesResult.error || groupsResult.error,
+    ),
   };
 }
 

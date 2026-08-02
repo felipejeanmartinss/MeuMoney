@@ -146,12 +146,20 @@ export function AccountRegister({
             {formatFinancialDate(openingBalanceDate)}
           </p>
         </div>
-        <Link
-          href={`/transactions/new?accountId=${accountId}`}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
-        >
-          Nova movimentação
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/transactions/new?accountId=${accountId}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+          >
+            Nova movimentação
+          </Link>
+          <Link
+            href={`/transactions/new?accountId=${accountId}&type=transfer`}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800 hover:bg-slate-50"
+          >
+            Transferir
+          </Link>
+        </div>
       </div>
 
       {feedback ? (

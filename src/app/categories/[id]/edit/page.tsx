@@ -49,11 +49,13 @@ export default async function EditCategoryPage({
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <CategoryForm
           categories={categoriesResult.categories}
+          groups={categoriesResult.groups}
           values={{
             id: category.id,
             name: category.name,
             kind: category.kind,
             context: category.context,
+            groupId: category.group_id,
             parentId: category.parent_id,
           }}
         />

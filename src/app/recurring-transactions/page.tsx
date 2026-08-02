@@ -10,7 +10,7 @@ import {
   RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
-import { getCategoryDisplayName } from "@/domain/categories";
+import { getCategoryQualifiedName } from "@/domain/categories";
 import { TRANSACTION_TYPE_LABELS } from "@/domain/transactions";
 import { listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
 import type {
@@ -138,7 +138,7 @@ export default async function RecurringTransactionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const rawParams = await searchParams;
-  const { recurrences, accounts, categories, hasError } =
+  const { recurrences, accounts, categories, groups, hasError } =
     await listCurrentUserRecurringTransactions();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
@@ -422,7 +422,11 @@ export default async function RecurringTransactionsPage({
                         </p>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
                           {category
-                            ? getCategoryDisplayName(category, categories)
+                            ? getCategoryQualifiedName(
+                                category,
+                                categories,
+                                groups,
+                              )
                             : "Categoria indisponível"}
                         </p>
                       </td>

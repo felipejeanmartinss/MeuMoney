@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TransactionForm } from "@/components/forms/transaction-form";
+import { AccountEntryForm } from "@/components/forms/account-entry-form";
 import { getTransactionFormOptions } from "@/services/finance/transactions-service";
 import { toIsoDate } from "@/utils/dates";
 
@@ -8,10 +8,10 @@ export const metadata = { title: "Novo lançamento" };
 export default async function NewTransactionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ accountId?: string }>;
+  searchParams: Promise<{ accountId?: string; type?: string }>;
 }) {
-  const { accountId } = await searchParams;
-  const { accounts, categories, hasError } = await getTransactionFormOptions(
+  const { accountId, type } = await searchParams;
+  const { accounts, categories, groups, hasError } = await getTransactionFormOptions(
     accountId ? { accountId } : undefined,
   );
   const selectedAccountId = accounts.some(
@@ -44,14 +44,15 @@ export default async function NewTransactionPage({
         </section>
       ) : (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <TransactionForm
+          <AccountEntryForm
             accounts={accounts}
             categories={categories}
-            values={{
-              accountId: selectedAccountId,
-              transactionDate: toIsoDate(new Date()),
-              amountMinor: "0,00",
-            }}
+            groups={groups}
+            accountId={selectedAccountId}
+            transactionDate={toIsoDate(new Date())}
+            initialMode={
+              type === "income" || type === "transfer" ? type : "expense"
+            }
           />
         </section>
       )}

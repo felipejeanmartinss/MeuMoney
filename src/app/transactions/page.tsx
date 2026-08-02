@@ -2,7 +2,7 @@ import Link from "next/link";
 import { toggleTransactionActivity } from "@/app/actions/transactions";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
-import { getCategoryDisplayName } from "@/domain/categories";
+import { getCategoryQualifiedName } from "@/domain/categories";
 import {
   TRANSACTION_STATUSES,
   TRANSACTION_STATUS_LABELS,
@@ -41,7 +41,7 @@ export default async function TransactionsPage({
   const filters = parsedFilters.success
     ? parsedFilters.data
     : { activity: "active" as const };
-  const { transactions, accounts, categories, hasError } =
+  const { transactions, accounts, categories, groups, hasError } =
     await listCurrentUserTransactions(filters);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
@@ -151,7 +151,7 @@ export default async function TransactionsPage({
             <option value="">Todas</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {getCategoryDisplayName(category, categories)}
+                {getCategoryQualifiedName(category, categories, groups)}
               </option>
             ))}
           </select>
@@ -273,7 +273,11 @@ export default async function TransactionsPage({
                         ? "Gerado por recorrência"
                         : "Liquidação de fatura"
                       : category
-                        ? getCategoryDisplayName(category, categories)
+                        ? getCategoryQualifiedName(
+                            category,
+                            categories,
+                            groups,
+                          )
                         : "Categoria indisponível"}{" "}
                     ·{" "}
                     {formatFinancialDate(transaction.transaction_date)}

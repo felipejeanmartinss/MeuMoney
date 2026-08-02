@@ -88,12 +88,6 @@ export const SECONDARY_NAVIGATION: Record<
       match: ["/accounts"],
     },
     {
-      href: "/transactions",
-      label: "Movimentações",
-      icon: "transactions",
-      match: ["/transactions"],
-    },
-    {
       href: "/recurring-transactions",
       label: "Recorrências",
       icon: "recurring",
@@ -104,12 +98,6 @@ export const SECONDARY_NAVIGATION: Record<
       label: "Orçamentos",
       icon: "budgets",
       match: ["/budgets"],
-    },
-    {
-      href: "/transfers",
-      label: "Transferências",
-      icon: "transfers",
-      match: ["/transfers"],
     },
     {
       href: "/categories",

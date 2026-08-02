@@ -5,7 +5,7 @@ import { listCurrentUserCategories } from "@/services/finance/categories-service
 export const metadata = { title: "Nova categoria" };
 
 export default async function NewCategoryPage() {
-  const { categories, hasError } = await listCurrentUserCategories();
+  const { categories, groups, hasError } = await listCurrentUserCategories();
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -30,7 +30,7 @@ export default async function NewCategoryPage() {
             Não foi possível carregar a estrutura de categorias.
           </p>
         ) : (
-          <CategoryForm categories={categories} values={{}} />
+          <CategoryForm categories={categories} groups={groups} values={{}} />
         )}
       </section>
     </main>

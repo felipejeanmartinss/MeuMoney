@@ -168,7 +168,7 @@ confirmação também cria todos os lançamentos e assinaturas de forma atômica
 - moedas aceitas: BRL, USD e EUR;
 - saldo inicial limitado ao intervalo de inteiros seguros do TypeScript;
 - `opening_balance_date` é obrigatória;
-- nomes de categorias são únicos por usuário, natureza e contexto;
+- nomes de categorias são únicos por usuário, grupo, categoria principal e nome normalizado;
 - valores de lançamentos e transferências são positivos e limitados ao intervalo inteiro seguro do TypeScript;
 - valores de cartão usam `numeric(16,0)`, sem escala decimal, no mesmo intervalo seguro;
 - valores de recorrências usam `bigint` positivo no mesmo intervalo inteiro seguro;
@@ -201,3 +201,21 @@ divergência entre valores derivados.
 
 O simulador de poupança é não persistente. Nenhuma migration é necessária para
 essa funcionalidade.
+
+## Grupos de categorias e tipos de investimento
+
+`public.category_groups` organiza categorias do mesmo usuário, natureza e
+contexto. `categories.group_id` usa chave estrangeira composta com `user_id`,
+impedindo associação entre proprietários. `parent_id` continua limitado a um
+nível e agora também exige o mesmo grupo. Grupos com categorias ativas não
+podem ser arquivados, e sua classificação não muda enquanto estiver em uso.
+
+`investment_positions.investment_type` detalha o produto dentro de
+`investment_class`. Uma restrição no banco impede, por exemplo, classificar
+uma ação como renda fixa. A view `investment_position_summary` expõe o novo
+campo sem alterar os cálculos de custo, valor ou resultado.
+
+As duas estruturas possuem RLS por proprietário, privilégios explícitos por
+coluna e índices que começam pelas colunas usadas nas chaves estrangeiras ou
+filtros de proprietário. A migration é cumulativa e migra todas as categorias
+e posições existentes para valores compatíveis.

@@ -6,6 +6,7 @@ import { assertMinorUnits, parseMoneyInputToMinor } from "./money";
 import type {
   InvestmentCashFlowType,
   InvestmentClass,
+  InvestmentType,
   SupportedCurrency,
 } from "../types/database";
 
@@ -28,6 +29,74 @@ export const INVESTMENT_CLASS_LABELS: Record<InvestmentClass, string> = {
   pension: "Previdência",
   crypto: "Criptomoeda",
 };
+
+export const INVESTMENT_FAMILY_LABELS = {
+  fixed_income: "Renda fixa",
+  variable_income: "Renda variável",
+  pension: "Previdência privada",
+  alternatives: "Alternativos",
+} as const;
+
+export const INVESTMENT_TYPES = [
+  "treasury",
+  "cdb",
+  "lci_lca",
+  "debenture",
+  "other_fixed_income",
+  "stock",
+  "fii",
+  "etf",
+  "variable_fund",
+  "pension",
+  "crypto",
+] as const;
+
+export const INVESTMENT_TYPE_LABELS: Record<InvestmentType, string> = {
+  treasury: "Tesouro Direto",
+  cdb: "CDB",
+  lci_lca: "LCI ou LCA",
+  debenture: "Debênture",
+  other_fixed_income: "Outra renda fixa",
+  stock: "Ação",
+  fii: "Fundo imobiliário (FII)",
+  etf: "ETF",
+  variable_fund: "Fundo de investimento",
+  pension: "Previdência privada",
+  crypto: "Criptomoeda",
+};
+
+export const INVESTMENT_TYPES_BY_CLASS: Record<
+  InvestmentClass,
+  readonly InvestmentType[]
+> = {
+  fixed_income: [
+    "treasury",
+    "cdb",
+    "lci_lca",
+    "debenture",
+    "other_fixed_income",
+  ],
+  stock: ["stock"],
+  fund: ["variable_fund"],
+  etf: ["etf"],
+  real_estate_fund: ["fii"],
+  pension: ["pension"],
+  crypto: ["crypto"],
+};
+
+export function getInvestmentFamily(investmentClass: InvestmentClass) {
+  if (investmentClass === "fixed_income") return "fixed_income" as const;
+  if (
+    investmentClass === "stock" ||
+    investmentClass === "fund" ||
+    investmentClass === "etf" ||
+    investmentClass === "real_estate_fund"
+  ) {
+    return "variable_income" as const;
+  }
+  if (investmentClass === "pension") return "pension" as const;
+  return "alternatives" as const;
+}
 
 export const INVESTMENT_CASH_FLOW_TYPES = [
   "contribution",
@@ -171,6 +240,9 @@ export const investmentPositionFormSchema = z.object({
   investmentClass: z.enum(INVESTMENT_CLASSES, {
     error: "Selecione a classe.",
   }),
+  investmentType: z.enum(INVESTMENT_TYPES, {
+    error: "Selecione o tipo de investimento.",
+  }),
   assetName: z
     .string()
     .trim()
@@ -192,6 +264,16 @@ export const investmentPositionFormSchema = z.object({
     .trim()
     .max(1000, "Use até 1.000 caracteres.")
     .transform((value) => value || null),
+}).superRefine((value, context) => {
+  if (!INVESTMENT_TYPES_BY_CLASS[value.investmentClass].includes(
+    value.investmentType,
+  )) {
+    context.addIssue({
+      code: "custom",
+      path: ["investmentType"],
+      message: "O tipo não corresponde à classe de investimento selecionada.",
+    });
+  }
 });
 
 export const investmentCashFlowFormSchema = z.object({

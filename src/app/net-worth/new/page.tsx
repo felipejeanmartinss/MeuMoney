@@ -5,8 +5,19 @@ import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Novo item patrimonial" };
 
-export default async function NewNetWorthItemPage() {
-  const { profile } = await getCurrentProfile();
+export default async function NewNetWorthItemPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ itemType?: string }>;
+}) {
+  const [{ profile }, params] = await Promise.all([
+    getCurrentProfile(),
+    searchParams,
+  ]);
+  const itemType =
+    params.itemType === "financing" || params.itemType === "loan"
+      ? params.itemType
+      : undefined;
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -27,6 +38,8 @@ export default async function NewNetWorthItemPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <NetWorthItemForm
           values={{
+            kind: itemType ? "liability" : undefined,
+            itemType,
             currency: profile?.preferred_currency ?? "BRL",
             valuationDate: toIsoDate(new Date()),
             maxValuationDate: toIsoDate(new Date()),

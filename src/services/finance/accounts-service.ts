@@ -3,11 +3,12 @@ import {
   buildAccountRegister,
   type AccountRegisterSourceEntry,
 } from "@/domain/account-register";
-import { getCategoryDisplayName } from "@/domain/categories";
+import { getCategoryQualifiedName } from "@/domain/categories";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   AccountType,
   Category,
+  CategoryGroup,
   FinancialContext,
   SupportedCurrency,
   Transaction,
@@ -17,7 +18,10 @@ import type {
 
 export type AccountMutationInput = {
   name: string;
-  type: Extract<AccountType, "checking" | "savings" | "cash" | "other">;
+  type: Extract<
+    AccountType,
+    "checking" | "savings" | "investment" | "cash" | "other"
+  >;
   context: FinancialContext;
   currency: SupportedCurrency;
   openingBalanceMinor: number;
@@ -100,6 +104,7 @@ export async function getCurrentUserAccountHub(id: string) {
     recurrencesResult,
     importsResult,
     categoriesResult,
+    categoryGroupsResult,
   ] = await Promise.all([
     supabase
       .from("account_balances")
@@ -143,12 +148,17 @@ export async function getCurrentUserAccountHub(id: string) {
     supabase
       .from("categories")
       .select(
-        "id, user_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+        "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
       )
+      .eq("user_id", user.id),
+    supabase
+      .from("category_groups")
+      .select("id, user_id, name, kind, context, is_system, archived_at, created_at, updated_at")
       .eq("user_id", user.id),
   ]);
 
   const categories = (categoriesResult.data ?? []) as Category[];
+  const categoryGroups = (categoryGroupsResult.data ?? []) as CategoryGroup[];
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
   );
@@ -174,7 +184,7 @@ export async function getCurrentUserAccountHub(id: string) {
         createdAt: transaction.created_at,
         description: transaction.description,
         detail: category
-          ? getCategoryDisplayName(category, categories)
+          ? getCategoryQualifiedName(category, categories, categoryGroups)
           : transaction.origin_type === "credit_card_invoice_payment"
             ? "Pagamento técnico de fatura"
             : transaction.transaction_type === "income"
@@ -239,8 +249,9 @@ export async function getCurrentUserAccountHub(id: string) {
         transfersResult.error ||
         accountsResult.error ||
         recurrencesResult.error ||
-        importsResult.error ||
-        categoriesResult.error,
+      importsResult.error ||
+      categoriesResult.error ||
+      categoryGroupsResult.error,
     ),
   };
 }

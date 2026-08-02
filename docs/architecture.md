@@ -178,3 +178,16 @@ O simulador patrimonial é o único novo Client Component com cálculo financeir
 A função pura `projectSavings` recebe dinheiro inteiro, taxa em pontos-base e
 prazo inteiro. O componente apenas coleta entradas e apresenta a projeção; não
 acessa o Supabase e não persiste simulações.
+
+## Experiência centrada na conta
+
+O dashboard e a central de Contas encaminham para `/accounts/[id]`, que reúne
+Extrato, Recorrências e Importar. O formulário `/transactions/new` aceita a
+conta de origem e alterna entre Receita, Despesa e Transferência; cada modo
+continua chamando suas Server Actions e serviços financeiros existentes.
+
+Grupos de categorias são lidos junto das categorias no servidor e enviados
+como opções mínimas aos formulários cliente. Nenhum Client Component acessa o
+Supabase diretamente. A central de Investimentos apenas organiza posições por
+família e reutiliza passivos patrimoniais para financiamentos e empréstimos,
+sem mover registros entre domínios.
