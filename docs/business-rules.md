@@ -178,6 +178,17 @@
 
 Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.
 
+## Central por conta, grupos de categorias e investimentos detalhados
+
+- A central de Contas é a entrada principal para movimentações. Cada conta possui extrato próprio com receitas, despesas e os dois lados das transferências que a envolvem.
+- O histórico global permanece acessível por URL para compatibilidade, mas não é a navegação operacional principal.
+- Transferência é criada no mesmo fluxo visual de entrada da conta, continua sem categoria e preserva criação, edição e inativação atômicas.
+- A classificação possui três níveis: grupo de relatório, categoria e subcategoria opcional. Uma subcategoria pertence à mesma natureza, contexto, proprietário e grupo da categoria principal.
+- Grupos e categorias sugeridos no cadastro são editáveis pelo proprietário. Alterar natureza ou contexto de um grupo em uso é bloqueado para não reinterpretar históricos.
+- Contas de investimento registram caixa, aportes e resgates; posições de investimento continuam separadas para evitar dupla contagem.
+- Posições distinguem produto operacional: Tesouro, CDB, LCI/LCA, debênture, outras rendas fixas, ações, FIIs, ETFs, fundos, previdência e criptoativos.
+- Financiamentos e empréstimos continuam passivos patrimoniais, apenas apresentados na central de Investimentos; cartões de crédito não integram essa aba.
+
 ## Consolidação patrimonial executiva
 
 - A visão executiva de patrimônio mantém uma seção independente para cada moeda.

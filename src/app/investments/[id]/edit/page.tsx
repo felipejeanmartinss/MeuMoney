@@ -48,6 +48,7 @@ export default async function EditInvestmentPositionPage({
             id: position.id,
             institution: position.institution,
             investmentClass: position.investment_class,
+            investmentType: position.investment_type,
             assetName: position.asset_name,
             currency: position.currency,
             quantity: position.quantity.replace(".", ","),

@@ -17,19 +17,21 @@ describe("financial foundation validation", () => {
     if (result.success) expect(result.data.openingBalanceMinor).toBe(123456);
   });
 
-  it("keeps credit cards and investments outside Sprint 2 account forms", () => {
-    for (const type of ["credit_card", "investment"]) {
-      expect(
-        accountFormSchema.safeParse({
-          name: "Fora do escopo",
-          type,
-          context: "personal",
-          currency: "BRL",
-          openingBalanceMinor: "0,00",
-          openingBalanceDate: "2026-07-23",
-        }).success,
-      ).toBe(false);
-    }
+  it("accepts investment accounts while keeping credit cards in their own module", () => {
+    const account = {
+      name: "Conta de investimentos",
+      context: "personal",
+      currency: "BRL",
+      openingBalanceMinor: "0,00",
+      openingBalanceDate: "2026-07-23",
+    };
+
+    expect(accountFormSchema.safeParse({ ...account, type: "investment" }).success).toBe(
+      true,
+    );
+    expect(accountFormSchema.safeParse({ ...account, type: "credit_card" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects impossible reference dates", () => {
@@ -51,6 +53,7 @@ describe("financial foundation validation", () => {
         name: "Cuidados com pets",
         kind: "expense",
         context: "personal",
+        groupId: "9f560c10-ebca-4b65-952d-e7b27c3ed1ac",
       }).success,
     ).toBe(true);
     expect(
@@ -58,6 +61,7 @@ describe("financial foundation validation", () => {
         name: "Inválida",
         kind: "transfer",
         context: "personal",
+        groupId: "9f560c10-ebca-4b65-952d-e7b27c3ed1ac",
       }).success,
     ).toBe(false);
   });

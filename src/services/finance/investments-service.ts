@@ -4,12 +4,14 @@ import type {
   FinancialContext,
   InvestmentCashFlowType,
   InvestmentClass,
+  InvestmentType,
   SupportedCurrency,
 } from "@/types/database";
 
 export type InvestmentPositionMutationInput = {
   institution: string;
   investmentClass: InvestmentClass;
+  investmentType: InvestmentType;
   assetName: string;
   currency: SupportedCurrency;
   quantity: string;
@@ -30,7 +32,7 @@ export type InvestmentCashFlowMutationInput = {
 };
 
 const positionColumns =
-  "id, user_id, institution, investment_class, asset_name, currency, quantity, accumulated_cost_minor, current_value_minor, position_date, context, history_is_complete, notes, is_active, archived_at, created_at, updated_at";
+  "id, user_id, institution, investment_class, investment_type, asset_name, currency, quantity, accumulated_cost_minor, current_value_minor, position_date, context, history_is_complete, notes, is_active, archived_at, created_at, updated_at";
 
 export async function listCurrentUserInvestmentPositions() {
   const { supabase, user } = await requireUser();
@@ -99,6 +101,7 @@ export async function createCurrentUserInvestmentPosition(
       user_id: user.id,
       institution: input.institution,
       investment_class: input.investmentClass,
+      investment_type: input.investmentType,
       asset_name: input.assetName,
       currency: input.currency,
       quantity: input.quantity,
@@ -130,6 +133,7 @@ export async function updateCurrentUserInvestmentPosition(
     .update({
       institution: input.institution,
       investment_class: input.investmentClass,
+      investment_type: input.investmentType,
       asset_name: input.assetName,
       quantity: input.quantity,
       accumulated_cost_minor: input.accumulatedCostMinor,

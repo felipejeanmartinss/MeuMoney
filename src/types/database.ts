@@ -55,6 +55,18 @@ export type InvestmentClass =
   | "real_estate_fund"
   | "pension"
   | "crypto";
+export type InvestmentType =
+  | "treasury"
+  | "cdb"
+  | "lci_lca"
+  | "debenture"
+  | "other_fixed_income"
+  | "stock"
+  | "fii"
+  | "etf"
+  | "variable_fund"
+  | "pension"
+  | "crypto";
 export type InvestmentCashFlowType =
   | "contribution"
   | "redemption"
@@ -99,7 +111,20 @@ export type Account = {
 export type Category = {
   id: string;
   user_id: string;
+  group_id: string;
   parent_id: string | null;
+  name: string;
+  kind: CategoryKind;
+  context: FinancialContext;
+  is_system: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CategoryGroup = {
+  id: string;
+  user_id: string;
   name: string;
   kind: CategoryKind;
   context: FinancialContext;
@@ -381,6 +406,7 @@ export type InvestmentPosition = {
   user_id: string;
   institution: string;
   investment_class: InvestmentClass;
+  investment_type: InvestmentType;
   asset_name: string;
   currency: SupportedCurrency;
   quantity: string;
@@ -561,6 +587,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          group_id: string;
           parent_id?: string | null;
           name: string;
           kind: CategoryKind;
@@ -572,6 +599,24 @@ export type Database = {
         };
         Update: Partial<
           Omit<Category, "id" | "user_id" | "is_system" | "created_at">
+        >;
+        Relationships: [];
+      };
+      category_groups: {
+        Row: CategoryGroup;
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          kind: CategoryKind;
+          context: FinancialContext;
+          is_system?: boolean;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<CategoryGroup, "id" | "user_id" | "is_system" | "created_at">
         >;
         Relationships: [];
       };
@@ -756,6 +801,7 @@ export type Database = {
           user_id: string;
           institution: string;
           investment_class: InvestmentClass;
+          investment_type: InvestmentType;
           asset_name: string;
           currency: SupportedCurrency;
           quantity: string;
@@ -775,6 +821,7 @@ export type Database = {
             InvestmentPosition,
             | "institution"
             | "investment_class"
+            | "investment_type"
             | "asset_name"
             | "quantity"
             | "accumulated_cost_minor"

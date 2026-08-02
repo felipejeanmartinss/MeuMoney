@@ -30,10 +30,10 @@ describe("navigation model", () => {
     ]);
   });
 
-  it("exposes account operations as secondary navigation", () => {
+  it("keeps account operations contextual while preserving module links", () => {
     expect(
       secondaryNavigationFor("/transactions").map((item) => item.label),
-    ).toContain("Movimentações");
+    ).not.toContain("Movimentações");
     expect(
       secondaryNavigationFor("/credit-cards").map((item) => item.label),
     ).toContain("Cartões");

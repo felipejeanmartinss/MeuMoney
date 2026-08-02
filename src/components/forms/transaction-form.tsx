@@ -13,7 +13,10 @@ import {
   TRANSACTION_TYPE_LABELS,
 } from "@/domain/transactions";
 import { CONTEXT_LABELS } from "@/domain/accounts";
-import { getCategoryDisplayName } from "@/domain/categories";
+import {
+  getCategoryDisplayName,
+  type CategoryGroupItem,
+} from "@/domain/categories";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import type {
   FinancialContext,
@@ -31,6 +34,7 @@ type AccountOption = {
 
 type CategoryOption = {
   id: string;
+  group_id: string;
   parent_id: string | null;
   name: string;
   kind: TransactionType;
@@ -56,16 +60,20 @@ const initialState: FinancialFormState = { status: "idle" };
 export function TransactionForm({
   accounts,
   categories,
+  groups,
   values,
+  fixedType,
 }: {
   accounts: AccountOption[];
   categories: CategoryOption[];
+  groups?: CategoryGroupItem[];
   values: TransactionFormValues;
+  fixedType?: TransactionType;
 }) {
   const action = values.id ? updateTransaction : createTransaction;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [transactionType, setTransactionType] = useState<TransactionType>(
-    values.transactionType ?? "expense",
+    fixedType ?? values.transactionType ?? "expense",
   );
   const [categoryId, setCategoryId] = useState(values.categoryId ?? "");
   const filteredCategories = categories.filter(
@@ -81,6 +89,9 @@ export function TransactionForm({
   return (
     <form action={formAction} className="grid gap-5">
       {values.id ? <input type="hidden" name="id" value={values.id} /> : null}
+      {fixedType ? (
+        <input type="hidden" name="transactionType" value={fixedType} />
+      ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
       <Field
@@ -89,8 +100,9 @@ export function TransactionForm({
       >
         <select
           className={inputClass(Boolean(state.fieldErrors?.transactionType))}
-          name="transactionType"
+          name={fixedType ? undefined : "transactionType"}
           value={transactionType}
+          disabled={Boolean(fixedType)}
           onChange={(event) =>
             changeTransactionType(event.target.value as TransactionType)
           }
@@ -152,12 +164,36 @@ export function TransactionForm({
             <option value="" disabled>
               Selecione
             </option>
-            {filteredCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {getCategoryDisplayName(category, categories)} ·{" "}
-                {CONTEXT_LABELS[category.context]}
-              </option>
-            ))}
+            {(groups ?? []).length
+              ? (groups ?? [])
+                  .filter(
+                    (group) =>
+                      group.kind === transactionType &&
+                      group.archived_at === null &&
+                      filteredCategories.some(
+                        (category) => category.group_id === group.id,
+                      ),
+                  )
+                  .map((group) => (
+                    <optgroup
+                      key={group.id}
+                      label={`${group.name} · ${CONTEXT_LABELS[group.context]}`}
+                    >
+                      {filteredCategories
+                        .filter((category) => category.group_id === group.id)
+                        .map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {getCategoryDisplayName(category, categories)}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))
+              : filteredCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {getCategoryDisplayName(category, categories)} ·{" "}
+                    {CONTEXT_LABELS[category.context]}
+                  </option>
+                ))}
           </select>
         </Field>
       </div>

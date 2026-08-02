@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FINANCIAL_CONTEXTS } from "./accounts";
 import type {
   Category,
+  CategoryGroup,
   CategoryKind,
   FinancialContext,
 } from "../types/database";
@@ -22,14 +23,28 @@ export const categoryFormSchema = z.object({
   name: z.string().trim().min(1, "Informe o nome da categoria.").max(80, "Use até 80 caracteres."),
   kind: z.enum(CATEGORY_KINDS, { error: "Selecione receita ou despesa." }),
   context: z.enum(FINANCIAL_CONTEXTS, { error: "Selecione o contexto." }),
+  groupId: z.uuid("Selecione um grupo válido."),
   parentId: optionalParentId,
 });
 
+export const categoryGroupFormSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(1, "Informe o nome do grupo.").max(80),
+  kind: z.enum(CATEGORY_KINDS),
+  context: z.enum(FINANCIAL_CONTEXTS),
+});
+
 export const categoryIdSchema = z.uuid("Categoria inválida.");
+export const categoryGroupIdSchema = z.uuid("Grupo de categorias inválido.");
 
 export type CategoryHierarchyItem = Pick<
   Category,
-  "id" | "parent_id" | "name" | "kind" | "context" | "archived_at"
+  "id" | "group_id" | "parent_id" | "name" | "kind" | "context" | "archived_at"
+>;
+
+export type CategoryGroupItem = Pick<
+  CategoryGroup,
+  "id" | "name" | "kind" | "context" | "archived_at"
 >;
 
 export type CategoryPathItem = Pick<
@@ -46,10 +61,21 @@ export function getCategoryDisplayName(
   return parent ? `${parent.name} › ${category.name}` : category.name;
 }
 
+export function getCategoryQualifiedName(
+  category: CategoryPathItem & { group_id: string },
+  categories: Array<CategoryPathItem & { group_id: string }>,
+  groups: CategoryGroupItem[],
+) {
+  const group = groups.find((item) => item.id === category.group_id);
+  const path = getCategoryDisplayName(category, categories);
+  return group ? `${group.name} › ${path}` : path;
+}
+
 export function getAvailableCategoryParents(
   categories: CategoryHierarchyItem[],
   selection: {
     categoryId?: string;
+    groupId: string;
     kind: CategoryKind;
     context: FinancialContext;
   },
@@ -57,6 +83,7 @@ export function getAvailableCategoryParents(
   return categories.filter(
     (category) =>
       category.id !== selection.categoryId &&
+      category.group_id === selection.groupId &&
       category.parent_id === null &&
       category.archived_at === null &&
       category.kind === selection.kind &&

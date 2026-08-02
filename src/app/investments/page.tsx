@@ -4,14 +4,16 @@ import { CONTEXT_LABELS } from "@/domain/accounts";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
   formatInvestmentQuantity,
+  getInvestmentFamily,
+  INVESTMENT_FAMILY_LABELS,
   INVESTMENT_CLASS_LABELS,
+  INVESTMENT_TYPE_LABELS,
 } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
 import { NET_WORTH_ITEM_TYPE_LABELS } from "@/domain/net-worth";
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
 import { listCurrentUserNetWorth } from "@/services/finance/net-worth-service";
 import type {
-  InvestmentClass,
   InvestmentPositionSummary,
   NetWorthItem,
   SupportedCurrency,
@@ -57,15 +59,16 @@ function PositionsView({
     string,
     {
       currency: SupportedCurrency;
-      investmentClass: InvestmentClass;
+      family: ReturnType<typeof getInvestmentFamily>;
       rows: InvestmentPositionSummary[];
     }
   >();
   for (const position of positions) {
-    const key = `${position.currency}-${position.investment_class}`;
+    const family = getInvestmentFamily(position.investment_class);
+    const key = `${position.currency}-${family}`;
     const group = groups.get(key) ?? {
       currency: position.currency,
-      investmentClass: position.investment_class,
+      family,
       rows: [],
     };
     group.rows.push(position);
@@ -134,7 +137,7 @@ function PositionsView({
 
       {[...groups.values()].map((group) => (
         <section
-          key={`${group.currency}-${group.investmentClass}`}
+          key={`${group.currency}-${group.family}`}
           className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
         >
           <div className="border-b border-slate-200 px-5 py-4">
@@ -142,7 +145,7 @@ function PositionsView({
               {group.currency}
             </p>
             <h2 className="mt-1 text-lg font-black text-slate-950">
-              {INVESTMENT_CLASS_LABELS[group.investmentClass]}
+              {INVESTMENT_FAMILY_LABELS[group.family]}
             </h2>
           </div>
           <div className="grid divide-y divide-slate-100">
@@ -164,6 +167,8 @@ function PositionsView({
                       {position.institution} · {CONTEXT_LABELS[position.context]}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
+                      {INVESTMENT_TYPE_LABELS[position.investment_type]} ·{" "}
+                      {INVESTMENT_CLASS_LABELS[position.investment_class]} ·{" "}
                       {formatInvestmentQuantity(position.quantity)} unidades ·{" "}
                       {formatDate(position.position_date)}
                     </p>
@@ -296,12 +301,20 @@ function FinancingsView({ items }: { items: NetWorthItem[] }) {
             Estes registros continuam no patrimônio e apenas são apresentados
             nesta central.
           </p>
-          <Link
-            href="/net-worth/new"
-            className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white"
-          >
-            Cadastrar passivo
-          </Link>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/net-worth/new?itemType=financing"
+              className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white"
+            >
+              Novo financiamento
+            </Link>
+            <Link
+              href="/net-worth/new?itemType=loan"
+              className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
+            >
+              Novo empréstimo
+            </Link>
+          </div>
         </section>
       ) : (
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -393,10 +406,10 @@ export default async function InvestmentsPage({
           </p>
         </div>
         <Link
-          href={activeTab === "positions" ? "/investments/new" : "/net-worth/new"}
+          href={activeTab === "positions" ? "/investments/new" : "/net-worth/new?itemType=financing"}
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
-          {activeTab === "positions" ? "Nova posição" : "Novo passivo"}
+          {activeTab === "positions" ? "Nova posição" : "Novo financiamento"}
         </Link>
       </header>
 
@@ -424,7 +437,7 @@ export default async function InvestmentsPage({
               : "text-slate-600 hover:bg-slate-100"
           }`}
         >
-          Financiamentos
+          Financiamentos e empréstimos
         </Link>
       </nav>
 

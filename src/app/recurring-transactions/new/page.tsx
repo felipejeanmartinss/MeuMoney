@@ -11,7 +11,7 @@ export default async function NewRecurringTransactionPage({
   searchParams: Promise<{ accountId?: string }>;
 }) {
   const { accountId } = await searchParams;
-  const { accounts, categories, hasError } =
+  const { accounts, categories, groups, hasError } =
     await getRecurringTransactionFormOptions(
       accountId ? { accountId } : undefined,
     );
@@ -48,6 +48,7 @@ export default async function NewRecurringTransactionPage({
           <RecurringTransactionForm
             accounts={accounts}
             categories={categories}
+            groups={groups}
             values={{
               accountId: selectedAccountId,
               amountMinor: "0,00",

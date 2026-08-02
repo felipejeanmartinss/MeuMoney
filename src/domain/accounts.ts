@@ -4,7 +4,13 @@ import { SUPPORTED_CURRENCIES } from "./currencies";
 import { isValidIsoDate } from "./dates";
 import type { AccountType, FinancialContext } from "../types/database";
 
-export const EDITABLE_ACCOUNT_TYPES = ["checking", "savings", "cash", "other"] as const;
+export const EDITABLE_ACCOUNT_TYPES = [
+  "checking",
+  "savings",
+  "investment",
+  "cash",
+  "other",
+] as const;
 export const FINANCIAL_CONTEXTS = ["personal", "professional"] as const;
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {

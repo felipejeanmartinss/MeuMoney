@@ -107,3 +107,14 @@ autorizados. Não altera as regras financeiras existentes nem exige migration.
 - lançamentos ativos e realizados podem ser reconciliados, com confirmação
   independente para cada lado de uma transferência;
 - mudanças financeiras invalidam automaticamente a conciliação anterior.
+
+## Incremento — Operação centrada na conta
+
+- dashboard e central com acesso direto ao extrato de cada conta;
+- filtro entre contas ativas e todas as contas;
+- lançamento unificado de receita, despesa ou transferência no contexto da conta;
+- grupos de relatório editáveis acima de categorias e subcategorias;
+- recorrências com a mesma classificação hierárquica dos lançamentos;
+- contas transacionais de investimento separadas das posições;
+- posições organizadas em renda fixa, renda variável, previdência e alternativos;
+- financiamentos e empréstimos acessíveis na central de Investimentos sem duplicação patrimonial.

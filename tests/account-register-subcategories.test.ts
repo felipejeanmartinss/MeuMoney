@@ -44,6 +44,7 @@ function entry(
 const categories: CategoryHierarchyItem[] = [
   {
     id: "principal",
+    group_id: "grupo-pessoal",
     parent_id: null,
     name: "Moradia",
     kind: "expense",
@@ -52,6 +53,7 @@ const categories: CategoryHierarchyItem[] = [
   },
   {
     id: "subcategoria",
+    group_id: "grupo-pessoal",
     parent_id: "principal",
     name: "Energia",
     kind: "expense",
@@ -60,6 +62,7 @@ const categories: CategoryHierarchyItem[] = [
   },
   {
     id: "profissional",
+    group_id: "grupo-profissional",
     parent_id: null,
     name: "Escritório",
     kind: "expense",
@@ -137,6 +140,7 @@ describe("account register and subcategories", () => {
     );
     expect(
       getAvailableCategoryParents(categories, {
+        groupId: "grupo-pessoal",
         kind: "expense",
         context: "personal",
       }).map((category) => category.id),
