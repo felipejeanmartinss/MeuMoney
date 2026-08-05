@@ -300,7 +300,7 @@ function CardsGroup({
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ message?: string }>;
+  searchParams: Promise<{ message?: string; status?: string }>;
 }) {
   const [accountResult, cardResult, params] = await Promise.all([
     listCurrentUserAccounts(),
@@ -308,10 +308,20 @@ export default async function AccountsPage({
     searchParams,
   ]);
   const feedback = params.message ? messages[params.message] : undefined;
-  const banking = accountResult.accounts.filter((account) =>
+  const showAll = params.status === "all";
+  const visibleAccounts = accountResult.accounts.filter(
+    (account) => showAll || !account.archived_at,
+  );
+  const visibleCards = cardResult.cards.filter(
+    (card) => showAll || card.is_active,
+  );
+  const banking = visibleAccounts.filter((account) =>
     ["checking", "savings"].includes(account.type),
   );
-  const cashAndOther = accountResult.accounts.filter((account) =>
+  const investmentAccounts = visibleAccounts.filter(
+    (account) => account.type === "investment",
+  );
+  const cashAndOther = visibleAccounts.filter((account) =>
     ["cash", "other"].includes(account.type),
   );
   const hasError = accountResult.hasError || cardResult.hasError;
@@ -369,6 +379,34 @@ export default async function AccountsPage({
         </p>
       ) : null}
 
+      <nav
+        aria-label="Filtro de situação das contas"
+        className="flex w-fit rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+      >
+        <Link
+          href="/accounts"
+          aria-current={!showAll ? "page" : undefined}
+          className={`rounded-lg px-4 py-2 text-sm font-bold ${
+            !showAll
+              ? "bg-slate-950 text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Somente ativas
+        </Link>
+        <Link
+          href="/accounts?status=all"
+          aria-current={showAll ? "page" : undefined}
+          className={`rounded-lg px-4 py-2 text-sm font-bold ${
+            showAll
+              ? "bg-slate-950 text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Todas
+        </Link>
+      </nav>
+
       <div className="grid gap-5">
         <AccountGroup
           title="Contas correntes e poupança"
@@ -376,12 +414,17 @@ export default async function AccountsPage({
           accounts={banking}
         />
         <AccountGroup
+          title="Contas de investimento"
+          description="Contas transacionais usadas para aportes, resgates e liquidação. As posições ficam na central de Investimentos."
+          accounts={investmentAccounts}
+        />
+        <AccountGroup
           title="Dinheiro e outras contas"
           description="Caixa físico e demais saldos transacionais."
           accounts={cashAndOther}
         />
         <CardsGroup
-          cards={cardResult.cards}
+          cards={visibleCards}
           invoices={cardResult.invoices}
         />
       </div>

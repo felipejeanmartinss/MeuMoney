@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   createInvestmentPosition,
   updateInvestmentPosition,
@@ -11,10 +11,13 @@ import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
 import {
   INVESTMENT_CLASSES,
   INVESTMENT_CLASS_LABELS,
+  INVESTMENT_TYPES_BY_CLASS,
+  INVESTMENT_TYPE_LABELS,
 } from "@/domain/investments";
 import type {
   FinancialContext,
   InvestmentClass,
+  InvestmentType,
   SupportedCurrency,
 } from "@/types/database";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
@@ -23,6 +26,7 @@ type InvestmentPositionFormValues = {
   id?: string;
   institution?: string;
   investmentClass?: InvestmentClass;
+  investmentType?: InvestmentType;
   assetName?: string;
   currency?: SupportedCurrency;
   quantity?: string;
@@ -48,6 +52,11 @@ export function InvestmentPositionForm({
     : createInvestmentPosition;
   const [state, formAction, pending] = useActionState(action, initialState);
   const currencyIsLocked = Boolean(values.id);
+  const [investmentClass, setInvestmentClass] = useState<InvestmentClass>(
+    values.investmentClass ?? "fixed_income",
+  );
+  const validTypes = INVESTMENT_TYPES_BY_CLASS[investmentClass];
+  const initialType = values.investmentType ?? validTypes[0];
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -61,7 +70,7 @@ export function InvestmentPositionForm({
       ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-3">
         <Field
           label="Instituição"
           error={state.fieldErrors?.institution?.[0]}
@@ -83,13 +92,36 @@ export function InvestmentPositionForm({
               Boolean(state.fieldErrors?.investmentClass),
             )}
             name="investmentClass"
-            defaultValue={values.investmentClass ?? "fixed_income"}
+            value={investmentClass}
+            onChange={(event) =>
+              setInvestmentClass(event.target.value as InvestmentClass)
+            }
             required
             aria-invalid={Boolean(state.fieldErrors?.investmentClass)}
           >
             {INVESTMENT_CLASSES.map((investmentClass) => (
               <option key={investmentClass} value={investmentClass}>
                 {INVESTMENT_CLASS_LABELS[investmentClass]}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field
+          label="Tipo de investimento"
+          error={state.fieldErrors?.investmentType?.[0]}
+        >
+          <select
+            key={investmentClass}
+            className={inputClass(Boolean(state.fieldErrors?.investmentType))}
+            name="investmentType"
+            defaultValue={validTypes.includes(initialType) ? initialType : validTypes[0]}
+            required
+            aria-invalid={Boolean(state.fieldErrors?.investmentType)}
+          >
+            {validTypes.map((investmentType) => (
+              <option key={investmentType} value={investmentType}>
+                {INVESTMENT_TYPE_LABELS[investmentType]}
               </option>
             ))}
           </select>

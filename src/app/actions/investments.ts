@@ -24,6 +24,7 @@ const positionInputFrom = (formData: FormData) => ({
   id: formData.get("id")?.toString(),
   institution: formData.get("institution"),
   investmentClass: formData.get("investmentClass"),
+  investmentType: formData.get("investmentType"),
   assetName: formData.get("assetName"),
   currency: formData.get("currency"),
   quantity: formData.get("quantity"),

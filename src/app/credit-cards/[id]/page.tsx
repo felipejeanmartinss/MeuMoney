@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getCategoryDisplayName } from "@/domain/categories";
 import { cancelCreditCardPurchase } from "@/app/actions/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserCreditCardDetails } from "@/services/finance/credit-cards-service";
@@ -23,7 +24,12 @@ export default async function CreditCardPage({
   const { card, purchases, installments, invoices, categories, hasError } =
     await getCurrentUserCreditCardDetails(id);
   if (!card) notFound();
-  const categoryById = new Map(categories.map((item) => [item.id, item.name]));
+  const categoryById = new Map(
+    categories.map((item) => [
+      item.id,
+      getCategoryDisplayName(item, categories),
+    ]),
+  );
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">

@@ -6,6 +6,7 @@ import {
   correctFinancialImportTransferRow,
   toggleFinancialImportRow,
 } from "@/app/actions/file-imports";
+import { getCategoryDisplayName } from "@/domain/categories";
 import { minorUnitsToInput } from "@/domain/money";
 import type {
   Category,
@@ -55,7 +56,10 @@ export function ImportStagingRowForm({
 }: {
   jobId: string;
   row: ImportStagingRow;
-  categories: Pick<Category, "id" | "name" | "kind" | "context">[];
+  categories: Pick<
+    Category,
+    "id" | "parent_id" | "name" | "kind" | "context"
+  >[];
   accounts: Pick<Account, "id" | "name" | "currency">[];
   page: number;
 }) {
@@ -271,7 +275,7 @@ export function ImportStagingRowForm({
                   {category.context === "professional"
                     ? "Profissional"
                     : "Pessoal"}{" "}
-                  · {category.name}
+                  · {getCategoryDisplayName(category, categories)}
                 </option>
               ))}
             </select>

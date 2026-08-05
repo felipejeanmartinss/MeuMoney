@@ -97,3 +97,24 @@ de cartão serão planejados separadamente.
 
 O incremento é exclusivamente de experiência e composição de dados já
 autorizados. Não altera as regras financeiras existentes nem exige migration.
+
+## Incremento — Subcategorias, extrato por conta e conciliação
+
+- categorias principais recebem subcategorias de um nível, preservando
+  natureza, contexto, proprietário e isolamento por RLS;
+- a página de cada conta passa a ser o registro cronológico completo de
+  receitas, despesas e transferências, com saldo após cada item;
+- lançamentos ativos e realizados podem ser reconciliados, com confirmação
+  independente para cada lado de uma transferência;
+- mudanças financeiras invalidam automaticamente a conciliação anterior.
+
+## Incremento — Operação centrada na conta
+
+- dashboard e central com acesso direto ao extrato de cada conta;
+- filtro entre contas ativas e todas as contas;
+- lançamento unificado de receita, despesa ou transferência no contexto da conta;
+- grupos de relatório editáveis acima de categorias e subcategorias;
+- recorrências com a mesma classificação hierárquica dos lançamentos;
+- contas transacionais de investimento separadas das posições;
+- posições organizadas em renda fixa, renda variável, previdência e alternativos;
+- financiamentos e empréstimos acessíveis na central de Investimentos sem duplicação patrimonial.

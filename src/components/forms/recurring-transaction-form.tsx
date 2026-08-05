@@ -8,6 +8,10 @@ import {
 import type { FinancialFormState } from "@/app/actions/accounts";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import {
+  getCategoryDisplayName,
+  type CategoryGroupItem,
+} from "@/domain/categories";
+import {
   RECURRENCE_FREQUENCIES,
   RECURRENCE_FREQUENCY_LABELS,
 } from "@/domain/recurring-transactions";
@@ -32,6 +36,8 @@ type AccountOption = {
 
 type CategoryOption = {
   id: string;
+  group_id: string;
+  parent_id: string | null;
   name: string;
   kind: TransactionType;
   context: FinancialContext;
@@ -56,10 +62,12 @@ const initialState: FinancialFormState = { status: "idle" };
 export function RecurringTransactionForm({
   accounts,
   categories,
+  groups,
   values,
 }: {
   accounts: AccountOption[];
   categories: CategoryOption[];
+  groups: CategoryGroupItem[];
   values: RecurringTransactionFormValues;
 }) {
   const action = values.id
@@ -162,11 +170,29 @@ export function RecurringTransactionForm({
             <option value="" disabled>
               Selecione
             </option>
-            {filteredCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name} · {CONTEXT_LABELS[category.context]}
-              </option>
-            ))}
+            {groups
+              .filter(
+                (group) =>
+                  group.kind === transactionType &&
+                  group.archived_at === null &&
+                  filteredCategories.some(
+                    (category) => category.group_id === group.id,
+                  ),
+              )
+              .map((group) => (
+                <optgroup
+                  key={group.id}
+                  label={`${group.name} · ${CONTEXT_LABELS[group.context]}`}
+                >
+                  {filteredCategories
+                    .filter((category) => category.group_id === group.id)
+                    .map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {getCategoryDisplayName(category, categories)}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
           </select>
         </Field>
       </div>

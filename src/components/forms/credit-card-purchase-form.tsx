@@ -12,6 +12,7 @@ import {
 } from "@/domain/credit-cards";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
+import { getCategoryDisplayName } from "@/domain/categories";
 import type { SupportedCurrency } from "@/types/database";
 
 type Values = {
@@ -38,7 +39,12 @@ export function CreditCardPurchaseForm({
   closingDay: number;
   dueDay: number;
   currency: SupportedCurrency;
-  categories: { id: string; name: string; context: string }[];
+  categories: {
+    id: string;
+    parent_id: string | null;
+    name: string;
+    context: string;
+  }[];
   values: Values;
 }) {
   const action = values.purchaseId
@@ -92,7 +98,7 @@ export function CreditCardPurchaseForm({
           </option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
-              {category.name} ·{" "}
+              {getCategoryDisplayName(category, categories)} ·{" "}
               {category.context === "professional"
                 ? "Profissional"
                 : "Pessoal"}

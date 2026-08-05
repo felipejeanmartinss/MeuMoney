@@ -44,7 +44,7 @@ function mutationErrorMessage(error: { message?: string } | null) {
 
 export async function listCurrentUserRecurringTransactions() {
   const { supabase, user } = await requireUser();
-  const [recurrencesResult, accountsResult, categoriesResult] =
+  const [recurrencesResult, accountsResult, categoriesResult, groupsResult] =
     await Promise.all([
       supabase
         .from("recurring_transactions")
@@ -60,6 +60,11 @@ export async function listCurrentUserRecurringTransactions() {
         .order("name"),
       supabase
         .from("categories")
+        .select("id, group_id, parent_id, name, kind, context, archived_at")
+        .eq("user_id", user.id)
+        .order("name"),
+      supabase
+        .from("category_groups")
         .select("id, name, kind, context, archived_at")
         .eq("user_id", user.id)
         .order("name"),
@@ -69,10 +74,12 @@ export async function listCurrentUserRecurringTransactions() {
     recurrences: recurrencesResult.data ?? [],
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
+    groups: groupsResult.data ?? [],
     hasError: Boolean(
       recurrencesResult.error ||
         accountsResult.error ||
-        categoriesResult.error,
+        categoriesResult.error ||
+        groupsResult.error,
     ),
   };
 }
@@ -92,21 +99,30 @@ export async function getRecurringTransactionFormOptions(include?: {
 
   let categoriesQuery = supabase
     .from("categories")
-    .select("id, name, kind, context")
+    .select("id, group_id, parent_id, name, kind, context")
     .eq("user_id", user.id);
   categoriesQuery = include?.categoryId
     ? categoriesQuery.or(`archived_at.is.null,id.eq.${include.categoryId}`)
     : categoriesQuery.is("archived_at", null);
 
-  const [accountsResult, categoriesResult] = await Promise.all([
+  const [accountsResult, categoriesResult, groupsResult] = await Promise.all([
     accountsQuery.order("name"),
     categoriesQuery.order("name"),
+    supabase
+      .from("category_groups")
+      .select("id, name, kind, context, archived_at")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .order("name"),
   ]);
 
   return {
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
-    hasError: Boolean(accountsResult.error || categoriesResult.error),
+    groups: groupsResult.data ?? [],
+    hasError: Boolean(
+      accountsResult.error || categoriesResult.error || groupsResult.error,
+    ),
   };
 }
 

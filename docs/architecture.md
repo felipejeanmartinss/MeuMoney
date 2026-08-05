@@ -38,6 +38,11 @@ Valores monetários são convertidos na fronteira do formulário e persistidos c
 
 Categorias iniciais são criadas no banco junto ao perfil, por função `security definer`. O campo `is_system` registra apenas que a categoria veio desse conjunto de sugestões; a política de atualização permite ao proprietário editar, inativar ou reativar qualquer uma de suas categorias.
 
+Subcategorias reutilizam a autorreferência `categories.parent_id`. O domínio
+filtra pais compatíveis para uma interação imediata, e o trigger do PostgreSQL
+repete as invariantes de proprietário, natureza, contexto e profundidade na
+fronteira confiável.
+
 ## Movimentações financeiras — Sprint 3
 
 As rotas `/transactions` e `/transfers` seguem o mesmo fluxo Server Component → Server Action → serviço de dados. Formulários validam a entrada com Zod, enquanto triggers e funções SQL repetem as invariantes críticas na fronteira confiável do banco.
@@ -45,6 +50,17 @@ As rotas `/transactions` e `/transfers` seguem o mesmo fluxo Server Component �
 Receitas e despesas são persistidas em `transactions`. Transferências usam uma tabela canônica separada e duas entradas vinculadas. Mutações de transferência são expostas por fachadas públicas `security invoker`, que delegam à implementação privilegiada no schema `private`; assim, a origem e o destino são criados, editados e inativados atomicamente sem expor uma função privilegiada no schema da Data API.
 
 O saldo não é atualizado por incrementos mutáveis. A view `account_balances`, executada com as políticas do usuário chamador, calcula o valor atual a partir do saldo inicial e apenas de movimentações ativas e realizadas. Essa decisão elimina rotinas de compensação ao editar lançamentos e reduz o risco de divergência.
+
+O detalhe da conta pagina a apresentação, mas o serviço busca o histórico em
+lotes no servidor, combina `transactions` e `transfer_entries` e entrega ao
+componente apenas a página renderizada. A função pura `buildAccountRegister`
+ordena as entradas e calcula o saldo linha a linha usando as mesmas condições
+de atividade e realização da view de saldos.
+
+A conciliação usa uma fachada pública `security invoker` e uma implementação
+interna que valida `auth.uid()`. O estado fica em cada movimentação de conta,
+inclusive separadamente nos dois lados da transferência, e triggers o removem
+quando uma alteração financeira torna a confirmação anterior obsoleta.
 
 ## Cartões e faturas — Sprint 4
 
@@ -162,3 +178,16 @@ O simulador patrimonial é o único novo Client Component com cálculo financeir
 A função pura `projectSavings` recebe dinheiro inteiro, taxa em pontos-base e
 prazo inteiro. O componente apenas coleta entradas e apresenta a projeção; não
 acessa o Supabase e não persiste simulações.
+
+## Experiência centrada na conta
+
+O dashboard e a central de Contas encaminham para `/accounts/[id]`, que reúne
+Extrato, Recorrências e Importar. O formulário `/transactions/new` aceita a
+conta de origem e alterna entre Receita, Despesa e Transferência; cada modo
+continua chamando suas Server Actions e serviços financeiros existentes.
+
+Grupos de categorias são lidos junto das categorias no servidor e enviados
+como opções mínimas aos formulários cliente. Nenhum Client Component acessa o
+Supabase diretamente. A central de Investimentos apenas organiza posições por
+família e reutiliza passivos patrimoniais para financiamentos e empréstimos,
+sem mover registros entre domínios.

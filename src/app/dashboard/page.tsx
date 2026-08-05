@@ -242,9 +242,10 @@ export default async function DashboardPage({
               {section.accounts.length ? (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {section.accounts.map((account) => (
-                    <article
+                    <Link
                       key={account.id}
-                      className="rounded-xl border border-slate-200 p-4"
+                      href={`/accounts/${account.id}`}
+                      className="rounded-xl border border-slate-200 p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -269,7 +270,10 @@ export default async function DashboardPage({
                           )}
                         </p>
                       </div>
-                    </article>
+                      <span className="mt-3 inline-flex text-xs font-bold text-emerald-700">
+                        Abrir extrato →
+                      </span>
+                    </Link>
                   ))}
                 </div>
               ) : (

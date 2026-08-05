@@ -35,7 +35,9 @@
 - Categorias separam natureza (Receita ou Despesa) e contexto (Pessoal ou Profissional).
 - Categorias iniciais são criadas automaticamente para cada usuário e partem de uma taxonomia inspirada na orientação AUVP adaptada aos contextos do MeuMoney.
 - A taxonomia inicial é somente uma sugestão: todas as categorias pertencem ao usuário e podem ser editadas, inativadas e reativadas pelo proprietário.
-- A combinação nome, natureza e contexto é única por usuário.
+- Uma categoria pode ser principal ou subcategoria. A hierarquia possui um único nível; pai e filha pertencem ao mesmo usuário e mantêm a mesma natureza e contexto.
+- O nome é único dentro da mesma categoria principal, natureza e contexto. Assim, duas categorias principais distintas podem possuir subcategorias homônimas.
+- Uma categoria principal com subcategorias ativas só pode ser inativada depois delas, evitando opções órfãs nos formulários.
 - O saldo inicial permanece como ponto de partida imutável do cálculo histórico, embora possa ser corrigido pelo usuário na edição da conta.
 
 ## Movimentações financeiras — Sprint 3
@@ -51,6 +53,10 @@
 - Transferências previstas ou inativas não afetam o saldo realizado.
 - Lançamentos e transferências não são excluídos fisicamente pela interface.
 - O saldo atual é o saldo inicial, mais receitas realizadas ativas, menos despesas realizadas ativas, mais transferências recebidas realizadas ativas e menos transferências enviadas realizadas ativas.
+- O extrato pertence à conta e combina receitas, despesas e o lado correspondente de cada transferência em ordem cronológica. O saldo linha a linha parte do saldo inicial e aplica somente itens ativos e realizados.
+- A conciliação confirma um item realizado e ativo contra o extrato externo. Cada lado de uma transferência possui estado próprio, porque contas diferentes podem ser conciliadas em momentos diferentes.
+- `reconciled_at` registra quando ocorreu a última conciliação. Alterar conta, tipo, direção, moeda, valor, data, status ou atividade remove automaticamente essa confirmação e exige nova conferência.
+- Itens previstos ou inativos permanecem visíveis no extrato, mas não podem ser marcados como reconciliados nem alterar o saldo realizado.
 
 ## Cartões de crédito — Sprint 4
 
@@ -171,6 +177,17 @@
 ## Regras financeiras futuras
 
 Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.
+
+## Central por conta, grupos de categorias e investimentos detalhados
+
+- A central de Contas é a entrada principal para movimentações. Cada conta possui extrato próprio com receitas, despesas e os dois lados das transferências que a envolvem.
+- O histórico global permanece acessível por URL para compatibilidade, mas não é a navegação operacional principal.
+- Transferência é criada no mesmo fluxo visual de entrada da conta, continua sem categoria e preserva criação, edição e inativação atômicas.
+- A classificação possui três níveis: grupo de relatório, categoria e subcategoria opcional. Uma subcategoria pertence à mesma natureza, contexto, proprietário e grupo da categoria principal.
+- Grupos e categorias sugeridos no cadastro são editáveis pelo proprietário. Alterar natureza ou contexto de um grupo em uso é bloqueado para não reinterpretar históricos.
+- Contas de investimento registram caixa, aportes e resgates; posições de investimento continuam separadas para evitar dupla contagem.
+- Posições distinguem produto operacional: Tesouro, CDB, LCI/LCA, debênture, outras rendas fixas, ações, FIIs, ETFs, fundos, previdência e criptoativos.
+- Financiamentos e empréstimos continuam passivos patrimoniais, apenas apresentados na central de Investimentos; cartões de crédito não integram essa aba.
 
 ## Consolidação patrimonial executiva
 

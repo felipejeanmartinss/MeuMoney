@@ -10,6 +10,7 @@ import {
   RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
+import { getCategoryQualifiedName } from "@/domain/categories";
 import { TRANSACTION_TYPE_LABELS } from "@/domain/transactions";
 import { listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
 import type {
@@ -137,7 +138,7 @@ export default async function RecurringTransactionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const rawParams = await searchParams;
-  const { recurrences, accounts, categories, hasError } =
+  const { recurrences, accounts, categories, groups, hasError } =
     await listCurrentUserRecurringTransactions();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
@@ -411,6 +412,7 @@ export default async function RecurringTransactionsPage({
                   const currency =
                     (account?.currency as SupportedCurrency | undefined) ??
                     "BRL";
+                  const category = categoryById.get(recurrence.category_id);
                   const state = recurrenceState(recurrence);
                   return (
                     <tr key={recurrence.id}>
@@ -419,8 +421,13 @@ export default async function RecurringTransactionsPage({
                           {recurrence.description}
                         </p>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {categoryById.get(recurrence.category_id)?.name ??
-                            "Categoria indisponível"}
+                          {category
+                            ? getCategoryQualifiedName(
+                                category,
+                                categories,
+                                groups,
+                              )
+                            : "Categoria indisponível"}
                         </p>
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 font-extrabold text-slate-950">

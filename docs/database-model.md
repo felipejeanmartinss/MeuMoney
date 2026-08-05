@@ -27,25 +27,29 @@ A função `handle_new_user` é `security definer`, usa `search_path` vazio, cri
 
 ## Categorias
 
-`public.categories` contém proprietário, nome, natureza, contexto, indicador de origem na taxonomia inicial, arquivamento e timestamps. A função `seed_default_categories` cria as sugestões iniciais de cada usuário e também atende usuários existentes durante a migration.
+`public.categories` contém proprietário, nome, natureza, contexto, indicador de origem na taxonomia inicial, arquivamento e timestamps. `parent_id` referencia uma categoria principal do mesmo usuário, natureza e contexto. Um trigger limita a árvore a um nível, impede ciclos e rejeita pai inativo. A unicidade considera a categoria principal, permitindo o mesmo nome sob pais diferentes. A função `seed_default_categories` cria as sugestões iniciais de cada usuário e também atende usuários existentes durante a migration.
 
 RLS permite leitura e atualização das categorias pelo proprietário. O campo `is_system` é mantido somente como informação de origem e não bloqueia alterações. Os privilégios por coluna impedem o cliente de alterar esse indicador, e não existe política de exclusão.
 
 ## Lançamentos
 
-`public.transactions` representa somente receitas e despesas. O valor usa `bigint` positivo; `transaction_type` define seu efeito no saldo. `status` diferencia `pending` de `completed`, e `is_active` preserva o histórico sem exclusão física.
+`public.transactions` representa somente receitas e despesas. O valor usa `bigint` positivo; `transaction_type` define seu efeito no saldo. `status` diferencia `pending` de `completed`, e `is_active` preserva o histórico sem exclusão física. `reconciled_at` registra a conferência do item realizado e ativo contra um extrato externo.
 
 Um trigger valida que conta, categoria e usuário são compatíveis e que a natureza da categoria coincide com o tipo do lançamento. RLS e privilégios por coluna permitem leitura, inserção e atualização apenas ao proprietário; não há permissão de exclusão.
 
 ## Transferências
 
-`public.transfers` é o registro canônico da operação. `public.transfer_entries` materializa exatamente duas movimentações vinculadas por `transfer_id` e direção única: `outflow` na origem e `inflow` no destino.
+`public.transfers` é o registro canônico da operação. `public.transfer_entries` materializa exatamente duas movimentações vinculadas por `transfer_id` e direção única: `outflow` na origem e `inflow` no destino. Cada entrada possui `reconciled_at` próprio para que a conciliação da origem seja independente da conta de destino.
 
 O cliente não recebe permissão de escrita direta nessas tabelas. As funções `create_transfer`, `update_transfer` e `set_transfer_active` validam propriedade, contas distintas, mesma moeda e executam a alteração dos dois lados na mesma transação do PostgreSQL.
+
+`set_account_entry_reconciled` é uma fachada pública `security invoker` para uma implementação privilegiada no schema `private`. Ela exige `auth.uid()`, atualiza apenas lançamento ou entrada de transferência do proprietário e aceita somente itens ativos e realizados. Triggers removem a conciliação quando um campo com efeito financeiro muda.
 
 ## Saldos
 
 `public.account_balances` é uma view com `security_invoker`. Ela deriva `current_balance_minor` do saldo inicial, dos lançamentos e das movimentações de transferência que estejam ativos e realizados. O saldo atual não é duplicado em uma coluna mutável.
+
+A central da conta lê lançamentos e entradas de transferência em páginas internas do servidor, combina os registros e calcula o saldo cronológico com uma função pura. Apenas a página solicitada é enviada ao navegador, preservando uma visão completa por conta sem carregar o histórico bruto no cliente.
 
 ## Cartões, compras, parcelas e faturas
 
@@ -164,7 +168,7 @@ confirmação também cria todos os lançamentos e assinaturas de forma atômica
 - moedas aceitas: BRL, USD e EUR;
 - saldo inicial limitado ao intervalo de inteiros seguros do TypeScript;
 - `opening_balance_date` é obrigatória;
-- nomes de categorias são únicos por usuário, natureza e contexto;
+- nomes de categorias são únicos por usuário, grupo, categoria principal e nome normalizado;
 - valores de lançamentos e transferências são positivos e limitados ao intervalo inteiro seguro do TypeScript;
 - valores de cartão usam `numeric(16,0)`, sem escala decimal, no mesmo intervalo seguro;
 - valores de recorrências usam `bigint` positivo no mesmo intervalo inteiro seguro;
@@ -197,3 +201,21 @@ divergência entre valores derivados.
 
 O simulador de poupança é não persistente. Nenhuma migration é necessária para
 essa funcionalidade.
+
+## Grupos de categorias e tipos de investimento
+
+`public.category_groups` organiza categorias do mesmo usuário, natureza e
+contexto. `categories.group_id` usa chave estrangeira composta com `user_id`,
+impedindo associação entre proprietários. `parent_id` continua limitado a um
+nível e agora também exige o mesmo grupo. Grupos com categorias ativas não
+podem ser arquivados, e sua classificação não muda enquanto estiver em uso.
+
+`investment_positions.investment_type` detalha o produto dentro de
+`investment_class`. Uma restrição no banco impede, por exemplo, classificar
+uma ação como renda fixa. A view `investment_position_summary` expõe o novo
+campo sem alterar os cálculos de custo, valor ou resultado.
+
+As duas estruturas possuem RLS por proprietário, privilégios explícitos por
+coluna e índices que começam pelas colunas usadas nas chaves estrangeiras ou
+filtros de proprietário. A migration é cumulativa e migra todas as categorias
+e posições existentes para valores compatíveis.

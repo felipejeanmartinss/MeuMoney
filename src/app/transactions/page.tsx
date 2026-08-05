@@ -2,6 +2,7 @@ import Link from "next/link";
 import { toggleTransactionActivity } from "@/app/actions/transactions";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
+import { getCategoryQualifiedName } from "@/domain/categories";
 import {
   TRANSACTION_STATUSES,
   TRANSACTION_STATUS_LABELS,
@@ -40,7 +41,7 @@ export default async function TransactionsPage({
   const filters = parsedFilters.success
     ? parsedFilters.data
     : { activity: "active" as const };
-  const { transactions, accounts, categories, hasError } =
+  const { transactions, accounts, categories, groups, hasError } =
     await listCurrentUserTransactions(filters);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
@@ -150,7 +151,7 @@ export default async function TransactionsPage({
             <option value="">Todas</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {getCategoryQualifiedName(category, categories, groups)}
               </option>
             ))}
           </select>
@@ -256,6 +257,11 @@ export default async function TransactionsPage({
                         Inativo
                       </span>
                     ) : null}
+                    {transaction.reconciled_at ? (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                        Reconciliado
+                      </span>
+                    ) : null}
                   </div>
                   <h2 className="mt-2 truncate text-lg font-bold text-slate-950">
                     {transaction.description}
@@ -266,7 +272,13 @@ export default async function TransactionsPage({
                       ? isRecurring
                         ? "Gerado por recorrência"
                         : "Liquidação de fatura"
-                      : category?.name ?? "Categoria indisponível"}{" "}
+                      : category
+                        ? getCategoryQualifiedName(
+                            category,
+                            categories,
+                            groups,
+                          )
+                        : "Categoria indisponível"}{" "}
                     ·{" "}
                     {formatFinancialDate(transaction.transaction_date)}
                   </p>

@@ -49,6 +49,7 @@ export default async function EditRecurringTransactionPage({
         <RecurringTransactionForm
           accounts={options.accounts}
           categories={options.categories}
+          groups={options.groups}
           values={{
             id: recurrence.id,
             accountId: recurrence.account_id,

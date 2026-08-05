@@ -18,17 +18,29 @@ const messages: Record<string, string> = {
   updated: "Categoria atualizada com sucesso.",
   "status-updated": "Status da categoria atualizado com sucesso.",
   "status-error": "Não foi possível alterar o status da categoria.",
+  "group-created": "Grupo criado com sucesso.",
+  "group-updated": "Grupo atualizado com sucesso.",
 };
 
-function CategoryItem({ category }: { category: Category }) {
+function CategoryItem({
+  category,
+  isSubcategory = false,
+}: {
+  category: Category;
+  isSubcategory?: boolean;
+}) {
   const archived = Boolean(category.archived_at);
 
   return (
-    <li className={`rounded-xl border border-slate-200 bg-white p-4 ${archived ? "opacity-65" : ""}`}>
+    <article className={`rounded-xl border border-slate-200 bg-white p-4 ${archived ? "opacity-65" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-slate-950">{category.name}</p>
+          <p className="font-semibold text-slate-950">
+            {isSubcategory ? "↳ " : ""}
+            {category.name}
+          </p>
           <p className="mt-1 text-xs text-slate-500">
+            {isSubcategory ? "Subcategoria" : "Categoria principal"} ·{" "}
             {category.is_system ? "Sugestão inicial" : "Personalizada"}
             {archived ? " · Inativa" : ""}
           </p>
@@ -56,7 +68,7 @@ function CategoryItem({ category }: { category: Category }) {
           </form>
         </div>
       </div>
-    </li>
+    </article>
   );
 }
 
@@ -65,7 +77,7 @@ export default async function CategoriesPage({
 }: {
   searchParams: Promise<{ message?: string }>;
 }) {
-  const [{ categories, hasError }, params] = await Promise.all([
+  const [{ categories, groups, hasError }, params] = await Promise.all([
     listCurrentUserCategories(),
     searchParams,
   ]);
@@ -86,12 +98,20 @@ export default async function CategoriesPage({
             Use as sugestões iniciais ou adapte toda a organização ao seu jeito.
           </p>
         </div>
-        <Link
-          href="/categories/new"
-          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm hover:bg-blue-800"
-        >
-          Nova categoria
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/categories/groups/new"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            Novo grupo
+          </Link>
+          <Link
+            href="/categories/new"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm hover:bg-blue-800"
+          >
+            Nova categoria
+          </Link>
+        </div>
       </div>
 
       <aside className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
@@ -117,15 +137,15 @@ export default async function CategoriesPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Não foi possível carregar suas categorias. Confirme se a migration da
-          Sprint 2 foi aplicada.
+          Não foi possível carregar suas categorias. Confirme se a migration de
+          grupos e subcategorias foi aplicada.
         </p>
       ) : null}
 
       {!hasError && categories.length === 0 ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
-          Nenhuma categoria foi encontrada. Aplique a migration da Sprint 2
-          para criar as categorias padrão automaticamente.
+          Nenhuma categoria foi encontrada. As sugestões iniciais serão criadas
+          automaticamente para cada novo usuário.
         </section>
       ) : null}
 
@@ -140,9 +160,12 @@ export default async function CategoriesPage({
             </h2>
             <div className="mt-5 grid gap-6">
               {CATEGORY_KINDS.map((kind) => {
-                const group = categories.filter(
+                const categorySet = categories.filter(
                   (category) =>
                     category.context === context && category.kind === kind,
+                );
+                const matchingGroups = groups.filter(
+                  (group) => group.context === context && group.kind === kind,
                 );
                 return (
                   <div key={kind}>
@@ -155,15 +178,74 @@ export default async function CategoriesPage({
                     >
                       {CATEGORY_KIND_LABELS[kind]}
                     </h3>
-                    {group.length ? (
-                      <ul className="mt-3 grid gap-2">
-                        {group.map((category) => (
-                          <CategoryItem
-                            key={category.id}
-                            category={category}
-                          />
-                        ))}
-                      </ul>
+                    {matchingGroups.length ? (
+                      <div className="mt-3 grid gap-4">
+                        {matchingGroups.map((categoryGroup) => {
+                          const groupCategories = categorySet.filter(
+                            (category) => category.group_id === categoryGroup.id,
+                          );
+                          const roots = groupCategories.filter(
+                            (category) =>
+                              category.parent_id === null ||
+                              !groupCategories.some(
+                                (candidate) => candidate.id === category.parent_id,
+                              ),
+                          );
+                          return (
+                            <section
+                              key={categoryGroup.id}
+                              className={`rounded-2xl border border-slate-200 bg-white p-3 ${
+                                categoryGroup.archived_at ? "opacity-65" : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3 px-1 pb-2">
+                                <div>
+                                  <h4 className="font-extrabold text-slate-950">
+                                    {categoryGroup.name}
+                                  </h4>
+                                  <p className="text-xs text-slate-500">Grupo de relatório</p>
+                                </div>
+                                <Link
+                                  href={`/categories/groups/${categoryGroup.id}/edit`}
+                                  className="rounded-lg px-2 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                                >
+                                  Editar grupo
+                                </Link>
+                              </div>
+                              {roots.length ? (
+                                <ul className="grid gap-2">
+                                  {roots.map((category) => {
+                                    const children = groupCategories.filter(
+                                      (candidate) => candidate.parent_id === category.id,
+                                    );
+                                    return (
+                                      <li key={category.id} className="grid gap-2">
+                                        <CategoryItem category={category} />
+                                        {children.length ? (
+                                          <ul
+                                            aria-label={`Subcategorias de ${category.name}`}
+                                            className="ml-4 grid gap-2 border-l-2 border-blue-100 pl-3"
+                                          >
+                                            {children.map((child) => (
+                                              <li key={child.id}>
+                                                <CategoryItem category={child} isSubcategory />
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        ) : null}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              ) : (
+                                <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                                  Nenhuma categoria neste grupo.
+                                </p>
+                              )}
+                            </section>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <p className="mt-3 rounded-xl bg-white p-4 text-sm text-slate-500">
                         Nenhuma categoria neste grupo.

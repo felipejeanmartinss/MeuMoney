@@ -58,6 +58,7 @@ export default async function EditTransactionPage({
         <TransactionForm
           accounts={options.accounts}
           categories={options.categories}
+          groups={options.groups}
           values={{
             id: transaction.id,
             accountId: transaction.account_id,

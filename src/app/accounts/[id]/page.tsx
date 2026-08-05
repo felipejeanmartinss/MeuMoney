@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AccountRegister } from "@/components/accounts/account-register";
 import { ACCOUNT_TYPE_LABELS, CONTEXT_LABELS } from "@/domain/accounts";
 import { formatMoney } from "@/domain/money";
 import {
   RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
-import {
-  TRANSACTION_STATUS_LABELS,
-  TRANSACTION_TYPE_LABELS,
-} from "@/domain/transactions";
 import { getCurrentUserAccountHub } from "@/services/finance/accounts-service";
 import type {
   ImportJobStatus,
@@ -43,7 +40,7 @@ export default async function AccountDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string; message?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const result = await getCurrentUserAccountHub(id);
@@ -76,9 +73,6 @@ export default async function AccountDetailPage({
   )
     ? query.tab
     : "statement";
-  const categoryById = new Map(
-    result.categories.map((category) => [category.id, category.name]),
-  );
   const tabs = [
     { id: "statement", label: "Extrato" },
     { id: "recurrences", label: "Recorrências" },
@@ -152,65 +146,15 @@ export default async function AccountDetailPage({
       </nav>
 
       {activeTab === "statement" ? (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-950">Extrato</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Até 100 lançamentos mais recentes desta conta.
-              </p>
-            </div>
-            <Link
-              href={`/transactions/new?accountId=${account.id}`}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
-            >
-              Nova movimentação
-            </Link>
-          </div>
-          {result.transactions.length === 0 ? (
-            <p className="px-5 py-10 text-center text-slate-500">
-              Nenhuma movimentação nesta conta.
-            </p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {result.transactions.map((transaction) => {
-                const income = transaction.transaction_type === "income";
-                return (
-                  <article
-                    key={transaction.id}
-                    className={`grid gap-2 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${
-                      transaction.is_active ? "" : "opacity-55"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate font-bold text-slate-950">
-                          {transaction.description}
-                        </h3>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
-                          {TRANSACTION_STATUS_LABELS[transaction.status]}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {formatFinancialDate(transaction.transaction_date)} ·{" "}
-                        {categoryById.get(transaction.category_id ?? "") ??
-                          TRANSACTION_TYPE_LABELS[transaction.transaction_type]}
-                      </p>
-                    </div>
-                    <p
-                      className={`font-extrabold ${
-                        income ? "text-emerald-700" : "text-rose-700"
-                      }`}
-                    >
-                      {income ? "+" : "−"}
-                      {formatMoney(transaction.amount_minor, account.currency)}
-                    </p>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        <AccountRegister
+          accountId={account.id}
+          currency={account.currency}
+          entries={result.registerEntries}
+          openingBalanceDate={account.opening_balance_date}
+          openingBalanceMinor={account.opening_balance_minor}
+          requestedPage={query.page}
+          message={query.message}
+        />
       ) : null}
 
       {activeTab === "recurrences" ? (

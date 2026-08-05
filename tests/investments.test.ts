@@ -43,6 +43,7 @@ describe("investment rules", () => {
     const result = investmentPositionFormSchema.safeParse({
       institution: "Corretora",
       investmentClass: "crypto",
+      investmentType: "crypto",
       assetName: "Bitcoin",
       currency: "BRL",
       quantity: "0,00000001",
