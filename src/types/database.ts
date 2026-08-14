@@ -933,6 +933,13 @@ export type Database = {
         };
         Returns: boolean;
       };
+      delete_category_group_with_replacement: {
+        Args: {
+          target_group_id: string;
+          replacement_group_id?: string | null;
+        };
+        Returns: boolean;
+      };
       delete_archived_account: {
         Args: { target_account_id: string };
         Returns: boolean;

@@ -48,6 +48,17 @@ export const categoryDeletionSchema = z.object({
   }),
 });
 
+export const categoryGroupDeletionSchema = z.object({
+  id: categoryGroupIdSchema,
+  replacementGroupId: z.preprocess(
+    (value) => (value === "" || value == null ? null : value),
+    z.uuid("Selecione um grupo substituto válido.").nullable(),
+  ),
+  confirmation: z.literal("EXCLUIR", {
+    error: "Digite EXCLUIR para confirmar.",
+  }),
+});
+
 export type CategoryHierarchyItem = Pick<
   Category,
   "id" | "group_id" | "parent_id" | "name" | "kind" | "context" | "archived_at"

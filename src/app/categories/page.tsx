@@ -15,6 +15,7 @@ const messages: Record<string, string> = {
   "status-error": "Não foi possível alterar o status da categoria.",
   "group-created": "Grupo criado com sucesso.",
   "group-updated": "Grupo atualizado com sucesso.",
+  "group-deleted": "Grupo excluído e categorias realocadas com sucesso.",
 };
 
 function orderedCategories(categories: Category[]) {
@@ -214,35 +215,38 @@ export default async function CategoriesPage({
                             (category) => category.group_id === group.id,
                           ),
                         );
-                        if (groupCategories.length === 0) {
-                          return [
-                            <tr key={`empty-${group.id}`} className="bg-white">
-                              <td className="border-b border-slate-200 px-3 py-2 italic text-slate-400">
-                                Sem categorias
-                              </td>
-                              <td className="border-b border-slate-200 px-3 py-2">
-                                <Link
-                                  href={`/categories/groups/${group.id}/edit`}
-                                  className="font-semibold text-blue-700 hover:underline"
-                                >
-                                  {group.name}
-                                </Link>
-                              </td>
-                              <td className="border-b border-slate-200 px-3 py-2" />
-                              <td className="border-b border-slate-200 px-3 py-2 text-xs font-bold text-slate-500">
-                                {group.archived_at ? "Inativo" : "Ativo"}
-                              </td>
-                              <td className="border-b border-slate-200 px-3 py-2" />
-                            </tr>,
-                          ];
-                        }
-                        return groupCategories.map((category) => (
-                          <CategoryRow
-                            key={category.id}
-                            category={category}
-                            group={group}
-                          />
-                        ));
+                        return [
+                          <tr key={`group-${group.id}`} className="bg-slate-50">
+                            <td
+                              colSpan={4}
+                              className="border-b border-slate-200 px-3 py-2"
+                            >
+                              <span className="font-extrabold text-slate-900">
+                                Grupo: {group.name}
+                              </span>
+                              <span className="ml-2 text-xs text-slate-500">
+                                {groupCategories.length === 0
+                                  ? "Sem categorias"
+                                  : `${groupCategories.length} item${groupCategories.length === 1 ? "" : "s"}`}
+                              </span>
+                            </td>
+                            <td className="border-b border-slate-200 px-3 py-1.5 text-right">
+                              <Link
+                                href={`/categories/groups/${group.id}/edit`}
+                                className="rounded-md px-2 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                              >
+                                Editar / excluir grupo
+                              </Link>
+                            </td>
+                          </tr>,
+                          ...groupCategories.map((category) => (
+                            <CategoryRow
+                              key={category.id}
+                              category={category}
+                              group={group}
+                            />
+                          )),
+                        ];
                       })}
                     </tbody>
                   </table>

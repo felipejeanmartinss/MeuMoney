@@ -217,6 +217,11 @@ contexto. `categories.group_id` usa chave estrangeira composta com `user_id`,
 impedindo associação entre proprietários. `parent_id` continua limitado a um
 nível e agora também exige o mesmo grupo. Grupos com categorias ativas não
 podem ser arquivados, e sua classificação não muda enquanto estiver em uso.
+`delete_category_group_with_replacement(group_id, replacement_id)` expõe um
+wrapper `security invoker` para uma função privada que valida `auth.uid()`,
+bloqueia os grupos envolvidos e move a hierarquia completa antes da exclusão.
+O destino deve estar ativo e manter natureza e contexto; conflitos entre nomes
+de categorias principais são rejeitados, sem fusão implícita.
 
 `investment_positions.investment_type` detalha o produto dentro de
 `investment_class`. Uma restrição no banco impede, por exemplo, classificar

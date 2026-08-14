@@ -41,6 +41,8 @@
 - Categorias e subcategorias podem ser excluídas definitivamente. Se a categoria ou alguma subcategoria removida tiver lançamentos, recorrências, compras de cartão, orçamentos ou linhas em revisão de importação, o usuário deve escolher uma categoria ativa da mesma natureza e contexto; a realocação e a exclusão ocorrem atomicamente.
 - Ao excluir uma categoria principal, suas subcategorias diretas também são removidas. Sem vínculos financeiros, nenhuma substituta é exigida, permitindo ao usuário manter uma estrutura sem categorias.
 - Categorias e subcategorias podem ser criadas durante a inclusão de um lançamento e durante a revisão de uma importação, usando os mesmos grupos, natureza, contexto e validações da administração de categorias.
+- Grupos podem ser editados e excluídos definitivamente. Se um grupo possuir categorias ou subcategorias, o usuário deve escolher outro grupo ativo da mesma natureza e contexto; toda a hierarquia é movida atomicamente antes da exclusão.
+- A exclusão de grupo é bloqueada quando categorias principais homônimas gerariam conflito no destino. Nenhuma categoria é mesclada ou renomeada silenciosamente.
 - O saldo inicial permanece como ponto de partida imutável do cálculo histórico, embora possa ser corrigido pelo usuário na edição da conta.
 
 ## Movimentações financeiras — Sprint 3

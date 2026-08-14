@@ -3,6 +3,7 @@
 ## Incremento — administração flexível de categorias e contas
 
 - Exclusão atômica de categorias com realocação de vínculos financeiros.
+- Edição e exclusão atômica de grupos, preservando a hierarquia em um grupo substituto compatível.
 - Exclusão definitiva de contas previamente inativadas.
 - Criação rápida de categoria ou subcategoria em lançamentos e importações.
 - Grade compacta de categorias inspirada em planilhas, mantendo a identidade visual atual.

@@ -300,6 +300,53 @@ export async function getCurrentUserCategoryGroup(id: string) {
   return { group: data, hasError: Boolean(error) };
 }
 
+export async function getCurrentUserCategoryGroupDeletionImpact(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data: group, error: groupError } = await supabase
+    .from("category_groups")
+    .select(
+      "id, user_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+    )
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!group || groupError) {
+    return {
+      group: null,
+      replacementGroups: [],
+      categoryCount: 0,
+      hasError: Boolean(groupError),
+    };
+  }
+
+  const [categoriesResult, replacementsResult] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("group_id", id),
+    supabase
+      .from("category_groups")
+      .select(
+        "id, user_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .eq("kind", group.kind)
+      .eq("context", group.context)
+      .is("archived_at", null)
+      .neq("id", id)
+      .order("name"),
+  ]);
+
+  return {
+    group,
+    replacementGroups: replacementsResult.data ?? [],
+    categoryCount: categoriesResult.count ?? 0,
+    hasError: Boolean(categoriesResult.error || replacementsResult.error),
+  };
+}
+
 export async function createCurrentUserCategoryGroup(
   input: CategoryGroupMutationInput,
 ) {
@@ -348,5 +395,44 @@ export async function updateCurrentUserCategoryGroup(
   }
   return error || !data
     ? { ok: false as const, message: "Não foi possível atualizar o grupo." }
+    : { ok: true as const };
+}
+
+export async function deleteCurrentUserCategoryGroup(
+  id: string,
+  replacementGroupId: string | null,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "delete_category_group_with_replacement",
+    {
+      target_group_id: id,
+      replacement_group_id: replacementGroupId,
+    },
+  );
+
+  if (error?.message.includes("category_group_replacement_required")) {
+    return {
+      ok: false as const,
+      message:
+        "Este grupo possui categorias. Escolha outro grupo para recebê-las.",
+    };
+  }
+  if (error?.message.includes("invalid_replacement_category_group")) {
+    return {
+      ok: false as const,
+      message:
+        "O grupo substituto deve estar ativo e manter a mesma natureza e contexto.",
+    };
+  }
+  if (error?.message.includes("category_group_name_conflict")) {
+    return {
+      ok: false as const,
+      message:
+        "Existem categorias principais com o mesmo nome nos dois grupos. Renomeie uma delas antes de continuar.",
+    };
+  }
+  return error || !data
+    ? { ok: false as const, message: "Não foi possível excluir o grupo." }
     : { ok: true as const };
 }

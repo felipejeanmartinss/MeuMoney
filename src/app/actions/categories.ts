@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   categoryFormSchema,
   categoryDeletionSchema,
+  categoryGroupDeletionSchema,
   categoryGroupFormSchema,
   categoryGroupIdSchema,
   categoryIdSchema,
@@ -14,6 +15,7 @@ import {
   createCurrentUserCategory,
   createCurrentUserCategoryGroup,
   deleteCurrentUserCategory,
+  deleteCurrentUserCategoryGroup,
   setCurrentUserCategoryArchived,
   updateCurrentUserCategory,
   updateCurrentUserCategoryGroup,
@@ -177,4 +179,31 @@ export async function updateCategoryGroup(
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/categories");
   redirect("/categories?message=group-updated");
+}
+
+export async function deleteCategoryGroup(
+  _previousState: FinancialFormState,
+  formData: FormData,
+): Promise<FinancialFormState> {
+  const parsed = categoryGroupDeletionSchema.safeParse({
+    id: formData.get("id"),
+    replacementGroupId: formData.get("replacementGroupId"),
+    confirmation: formData.get("confirmation"),
+  });
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const result = await deleteCurrentUserCategoryGroup(
+    parsed.data.id,
+    parsed.data.replacementGroupId,
+  );
+  if (!result.ok) return { status: "error", message: result.message };
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
+  revalidatePath("/recurring-transactions");
+  revalidatePath("/credit-cards");
+  revalidatePath("/budgets");
+  revalidatePath("/imports");
+  redirect("/categories?message=group-deleted");
 }
