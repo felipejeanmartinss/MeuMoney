@@ -45,6 +45,14 @@ const groupEditPage = readFileSync(
   ),
   "utf8",
 );
+const hardeningMigration = readFileSync(
+  resolve(
+    "supabase",
+    "migrations",
+    "20260814041000_harden_category_account_deletion_rpcs.sql",
+  ),
+  "utf8",
+);
 
 describe("category and archived-account management", () => {
   it("requires explicit destructive confirmation", () => {
@@ -115,6 +123,23 @@ describe("category and archived-account management", () => {
       "grant execute on function public.delete_archived_account(uuid)",
     );
     expect(migration).not.toContain("grant delete on table");
+  });
+
+  it("keeps privileged deletion logic outside the exposed API schema", () => {
+    expect(hardeningMigration).toContain(
+      "function private.delete_category_with_replacement",
+    );
+    expect(hardeningMigration).toContain(
+      "function private.delete_archived_account",
+    );
+    expect(hardeningMigration).toContain("security definer");
+    expect(hardeningMigration).toContain("security invoker");
+    expect(hardeningMigration).toContain(
+      "revoke all on function public.delete_category_with_replacement",
+    );
+    expect(hardeningMigration).toContain(
+      "revoke all on function public.delete_archived_account",
+    );
   });
 
   it("offers quick creation in transactions and import review", () => {
