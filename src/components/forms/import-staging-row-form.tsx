@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  correctFinancialImportRow,
-  correctFinancialImportTransferRow,
+  correctFinancialImportClassification,
   toggleFinancialImportRow,
 } from "@/app/actions/file-imports";
-import { getCategoryDisplayName } from "@/domain/categories";
+import type { CategoryGroupItem } from "@/domain/categories";
 import { minorUnitsToInput } from "@/domain/money";
 import type {
   Category,
@@ -14,7 +13,12 @@ import type {
   Account,
   TransactionType,
 } from "@/types/database";
+import { CategoryCombobox } from "./category-combobox";
 import { inputClass } from "./form-controls";
+import {
+  QuickCategoryCreate,
+  type QuickCreatedCategory,
+} from "./quick-category-create";
 
 const statusPresentation = {
   needs_review: {
@@ -51,6 +55,7 @@ export function ImportStagingRowForm({
   jobId,
   row,
   categories,
+  groups,
   accounts,
   page,
 }: {
@@ -58,9 +63,17 @@ export function ImportStagingRowForm({
   row: ImportStagingRow;
   categories: Pick<
     Category,
-    "id" | "parent_id" | "name" | "kind" | "context"
+    | "id"
+    | "group_id"
+    | "parent_id"
+    | "name"
+    | "kind"
+    | "context"
+    | "is_system"
+    | "archived_at"
   >[];
-  accounts: Pick<Account, "id" | "name" | "currency">[];
+  groups: CategoryGroupItem[];
+  accounts: Pick<Account, "id" | "name" | "type" | "currency">[];
   page: number;
 }) {
   const initialAmount =
@@ -68,21 +81,49 @@ export function ImportStagingRowForm({
       ? row.source_amount_text
       : minorUnitsToInput(row.signed_amount_minor);
   const [amount, setAmount] = useState(initialAmount);
+  const [createdCategories, setCreatedCategories] = useState<
+    QuickCreatedCategory[]
+  >([]);
+  const categoryOptions = [
+    ...categories,
+    ...createdCategories.filter(
+      (created) => !categories.some((category) => category.id === created.id),
+    ),
+  ];
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const transactionType = expectedType(amount);
-  const compatibleCategories = categories.filter(
-    (category) => category.kind === transactionType,
-  );
   const presentation = statusPresentation[row.status];
   const editable = !["imported"].includes(row.status);
   const isTransfer = row.record_kind === "transfer";
-  const sourceAccount = accounts.find(
-    (account) => account.id === row.account_id,
+  const [classification, setClassification] = useState(
+    isTransfer && row.transfer_account_id
+      ? `transfer:${row.transfer_account_id}`
+      : row.category_id
+        ? `category:${row.category_id}`
+        : "",
   );
-  const transferAccounts = accounts.filter(
-    (account) =>
-      account.id !== row.account_id &&
-      (!sourceAccount || account.currency === sourceAccount.currency),
+  const handleCategoryCreated = useCallback(
+    (category: QuickCreatedCategory) => {
+      setCreatedCategories((current) => [
+        ...current.filter((item) => item.id !== category.id),
+        category,
+      ]);
+      setClassification(`category:${category.id}`);
+      setQuickCreateOpen(false);
+    },
+    [setClassification, setCreatedCategories, setQuickCreateOpen],
   );
+  function changeAmount(nextAmount: string) {
+    setAmount(nextAmount);
+    if (!classification.startsWith("category:")) return;
+    const categoryId = classification.slice("category:".length);
+    const selected = categoryOptions.find(
+      (category) => category.id === categoryId,
+    );
+    if (!selected || selected.kind !== expectedType(nextAmount)) {
+      setClassification("");
+    }
+  }
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -155,9 +196,9 @@ export function ImportStagingRowForm({
         </p>
       ) : null}
 
-      {editable && row.status !== "ignored" && isTransfer ? (
+      {editable && row.status !== "ignored" ? (
         <form
-          action={correctFinancialImportTransferRow}
+          action={correctFinancialImportClassification}
           className="mt-4 grid gap-4 lg:grid-cols-12"
         >
           <input type="hidden" name="jobId" value={jobId} />
@@ -189,26 +230,31 @@ export function ImportStagingRowForm({
               className={inputClass()}
               name="signedAmountMinor"
               value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+              onChange={(event) => changeAmount(event.target.value)}
               inputMode="decimal"
+              placeholder="-120,50"
               required
             />
           </label>
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-3">
-            Outra conta
-            <select
-              className={inputClass()}
-              name="transferAccountId"
-              defaultValue={row.transfer_account_id ?? ""}
-              required
+            Categoria ou transferência
+            <CategoryCombobox
+              name="classification"
+              categories={categoryOptions}
+              transactionType={transactionType}
+              value={classification}
+              onValueChange={setClassification}
+              transferAccounts={accounts}
+              sourceAccountId={row.account_id}
+              prefixCategoryValue
+            />
+            <button
+              type="button"
+              onClick={() => setQuickCreateOpen(true)}
+              className="min-h-9 justify-self-start rounded-lg px-2 text-xs font-bold text-blue-700 hover:bg-blue-50"
             >
-              <option value="">Selecione</option>
-              {transferAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} · {account.currency}
-                </option>
-              ))}
-            </select>
+              + Criar categoria ou subcategoria
+            </button>
           </label>
           <div className="flex items-end lg:col-span-1">
             <button className="min-h-12 w-full rounded-xl bg-blue-700 px-3 text-sm font-semibold text-white hover:bg-blue-800">
@@ -216,75 +262,10 @@ export function ImportStagingRowForm({
             </button>
           </div>
           <p className="text-xs text-slate-500 lg:col-span-12">
-            {amount.trim().startsWith("-")
-              ? "Saída da conta do arquivo para a conta selecionada."
-              : "Entrada na conta do arquivo vinda da conta selecionada."}
+            Transferências entre contas correntes, poupança, caixa e
+            investimentos ficam fora das receitas e despesas. Pagamentos de
+            cartão continuam no fluxo da fatura para evitar gasto duplicado.
           </p>
-        </form>
-      ) : editable && row.status !== "ignored" ? (
-        <form
-          action={correctFinancialImportRow}
-          className="mt-4 grid gap-4 lg:grid-cols-12"
-        >
-          <input type="hidden" name="jobId" value={jobId} />
-          <input type="hidden" name="rowId" value={row.id} />
-          <input type="hidden" name="page" value={page} />
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
-            Data
-            <input
-              className={inputClass()}
-              name="transactionDate"
-              type="date"
-              defaultValue={row.transaction_date ?? ""}
-              required
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-4">
-            Descrição
-            <input
-              className={inputClass()}
-              name="description"
-              defaultValue={row.description ?? ""}
-              maxLength={180}
-              required
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
-            Valor com sinal
-            <input
-              className={inputClass()}
-              name="signedAmountMinor"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              inputMode="decimal"
-              placeholder="-120,50"
-              required
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-3">
-            Categoria
-            <select
-              className={inputClass()}
-              name="categoryId"
-              defaultValue={row.category_id ?? ""}
-              required
-            >
-              <option value="">Selecione</option>
-              {compatibleCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.context === "professional"
-                    ? "Profissional"
-                    : "Pessoal"}{" "}
-                  · {getCategoryDisplayName(category, categories)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-end lg:col-span-1">
-            <button className="min-h-12 w-full rounded-xl bg-blue-700 px-3 text-sm font-semibold text-white hover:bg-blue-800">
-              Salvar
-            </button>
-          </div>
         </form>
       ) : (
         <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
@@ -311,6 +292,15 @@ export function ImportStagingRowForm({
           </button>
         </form>
       ) : null}
+      <QuickCategoryCreate
+        key={transactionType}
+        open={quickCreateOpen}
+        kind={transactionType}
+        categories={categoryOptions}
+        groups={groups}
+        onCreated={handleCategoryCreated}
+        onClose={() => setQuickCreateOpen(false)}
+      />
     </article>
   );
 }

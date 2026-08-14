@@ -1,5 +1,13 @@
 # Roadmap
 
+## Incremento — administração flexível de categorias e contas
+
+- Exclusão atômica de categorias com realocação de vínculos financeiros.
+- Edição e exclusão atômica de grupos, preservando a hierarquia em um grupo substituto compatível.
+- Exclusão definitiva de contas previamente inativadas.
+- Criação rápida de categoria ou subcategoria em lançamentos e importações.
+- Grade compacta de categorias inspirada em planilhas, mantendo a identidade visual atual.
+
 ## Sprint 12 — Segurança e beta pessoal
 
 Exportação completa, backup restaurável e transacional, exclusão de conta com
@@ -118,3 +126,11 @@ autorizados. Não altera as regras financeiras existentes nem exige migration.
 - contas transacionais de investimento separadas das posições;
 - posições organizadas em renda fixa, renda variável, previdência e alternativos;
 - financiamentos e empréstimos acessíveis na central de Investimentos sem duplicação patrimonial.
+
+## Incremento — Classificação pesquisável e transferências no lançamento
+
+- seleção alfabética e pesquisável de categorias e subcategorias;
+- exibição do caminho completo e do contexto de cada categoria;
+- destinos de transferência de mesma moeda disponíveis no fluxo de lançamento por conta;
+- reclassificação segura de linhas importadas entre lançamento e transferência;
+- pagamentos de cartão preservados no fluxo técnico da fatura, sem dupla contagem.

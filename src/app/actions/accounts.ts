@@ -2,9 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { accountFormSchema, accountIdSchema } from "@/domain/accounts";
+import {
+  accountFormSchema,
+  accountIdSchema,
+  archivedAccountDeletionSchema,
+} from "@/domain/accounts";
 import {
   createCurrentUserAccount,
+  deleteCurrentUserArchivedAccount,
   setCurrentUserAccountArchived,
   updateCurrentUserAccount,
 } from "@/services/finance/accounts-service";
@@ -67,4 +72,27 @@ export async function toggleAccountStatus(formData: FormData) {
   const result = await setCurrentUserAccountArchived(parsedId.data, shouldArchive);
   revalidatePath("/accounts");
   redirect(`/accounts?message=${result.ok ? "status-updated" : "status-error"}`);
+}
+
+export async function deleteArchivedAccount(
+  _previousState: FinancialFormState,
+  formData: FormData,
+): Promise<FinancialFormState> {
+  const parsed = archivedAccountDeletionSchema.safeParse({
+    id: formData.get("id"),
+    confirmation: formData.get("confirmation"),
+  });
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const result = await deleteCurrentUserArchivedAccount(parsed.data.id);
+  if (!result.ok) return { status: "error", message: result.message };
+  revalidatePath("/accounts");
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+  revalidatePath("/transfers");
+  revalidatePath("/recurring-transactions");
+  revalidatePath("/imports");
+  redirect("/accounts?status=all&message=deleted");
 }

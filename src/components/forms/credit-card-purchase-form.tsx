@@ -12,8 +12,8 @@ import {
 } from "@/domain/credit-cards";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
-import { getCategoryDisplayName } from "@/domain/categories";
-import type { SupportedCurrency } from "@/types/database";
+import { CategoryCombobox } from "./category-combobox";
+import type { FinancialContext, SupportedCurrency } from "@/types/database";
 
 type Values = {
   purchaseId?: string;
@@ -43,7 +43,7 @@ export function CreditCardPurchaseForm({
     id: string;
     parent_id: string | null;
     name: string;
-    context: string;
+    context: FinancialContext;
   }[];
   values: Values;
 }) {
@@ -87,24 +87,16 @@ export function CreditCardPurchaseForm({
         label="Categoria de despesa"
         error={state.fieldErrors?.categoryId?.[0]}
       >
-        <select
-          className={inputClass(Boolean(state.fieldErrors?.categoryId))}
+        <CategoryCombobox
           name="categoryId"
+          categories={categories.map((category) => ({
+            ...category,
+            kind: "expense" as const,
+          }))}
+          transactionType="expense"
           defaultValue={values.categoryId ?? ""}
-          required
-        >
-          <option value="" disabled>
-            Selecione
-          </option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {getCategoryDisplayName(category, categories)} ·{" "}
-              {category.context === "professional"
-                ? "Profissional"
-                : "Pessoal"}
-            </option>
-          ))}
-        </select>
+          invalid={Boolean(state.fieldErrors?.categoryId)}
+        />
       </Field>
 
       <div className="grid gap-5 sm:grid-cols-3">

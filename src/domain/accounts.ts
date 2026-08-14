@@ -52,3 +52,10 @@ export const accountFormSchema = z.object({
 });
 
 export const accountIdSchema = z.uuid("Conta inválida.");
+
+export const archivedAccountDeletionSchema = z.object({
+  id: accountIdSchema,
+  confirmation: z.literal("EXCLUIR", {
+    error: "Digite EXCLUIR para confirmar.",
+  }),
+});

@@ -34,7 +34,7 @@ export default async function ImportReviewPage({
   searchParams: Promise<{ message?: string; page?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const { job, rows, accounts, categories, pagination, hasError } =
+  const { job, rows, accounts, categories, groups, pagination, hasError } =
     await getCurrentUserImportReview(id, Number(query.page) || 1);
   if (!job && !hasError) notFound();
   const feedback = query.message ? messages[query.message] : undefined;
@@ -220,6 +220,7 @@ export default async function ImportReviewPage({
                 jobId={job.id}
                 row={row}
                 categories={categories}
+                groups={groups}
                 accounts={accounts}
                 page={pagination.page}
               />

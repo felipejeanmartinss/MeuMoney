@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryForm } from "@/components/forms/category-form";
+import { CategoryDeletionForm } from "@/components/forms/category-deletion-form";
 import { categoryIdSchema } from "@/domain/categories";
 import {
-  getCurrentUserCategory,
+  getCurrentUserCategoryDeletionImpact,
   listCurrentUserCategories,
 } from "@/services/finance/categories-service";
 
@@ -17,18 +18,18 @@ export default async function EditCategoryPage({
   const parsedId = categoryIdSchema.safeParse((await params).id);
   if (!parsedId.success) notFound();
 
-  const [categoryResult, categoriesResult] = await Promise.all([
-    getCurrentUserCategory(parsedId.data),
+  const [deletionImpact, categoriesResult] = await Promise.all([
+    getCurrentUserCategoryDeletionImpact(parsedId.data),
     listCurrentUserCategories(),
   ]);
   if (
-    categoryResult.hasError ||
+    deletionImpact.hasError ||
     categoriesResult.hasError ||
-    !categoryResult.category
+    !deletionImpact.category
   ) {
     notFound();
   }
-  const category = categoryResult.category;
+  const category = deletionImpact.category;
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -59,6 +60,22 @@ export default async function EditCategoryPage({
             parentId: category.parent_id,
           }}
         />
+      </section>
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8">
+        <h2 className="text-xl font-extrabold text-red-950">Excluir categoria</h2>
+        <p className="mt-2 text-sm leading-6 text-red-900">
+          Use esta opção somente quando não quiser manter a categoria nem como
+          inativa. A operação é atômica e não deixa lançamentos sem classificação.
+        </p>
+        <div className="mt-5">
+          <CategoryDeletionForm
+            categoryId={category.id}
+            categoryName={category.name}
+            referenceCount={deletionImpact.referenceCount}
+            childCount={deletionImpact.childCount}
+            replacementCategories={deletionImpact.replacementCategories}
+          />
+        </div>
       </section>
     </main>
   );
