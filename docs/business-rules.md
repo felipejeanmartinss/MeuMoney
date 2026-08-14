@@ -162,6 +162,14 @@
 - Lançamentos divididos não são achatados: ficam bloqueados como não suportados.
 - O arquivo original é decodificado em UTF-8 ou Windows-1252, processado em memória e descartado.
 
+## Seleção pesquisável e classificação de transferências
+
+- Categorias e subcategorias são apresentadas em ordem alfabética pelo nome mais específico, com o caminho completo e o contexto Pessoal ou Profissional visíveis.
+- A busca de categorias ignora diferenças entre maiúsculas, minúsculas e acentos e procura tanto no nome principal quanto na subcategoria.
+- No lançamento por conta e na revisão de importação, contas ativas e de mesma moeda podem aparecer no seletor como destinos de transferência. A escolha cria ou reclassifica uma transferência canônica e nunca grava uma categoria fictícia.
+- Uma linha em staging pode ser corrigida de lançamento para transferência ou de transferência para lançamento. A troca limpa a referência incompatível, revalida proprietário, moeda e natureza e atualiza o job na mesma transação SQL.
+- Cartões de crédito não são destinos genéricos de transferência. O pagamento continua associado à fatura e à sua movimentação técnica para impedir a duplicação das despesas de consumo.
+
 ## Importação assistida por PDF — Sprint 11
 
 - PDF segue obrigatoriamente o mesmo fluxo de staging, correção e confirmação explícita usado por CSV e OFX. A extração nunca cria lançamentos diretamente.
