@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
 import {
   createTransaction,
   updateTransaction,
@@ -18,6 +18,10 @@ import {
   type CategoryGroupItem,
 } from "@/domain/categories";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
+import {
+  QuickCategoryCreate,
+  type QuickCreatedCategory,
+} from "./quick-category-create";
 import type {
   FinancialContext,
   SupportedCurrency,
@@ -75,46 +79,73 @@ export function TransactionForm({
   const [transactionType, setTransactionType] = useState<TransactionType>(
     fixedType ?? values.transactionType ?? "expense",
   );
+  const [createdCategories, setCreatedCategories] = useState<
+    QuickCreatedCategory[]
+  >([]);
+  const categoryOptions = [
+    ...categories,
+    ...createdCategories.filter(
+      (created) => !categories.some((category) => category.id === created.id),
+    ),
+  ];
   const [categoryId, setCategoryId] = useState(values.categoryId ?? "");
-  const filteredCategories = categories.filter(
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const filteredCategories = categoryOptions.filter(
     (category) => category.kind === transactionType,
+  );
+
+  const handleCategoryCreated = useCallback(
+    (category: QuickCreatedCategory) => {
+      setCreatedCategories((current) => [
+        ...current.filter((item) => item.id !== category.id),
+        category,
+      ]);
+      setCategoryId(category.id);
+      setQuickCreateOpen(false);
+    },
+    [setCategoryId, setCreatedCategories, setQuickCreateOpen],
   );
 
   function changeTransactionType(type: TransactionType) {
     setTransactionType(type);
-    const selected = categories.find((category) => category.id === categoryId);
+    const selected = categoryOptions.find(
+      (category) => category.id === categoryId,
+    );
     if (!selected || selected.kind !== type) setCategoryId("");
   }
 
   return (
-    <form action={formAction} className="grid gap-5">
-      {values.id ? <input type="hidden" name="id" value={values.id} /> : null}
-      {fixedType ? (
-        <input type="hidden" name="transactionType" value={fixedType} />
-      ) : null}
-      {state.message ? <FormMessage>{state.message}</FormMessage> : null}
+    <div className="grid gap-5">
+      <form action={formAction} className="grid gap-5">
+        {values.id ? (
+          <input type="hidden" name="id" value={values.id} />
+        ) : null}
+        {fixedType ? (
+          <input type="hidden" name="transactionType" value={fixedType} />
+        ) : null}
+        {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
-      <Field
-        label="Tipo de lançamento"
-        error={state.fieldErrors?.transactionType?.[0]}
-      >
-        <select
-          className={inputClass(Boolean(state.fieldErrors?.transactionType))}
-          name={fixedType ? undefined : "transactionType"}
-          value={transactionType}
-          disabled={Boolean(fixedType)}
-          onChange={(event) =>
-            changeTransactionType(event.target.value as TransactionType)
-          }
-          required
+        <Field
+          label="Tipo de lançamento"
+          error={state.fieldErrors?.transactionType?.[0]}
         >
-          {TRANSACTION_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {TRANSACTION_TYPE_LABELS[type]}
-            </option>
-          ))}
-        </select>
-      </Field>
+          <select
+            className={inputClass(Boolean(state.fieldErrors?.transactionType))}
+            name={fixedType ? undefined : "transactionType"}
+            value={transactionType}
+            disabled={Boolean(fixedType)}
+            onChange={(event) =>
+              changeTransactionType(event.target.value as TransactionType)
+            }
+            required
+          >
+            {TRANSACTION_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {TRANSACTION_TYPE_LABELS[type]}
+              </option>
+            ))}
+          </select>
+        </Field>
 
       <Field label="Descrição" error={state.fieldErrors?.description?.[0]}>
         <input
@@ -153,48 +184,60 @@ export function TransactionForm({
         </Field>
 
         <Field label="Categoria" error={state.fieldErrors?.categoryId?.[0]}>
-          <select
-            className={inputClass(Boolean(state.fieldErrors?.categoryId))}
-            name="categoryId"
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            required
-            aria-invalid={Boolean(state.fieldErrors?.categoryId)}
-          >
-            <option value="" disabled>
-              Selecione
-            </option>
-            {(groups ?? []).length
-              ? (groups ?? [])
-                  .filter(
-                    (group) =>
-                      group.kind === transactionType &&
-                      group.archived_at === null &&
-                      filteredCategories.some(
-                        (category) => category.group_id === group.id,
-                      ),
-                  )
-                  .map((group) => (
-                    <optgroup
-                      key={group.id}
-                      label={`${group.name} · ${CONTEXT_LABELS[group.context]}`}
-                    >
-                      {filteredCategories
-                        .filter((category) => category.group_id === group.id)
-                        .map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {getCategoryDisplayName(category, categories)}
-                          </option>
-                        ))}
-                    </optgroup>
-                  ))
-              : filteredCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {getCategoryDisplayName(category, categories)} ·{" "}
-                    {CONTEXT_LABELS[category.context]}
-                  </option>
-                ))}
-          </select>
+          <div className="grid gap-2">
+            <select
+              className={inputClass(Boolean(state.fieldErrors?.categoryId))}
+              name="categoryId"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+              required
+              aria-invalid={Boolean(state.fieldErrors?.categoryId)}
+            >
+              <option value="" disabled>
+                Selecione
+              </option>
+              {(groups ?? []).length
+                ? (groups ?? [])
+                    .filter(
+                      (group) =>
+                        group.kind === transactionType &&
+                        group.archived_at === null &&
+                        filteredCategories.some(
+                          (category) => category.group_id === group.id,
+                        ),
+                    )
+                    .map((group) => (
+                      <optgroup
+                        key={group.id}
+                        label={`${group.name} · ${CONTEXT_LABELS[group.context]}`}
+                      >
+                        {filteredCategories
+                          .filter((category) => category.group_id === group.id)
+                          .map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {getCategoryDisplayName(
+                                category,
+                                categoryOptions,
+                              )}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))
+                : filteredCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {getCategoryDisplayName(category, categoryOptions)} ·{" "}
+                      {CONTEXT_LABELS[category.context]}
+                    </option>
+                  ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setQuickCreateOpen(true)}
+              className="min-h-10 justify-self-start rounded-lg px-2 text-sm font-bold text-blue-700 hover:bg-blue-50"
+            >
+              + Criar categoria ou subcategoria
+            </button>
+          </div>
         </Field>
       </div>
 
@@ -251,9 +294,19 @@ export function TransactionForm({
         />
       </Field>
 
-      <SubmitButton pending={pending}>
-        {values.id ? "Salvar alterações" : "Criar lançamento"}
-      </SubmitButton>
-    </form>
+        <SubmitButton pending={pending}>
+          {values.id ? "Salvar alterações" : "Criar lançamento"}
+        </SubmitButton>
+      </form>
+      <QuickCategoryCreate
+        key={transactionType}
+        open={quickCreateOpen}
+        kind={transactionType}
+        categories={categoryOptions}
+        groups={groups ?? []}
+        onCreated={handleCategoryCreated}
+        onClose={() => setQuickCreateOpen(false)}
+      />
+    </div>
   );
 }

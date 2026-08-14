@@ -37,9 +37,9 @@ export default async function NewTransactionPage({
           saldo.
         </p>
       </div>
-      {hasError || accounts.length === 0 || categories.length === 0 ? (
+      {hasError || accounts.length === 0 ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
-          Cadastre ao menos uma conta e aplique a migration da Sprint 3 antes
+          Cadastre ao menos uma conta e aplique as migrations financeiras antes
           de criar lançamentos.
         </section>
       ) : (

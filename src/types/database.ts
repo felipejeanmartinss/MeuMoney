@@ -926,6 +926,24 @@ export type Database = {
       };
     };
     Functions: {
+      delete_category_with_replacement: {
+        Args: {
+          target_category_id: string;
+          replacement_category_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      delete_category_group_with_replacement: {
+        Args: {
+          target_group_id: string;
+          replacement_group_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      delete_archived_account: {
+        Args: { target_account_id: string };
+        Returns: boolean;
+      };
       seed_default_categories: {
         Args: { target_user_id: string };
         Returns: undefined;

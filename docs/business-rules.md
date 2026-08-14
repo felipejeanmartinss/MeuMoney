@@ -31,13 +31,18 @@
 - O saldo inicial é obrigatório, pode ser positivo, zero ou negativo e possui data de referência obrigatória.
 - Dinheiro é persistido como inteiro em unidades menores; valores de ponto flutuante não são aceitos no domínio.
 - As moedas suportadas inicialmente são BRL, USD e EUR. A moeda preferencial do perfil apenas sugere o valor inicial de novas contas; ela não converte contas existentes.
-- Contas não são excluídas pela interface: podem ser inativadas e reativadas.
+- Contas ativas não podem ser excluídas. Depois de inativada, uma conta pode ser excluída definitivamente mediante confirmação explícita; a operação remove seu histórico transacional, transferências, recorrências e importações vinculadas, e apenas desvincula cartões que a utilizavam como conta de pagamento.
 - Categorias separam natureza (Receita ou Despesa) e contexto (Pessoal ou Profissional).
 - Categorias iniciais são criadas automaticamente para cada usuário e partem de uma taxonomia inspirada na orientação AUVP adaptada aos contextos do MeuMoney.
 - A taxonomia inicial é somente uma sugestão: todas as categorias pertencem ao usuário e podem ser editadas, inativadas e reativadas pelo proprietário.
 - Uma categoria pode ser principal ou subcategoria. A hierarquia possui um único nível; pai e filha pertencem ao mesmo usuário e mantêm a mesma natureza e contexto.
 - O nome é único dentro da mesma categoria principal, natureza e contexto. Assim, duas categorias principais distintas podem possuir subcategorias homônimas.
 - Uma categoria principal com subcategorias ativas só pode ser inativada depois delas, evitando opções órfãs nos formulários.
+- Categorias e subcategorias podem ser excluídas definitivamente. Se a categoria ou alguma subcategoria removida tiver lançamentos, recorrências, compras de cartão, orçamentos ou linhas em revisão de importação, o usuário deve escolher uma categoria ativa da mesma natureza e contexto; a realocação e a exclusão ocorrem atomicamente.
+- Ao excluir uma categoria principal, suas subcategorias diretas também são removidas. Sem vínculos financeiros, nenhuma substituta é exigida, permitindo ao usuário manter uma estrutura sem categorias.
+- Categorias e subcategorias podem ser criadas durante a inclusão de um lançamento e durante a revisão de uma importação, usando os mesmos grupos, natureza, contexto e validações da administração de categorias.
+- Grupos podem ser editados e excluídos definitivamente. Se um grupo possuir categorias ou subcategorias, o usuário deve escolher outro grupo ativo da mesma natureza e contexto; toda a hierarquia é movida atomicamente antes da exclusão.
+- A exclusão de grupo é bloqueada quando categorias principais homônimas gerariam conflito no destino. Nenhuma categoria é mesclada ou renomeada silenciosamente.
 - O saldo inicial permanece como ponto de partida imutável do cálculo histórico, embora possa ser corrigido pelo usuário na edição da conta.
 
 ## Movimentações financeiras — Sprint 3

@@ -18,6 +18,7 @@ const messages: Record<string, string> = {
   updated: "Conta atualizada com sucesso.",
   "status-updated": "Status da conta atualizado com sucesso.",
   "status-error": "Não foi possível alterar o status da conta.",
+  deleted: "Conta inativa e seu histórico foram excluídos definitivamente.",
 };
 
 function formatDate(value: string) {
@@ -165,6 +166,14 @@ function AccountGroup({
                           {account.archived_at ? "Inativa" : "Ativa"}
                         </span>
                         <AccountStatusAction account={account} />
+                        {account.archived_at ? (
+                          <Link
+                            href={`/accounts/${account.id}/edit#delete-account`}
+                            className="min-h-10 rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Excluir
+                          </Link>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -207,6 +216,14 @@ function AccountGroup({
                     Atualizada em {formatDate(account.updated_at)}
                   </span>
                   <AccountStatusAction account={account} />
+                  {account.archived_at ? (
+                    <Link
+                      href={`/accounts/${account.id}/edit#delete-account`}
+                      className="min-h-10 rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                    >
+                      Excluir
+                    </Link>
+                  ) : null}
                 </div>
               </article>
             ))}

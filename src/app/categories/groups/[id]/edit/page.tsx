@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryGroupForm } from "@/components/forms/category-group-form";
+import { CategoryGroupDeletionForm } from "@/components/forms/category-group-deletion-form";
 import { categoryGroupIdSchema } from "@/domain/categories";
-import { getCurrentUserCategoryGroup } from "@/services/finance/categories-service";
+import { getCurrentUserCategoryGroupDeletionImpact } from "@/services/finance/categories-service";
 
 export const metadata = { title: "Editar grupo de categorias" };
 
@@ -13,7 +14,8 @@ export default async function EditCategoryGroupPage({
 }) {
   const parsedId = categoryGroupIdSchema.safeParse((await params).id);
   if (!parsedId.success) notFound();
-  const { group, hasError } = await getCurrentUserCategoryGroup(parsedId.data);
+  const { group, replacementGroups, categoryCount, hasError } =
+    await getCurrentUserCategoryGroupDeletionImpact(parsedId.data);
   if (hasError || !group) notFound();
 
   return (
@@ -35,6 +37,21 @@ export default async function EditCategoryGroupPage({
             context: group.context,
           }}
         />
+      </section>
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8">
+        <h2 className="text-xl font-extrabold text-red-950">Zona de perigo</h2>
+        <p className="mt-2 text-sm leading-6 text-red-900">
+          Excluir o grupo é permanente. Categorias e subcategorias vinculadas
+          precisam ser transferidas para outro grupo compatível.
+        </p>
+        <div className="mt-5">
+          <CategoryGroupDeletionForm
+            groupId={group.id}
+            groupName={group.name}
+            categoryCount={categoryCount}
+            replacementGroups={replacementGroups}
+          />
+        </div>
       </section>
     </main>
   );

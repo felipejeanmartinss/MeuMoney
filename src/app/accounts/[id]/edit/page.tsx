@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountForm } from "@/components/forms/account-form";
+import { ArchivedAccountDeletionForm } from "@/components/forms/archived-account-deletion-form";
 import { accountIdSchema } from "@/domain/accounts";
 import { minorUnitsToInput } from "@/domain/money";
 import { getCurrentUserAccount } from "@/services/finance/accounts-service";
@@ -49,6 +50,25 @@ export default async function EditAccountPage({
           }}
         />
       </section>
+      {account.archived_at ? (
+        <section
+          id="delete-account"
+          className="rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8"
+        >
+          <h2 className="text-xl font-extrabold text-red-950">
+            Excluir conta definitivamente
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-red-900">
+            Esta ação só está disponível porque a conta está inativa.
+          </p>
+          <div className="mt-5">
+            <ArchivedAccountDeletionForm
+              accountId={account.id}
+              accountName={account.name}
+            />
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
