@@ -1,5 +1,12 @@
 # Roadmap
 
+## Incremento — administração flexível de categorias e contas
+
+- Exclusão atômica de categorias com realocação de vínculos financeiros.
+- Exclusão definitiva de contas previamente inativadas.
+- Criação rápida de categoria ou subcategoria em lançamentos e importações.
+- Grade compacta de categorias inspirada em planilhas, mantendo a identidade visual atual.
+
 ## Sprint 12 — Segurança e beta pessoal
 
 Exportação completa, backup restaurável e transacional, exclusão de conta com

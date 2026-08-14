@@ -27,6 +27,14 @@ A função `handle_new_user` é `security definer`, usa `search_path` vazio, cri
 
 ## Categorias
 
+- `delete_category_with_replacement(category_id, replacement_id)` centraliza a exclusão física e a realocação atômica de referências. A função valida `auth.uid()`, propriedade, natureza, contexto e atividade da substituta, sem conceder `DELETE` direto ao cliente.
+- A realocação cobre `transactions`, `recurring_transactions`, `credit_card_purchases`, `monthly_budgets` e `import_staging_rows`. Orçamentos coincidentes são somados por mês e moeda antes da remoção.
+
+## Exclusão de contas inativas
+
+- `delete_archived_account(account_id)` aceita somente contas do usuário autenticado com `archived_at` preenchido.
+- A função remove dados pertencentes ao extrato da conta e desvincula referências que precisam permanecer, como cartões e faturas já registradas. O cliente não recebe privilégio de `DELETE` nas tabelas.
+
 `public.categories` contém proprietário, nome, natureza, contexto, indicador de origem na taxonomia inicial, arquivamento e timestamps. `parent_id` referencia uma categoria principal do mesmo usuário, natureza e contexto. Um trigger limita a árvore a um nível, impede ciclos e rejeita pai inativo. A unicidade considera a categoria principal, permitindo o mesmo nome sob pais diferentes. A função `seed_default_categories` cria as sugestões iniciais de cada usuário e também atende usuários existentes durante a migration.
 
 RLS permite leitura e atualização das categorias pelo proprietário. O campo `is_system` é mantido somente como informação de origem e não bloqueia alterações. Os privilégios por coluna impedem o cliente de alterar esse indicador, e não existe política de exclusão.

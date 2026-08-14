@@ -19,6 +19,6 @@ export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <div className="relative"><input {...props} type={visible ? "text" : "password"} className={`${inputClass(Boolean(props["aria-invalid"]))} pr-20`} /><button type="button" onClick={() => setVisible((value) => !value)} className="absolute inset-y-0 right-2 my-auto h-9 rounded-lg px-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" aria-label={visible ? "Ocultar senha" : "Exibir senha"}>{visible ? "Ocultar" : "Exibir"}</button></div>;
 }
 
-export function SubmitButton({ pending, children }: { pending: boolean; children: ReactNode }) {
-  return <button type="submit" disabled={pending} className="min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Aguarde…" : children}</button>;
+export function SubmitButton({ pending, disabled = false, children }: { pending: boolean; disabled?: boolean; children: ReactNode }) {
+  return <button type="submit" disabled={pending || disabled} className="min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Aguarde…" : children}</button>;
 }

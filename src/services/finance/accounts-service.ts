@@ -309,3 +309,23 @@ export async function setCurrentUserAccountArchived(id: string, archived: boolea
     ? { ok: false as const, message: "Não foi possível alterar o status da conta." }
     : { ok: true as const };
 }
+
+export async function deleteCurrentUserArchivedAccount(id: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("delete_archived_account", {
+    target_account_id: id,
+  });
+
+  if (error?.message.includes("account_must_be_archived")) {
+    return {
+      ok: false as const,
+      message: "Inative a conta antes de excluí-la definitivamente.",
+    };
+  }
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir a conta definitivamente.",
+      }
+    : { ok: true as const };
+}

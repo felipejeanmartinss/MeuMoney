@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   categoryFormSchema,
+  categoryDeletionSchema,
   categoryGroupFormSchema,
   categoryGroupIdSchema,
   categoryIdSchema,
@@ -12,10 +13,26 @@ import type { FinancialFormState } from "@/app/actions/accounts";
 import {
   createCurrentUserCategory,
   createCurrentUserCategoryGroup,
+  deleteCurrentUserCategory,
   setCurrentUserCategoryArchived,
   updateCurrentUserCategory,
   updateCurrentUserCategoryGroup,
 } from "@/services/finance/categories-service";
+import type { Category } from "@/types/database";
+
+export type QuickCategoryFormState = FinancialFormState & {
+  category?: Pick<
+    Category,
+    | "id"
+    | "group_id"
+    | "parent_id"
+    | "name"
+    | "kind"
+    | "context"
+    | "is_system"
+    | "archived_at"
+  >;
+};
 
 const categoryInputFrom = (formData: FormData) => ({
   id: formData.get("id")?.toString(),
@@ -45,6 +62,51 @@ export async function createCategory(
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/categories");
   redirect("/categories?message=created");
+}
+
+export async function quickCreateCategory(
+  _previousState: QuickCategoryFormState,
+  formData: FormData,
+): Promise<QuickCategoryFormState> {
+  const parsed = categoryFormSchema.safeParse(categoryInputFrom(formData));
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const result = await createCurrentUserCategory(parsed.data);
+  if (!result.ok || !result.category) {
+    return { status: "error", message: result.message };
+  }
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
+  revalidatePath("/imports");
+  return { status: "idle", category: result.category };
+}
+
+export async function deleteCategory(
+  _previousState: FinancialFormState,
+  formData: FormData,
+): Promise<FinancialFormState> {
+  const parsed = categoryDeletionSchema.safeParse({
+    id: formData.get("id"),
+    replacementCategoryId: formData.get("replacementCategoryId"),
+    confirmation: formData.get("confirmation"),
+  });
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const result = await deleteCurrentUserCategory(
+    parsed.data.id,
+    parsed.data.replacementCategoryId,
+  );
+  if (!result.ok) return { status: "error", message: result.message };
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
+  revalidatePath("/recurring-transactions");
+  revalidatePath("/credit-cards");
+  revalidatePath("/budgets");
+  revalidatePath("/imports");
+  redirect("/categories?message=deleted");
 }
 
 export async function updateCategory(

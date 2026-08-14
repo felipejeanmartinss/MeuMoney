@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   correctFinancialImportRow,
   correctFinancialImportTransferRow,
   toggleFinancialImportRow,
 } from "@/app/actions/file-imports";
 import { getCategoryDisplayName } from "@/domain/categories";
+import type { CategoryGroupItem } from "@/domain/categories";
 import { minorUnitsToInput } from "@/domain/money";
 import type {
   Category,
@@ -15,6 +16,10 @@ import type {
   TransactionType,
 } from "@/types/database";
 import { inputClass } from "./form-controls";
+import {
+  QuickCategoryCreate,
+  type QuickCreatedCategory,
+} from "./quick-category-create";
 
 const statusPresentation = {
   needs_review: {
@@ -51,6 +56,7 @@ export function ImportStagingRowForm({
   jobId,
   row,
   categories,
+  groups,
   accounts,
   page,
 }: {
@@ -58,8 +64,16 @@ export function ImportStagingRowForm({
   row: ImportStagingRow;
   categories: Pick<
     Category,
-    "id" | "parent_id" | "name" | "kind" | "context"
+    | "id"
+    | "group_id"
+    | "parent_id"
+    | "name"
+    | "kind"
+    | "context"
+    | "is_system"
+    | "archived_at"
   >[];
+  groups: CategoryGroupItem[];
   accounts: Pick<Account, "id" | "name" | "currency">[];
   page: number;
 }) {
@@ -68,8 +82,19 @@ export function ImportStagingRowForm({
       ? row.source_amount_text
       : minorUnitsToInput(row.signed_amount_minor);
   const [amount, setAmount] = useState(initialAmount);
+  const [createdCategories, setCreatedCategories] = useState<
+    QuickCreatedCategory[]
+  >([]);
+  const categoryOptions = [
+    ...categories,
+    ...createdCategories.filter(
+      (created) => !categories.some((category) => category.id === created.id),
+    ),
+  ];
+  const [categoryId, setCategoryId] = useState(row.category_id ?? "");
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const transactionType = expectedType(amount);
-  const compatibleCategories = categories.filter(
+  const compatibleCategories = categoryOptions.filter(
     (category) => category.kind === transactionType,
   );
   const presentation = statusPresentation[row.status];
@@ -82,6 +107,17 @@ export function ImportStagingRowForm({
     (account) =>
       account.id !== row.account_id &&
       (!sourceAccount || account.currency === sourceAccount.currency),
+  );
+  const handleCategoryCreated = useCallback(
+    (category: QuickCreatedCategory) => {
+      setCreatedCategories((current) => [
+        ...current.filter((item) => item.id !== category.id),
+        category,
+      ]);
+      setCategoryId(category.id);
+      setQuickCreateOpen(false);
+    },
+    [setCategoryId, setCreatedCategories, setQuickCreateOpen],
   );
 
   return (
@@ -266,7 +302,8 @@ export function ImportStagingRowForm({
             <select
               className={inputClass()}
               name="categoryId"
-              defaultValue={row.category_id ?? ""}
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
               required
             >
               <option value="">Selecione</option>
@@ -275,10 +312,17 @@ export function ImportStagingRowForm({
                   {category.context === "professional"
                     ? "Profissional"
                     : "Pessoal"}{" "}
-                  · {getCategoryDisplayName(category, categories)}
+                  · {getCategoryDisplayName(category, categoryOptions)}
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => setQuickCreateOpen(true)}
+              className="min-h-9 justify-self-start rounded-lg px-2 text-xs font-bold text-blue-700 hover:bg-blue-50"
+            >
+              + Criar categoria
+            </button>
           </label>
           <div className="flex items-end lg:col-span-1">
             <button className="min-h-12 w-full rounded-xl bg-blue-700 px-3 text-sm font-semibold text-white hover:bg-blue-800">
@@ -310,6 +354,17 @@ export function ImportStagingRowForm({
             {row.status === "ignored" ? "Reincluir na revisão" : "Ignorar linha"}
           </button>
         </form>
+      ) : null}
+      {!isTransfer ? (
+        <QuickCategoryCreate
+          key={transactionType}
+          open={quickCreateOpen}
+          kind={transactionType}
+          categories={categoryOptions}
+          groups={groups}
+          onCreated={handleCategoryCreated}
+          onClose={() => setQuickCreateOpen(false)}
+        />
       ) : null}
     </article>
   );

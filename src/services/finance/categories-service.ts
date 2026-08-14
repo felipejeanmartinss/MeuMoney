@@ -55,14 +55,20 @@ export async function getCurrentUserCategory(id: string) {
 
 export async function createCurrentUserCategory(input: CategoryMutationInput) {
   const { supabase, user } = await requireUser();
-  const { error } = await supabase.from("categories").insert({
-    user_id: user.id,
-    group_id: input.groupId,
-    parent_id: input.parentId,
-    name: input.name,
-    kind: input.kind,
-    context: input.context,
-  });
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({
+      user_id: user.id,
+      group_id: input.groupId,
+      parent_id: input.parentId,
+      name: input.name,
+      kind: input.kind,
+      context: input.context,
+    })
+    .select(
+      "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+    )
+    .single();
 
   if (error?.code === "23505") {
     return {
@@ -87,6 +93,136 @@ export async function createCurrentUserCategory(input: CategoryMutationInput) {
   }
   return error
     ? { ok: false as const, message: "Não foi possível cadastrar a categoria." }
+    : { ok: true as const, category: data };
+}
+
+export async function getCurrentUserCategoryDeletionImpact(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data: category, error: categoryError } = await supabase
+    .from("categories")
+    .select(
+      "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+    )
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!category || categoryError) {
+    return {
+      category: null,
+      replacementCategories: [],
+      childCount: 0,
+      referenceCount: 0,
+      hasError: Boolean(categoryError),
+    };
+  }
+
+  const { data: children, error: childrenError } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("parent_id", id);
+  const categoryIds = [id, ...(children ?? []).map((child) => child.id)];
+
+  const [
+    replacementsResult,
+    transactionsResult,
+    recurrencesResult,
+    purchasesResult,
+    budgetsResult,
+    stagingResult,
+  ] = await Promise.all([
+    supabase
+      .from("categories")
+      .select(
+        "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .eq("kind", category.kind)
+      .eq("context", category.context)
+      .is("archived_at", null)
+      .not("id", "in", `(${categoryIds.join(",")})`)
+      .order("name"),
+    supabase
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("category_id", categoryIds),
+    supabase
+      .from("recurring_transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("category_id", categoryIds),
+    supabase
+      .from("credit_card_purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("category_id", categoryIds),
+    supabase
+      .from("monthly_budgets")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("category_id", categoryIds),
+    supabase
+      .from("import_staging_rows")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("category_id", categoryIds),
+  ]);
+
+  const countResults = [
+    transactionsResult,
+    recurrencesResult,
+    purchasesResult,
+    budgetsResult,
+    stagingResult,
+  ];
+
+  return {
+    category,
+    replacementCategories: replacementsResult.data ?? [],
+    childCount: children?.length ?? 0,
+    referenceCount: countResults.reduce(
+      (total, result) => total + (result.count ?? 0),
+      0,
+    ),
+    hasError: Boolean(
+      childrenError ||
+        replacementsResult.error ||
+        countResults.some((result) => result.error),
+    ),
+  };
+}
+
+export async function deleteCurrentUserCategory(
+  id: string,
+  replacementCategoryId: string | null,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "delete_category_with_replacement",
+    {
+      target_category_id: id,
+      replacement_category_id: replacementCategoryId,
+    },
+  );
+
+  if (error?.message.includes("category_replacement_required")) {
+    return {
+      ok: false as const,
+      message:
+        "Esta categoria possui dados vinculados. Escolha uma categoria substituta.",
+    };
+  }
+  if (error?.message.includes("invalid_replacement_category")) {
+    return {
+      ok: false as const,
+      message:
+        "A substituta deve estar ativa e manter a mesma natureza e contexto.",
+    };
+  }
+  return error || !data
+    ? { ok: false as const, message: "Não foi possível excluir a categoria." }
     : { ok: true as const };
 }
 

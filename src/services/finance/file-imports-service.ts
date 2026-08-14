@@ -248,6 +248,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       rows: [],
       accounts: [],
       categories: [],
+      groups: [],
       pagination: { page: 1, totalRows: 0, totalPages: 1 },
       hasError: Boolean(jobResult.error),
     };
@@ -256,7 +257,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
   const safePage = Math.max(1, Math.trunc(page) || 1);
   const start = (safePage - 1) * IMPORT_REVIEW_PAGE_SIZE;
   const end = start + IMPORT_REVIEW_PAGE_SIZE - 1;
-  const [rowsResult, accountsResult, categoriesResult] = await Promise.all([
+  const [rowsResult, accountsResult, categoriesResult, groupsResult] = await Promise.all([
     supabase
       .from("import_staging_rows")
       .select(
@@ -275,11 +276,17 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       .order("name"),
     supabase
       .from("categories")
-      .select("id, parent_id, name, kind, context")
+      .select("id, group_id, parent_id, name, kind, context, is_system, archived_at")
       .eq("user_id", user.id)
       .is("archived_at", null)
       .order("context")
       .order("kind")
+      .order("name"),
+    supabase
+      .from("category_groups")
+      .select("id, name, kind, context, archived_at")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
       .order("name"),
   ]);
 
@@ -288,6 +295,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
     rows: rowsResult.data ?? [],
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
+    groups: groupsResult.data ?? [],
     pagination: {
       page: safePage,
       totalRows: rowsResult.count ?? 0,
@@ -300,7 +308,8 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       jobResult.error ||
         rowsResult.error ||
         accountsResult.error ||
-        categoriesResult.error,
+        categoriesResult.error ||
+        groupsResult.error,
     ),
   };
 }
