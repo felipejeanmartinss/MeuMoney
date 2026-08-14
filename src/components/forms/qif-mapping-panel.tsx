@@ -2,7 +2,6 @@ import {
   mapFinancialImportQifCategory,
   mapFinancialImportQifTransferAccount,
 } from "@/app/actions/file-imports";
-import { getCategoryDisplayName } from "@/domain/categories";
 import type {
   Account,
   Category,
@@ -10,6 +9,7 @@ import type {
   TransactionType,
 } from "@/types/database";
 import { inputClass } from "@/components/forms/form-control-styles";
+import { CategoryCombobox } from "@/components/forms/category-combobox";
 
 type CategoryMapping = {
   sourceName: string;
@@ -127,27 +127,12 @@ export function QifMappingPanel({
               </p>
               <label className="grid gap-1 text-sm font-semibold text-slate-700">
                 Categoria no MeuMoney
-                <select
-                  className={inputClass()}
+                <CategoryCombobox
                   name="categoryId"
+                  categories={categories}
+                  transactionType={mapping.transactionType}
                   defaultValue={mapping.categoryId ?? ""}
-                  required
-                >
-                  <option value="">Selecione</option>
-                  {categories
-                    .filter(
-                      (category) =>
-                        category.kind === mapping.transactionType,
-                    )
-                    .map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.context === "professional"
-                          ? "Profissional"
-                          : "Pessoal"}{" "}
-                        · {getCategoryDisplayName(category, categories)}
-                      </option>
-                    ))}
-                </select>
+                />
               </label>
               <button className="min-h-12 rounded-xl border border-blue-200 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 Aplicar

@@ -6,11 +6,7 @@ import {
   updateRecurringTransaction,
 } from "@/app/actions/recurring-transactions";
 import type { FinancialFormState } from "@/app/actions/accounts";
-import { CONTEXT_LABELS } from "@/domain/accounts";
-import {
-  getCategoryDisplayName,
-  type CategoryGroupItem,
-} from "@/domain/categories";
+import type { CategoryGroupItem } from "@/domain/categories";
 import {
   RECURRENCE_FREQUENCIES,
   RECURRENCE_FREQUENCY_LABELS,
@@ -25,6 +21,7 @@ import type {
   SupportedCurrency,
   TransactionType,
 } from "@/types/database";
+import { CategoryCombobox } from "./category-combobox";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 
 type AccountOption = {
@@ -82,9 +79,7 @@ export function RecurringTransactionForm({
   const [nextOccurrence, setNextOccurrence] = useState(
     values.nextOccurrence ?? values.startDate ?? "",
   );
-  const filteredCategories = categories.filter(
-    (category) => category.kind === transactionType,
-  );
+  void groups;
 
   function changeTransactionType(type: TransactionType) {
     setTransactionType(type);
@@ -160,40 +155,14 @@ export function RecurringTransactionForm({
         </Field>
 
         <Field label="Categoria" error={state.fieldErrors?.categoryId?.[0]}>
-          <select
-            className={inputClass(Boolean(state.fieldErrors?.categoryId))}
+          <CategoryCombobox
             name="categoryId"
+            categories={categories}
+            transactionType={transactionType}
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Selecione
-            </option>
-            {groups
-              .filter(
-                (group) =>
-                  group.kind === transactionType &&
-                  group.archived_at === null &&
-                  filteredCategories.some(
-                    (category) => category.group_id === group.id,
-                  ),
-              )
-              .map((group) => (
-                <optgroup
-                  key={group.id}
-                  label={`${group.name} · ${CONTEXT_LABELS[group.context]}`}
-                >
-                  {filteredCategories
-                    .filter((category) => category.group_id === group.id)
-                    .map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {getCategoryDisplayName(category, categories)}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-          </select>
+            onValueChange={setCategoryId}
+            invalid={Boolean(state.fieldErrors?.categoryId)}
+          />
         </Field>
       </div>
 

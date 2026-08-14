@@ -270,7 +270,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       .range(start, end),
     supabase
       .from("accounts")
-      .select("id, name, currency, context")
+      .select("id, name, type, currency, context")
       .eq("user_id", user.id)
       .is("archived_at", null)
       .order("name"),

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CategoryGroupItem } from "@/domain/categories";
 import type {
+  AccountType,
   FinancialContext,
   SupportedCurrency,
   TransactionType,
@@ -17,6 +18,7 @@ type AccountOption = {
   name: string;
   currency: SupportedCurrency;
   context: FinancialContext;
+  type: AccountType;
 };
 
 type CategoryOption = {
@@ -52,6 +54,8 @@ export function AccountEntryForm({
   initialMode: EntryMode;
 }) {
   const [mode, setMode] = useState<EntryMode>(initialMode);
+  const [transferDestinationAccountId, setTransferDestinationAccountId] =
+    useState("");
 
   return (
     <div className="grid gap-6">
@@ -84,6 +88,7 @@ export function AccountEntryForm({
           accounts={accounts}
           values={{
             sourceAccountId: accountId,
+            destinationAccountId: transferDestinationAccountId,
             transactionDate,
             status: "completed",
             amountMinor: "0,00",
@@ -96,6 +101,11 @@ export function AccountEntryForm({
           categories={categories}
           groups={groups}
           fixedType={mode}
+          transferAccounts={accounts}
+          onTransferSelected={(destinationAccountId) => {
+            setTransferDestinationAccountId(destinationAccountId);
+            setMode("transfer");
+          }}
           values={{
             accountId,
             transactionType: mode,

@@ -173,6 +173,32 @@ export const importTransferRowCorrectionSchema = z.object({
   transferAccountId: z.uuid("Selecione a outra conta da transferência."),
 });
 
+const importClassificationSelectionSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^(category|transfer):[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "Selecione uma categoria ou conta válida.",
+  )
+  .transform((value) => {
+    const [kind, id] = value.split(":") as ["category" | "transfer", string];
+    return { kind, id };
+  });
+
+export const importClassificationCorrectionSchema = z.object({
+  rowId: importRowIdSchema,
+  transactionDate: z
+    .string()
+    .refine(isValidIsoDate, "Informe uma data válida."),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Informe a descrição.")
+    .max(180, "Use até 180 caracteres."),
+  signedAmountMinor: signedAmountInput,
+  classification: importClassificationSelectionSchema,
+});
+
 export const qifCategoryMappingSchema = z.object({
   jobId: importJobIdSchema,
   sourceCategoryName: z.string().trim().min(1).max(180),

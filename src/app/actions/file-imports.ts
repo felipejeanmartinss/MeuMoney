@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   csvImportConfigSchema,
   importFileTypeSchema,
+  importClassificationCorrectionSchema,
   importJobIdSchema,
   importRowCorrectionSchema,
   importRowIdSchema,
@@ -180,6 +181,43 @@ export async function correctFinancialImportTransferRow(formData: FormData) {
       transferAccountId: parsed.data.transferAccountId,
     },
   );
+  revalidatePath(`/imports/${jobId.data}`);
+  redirect(
+    `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}&page=${page}`,
+  );
+}
+
+export async function correctFinancialImportClassification(formData: FormData) {
+  const parsed = importClassificationCorrectionSchema.safeParse({
+    rowId: formData.get("rowId"),
+    transactionDate: formData.get("transactionDate"),
+    description: formData.get("description"),
+    signedAmountMinor: formData.get("signedAmountMinor"),
+    classification: formData.get("classification"),
+  });
+  const jobId = importJobIdSchema.safeParse(formData.get("jobId"));
+  const page = Math.max(1, Number(formData.get("page")) || 1);
+  if (!parsed.success || !jobId.success) {
+    redirect(
+      `/imports/${jobId.success ? jobId.data : ""}?message=row-error&page=${page}`,
+    );
+  }
+
+  const commonInput = {
+    transactionDate: parsed.data.transactionDate,
+    description: parsed.data.description,
+    signedAmountMinor: parsed.data.signedAmountMinor,
+  };
+  const result =
+    parsed.data.classification.kind === "transfer"
+      ? await updateCurrentUserImportTransferRow(parsed.data.rowId, {
+          ...commonInput,
+          transferAccountId: parsed.data.classification.id,
+        })
+      : await updateCurrentUserImportRow(parsed.data.rowId, {
+          ...commonInput,
+          categoryId: parsed.data.classification.id,
+        });
   revalidatePath(`/imports/${jobId.data}`);
   redirect(
     `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}&page=${page}`,

@@ -12,11 +12,8 @@ import {
   TRANSACTION_TYPES,
   TRANSACTION_TYPE_LABELS,
 } from "@/domain/transactions";
-import { CONTEXT_LABELS } from "@/domain/accounts";
-import {
-  getCategoryDisplayName,
-  type CategoryGroupItem,
-} from "@/domain/categories";
+import type { CategoryGroupItem } from "@/domain/categories";
+import { CategoryCombobox } from "./category-combobox";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import {
   QuickCategoryCreate,
@@ -24,6 +21,7 @@ import {
 } from "./quick-category-create";
 import type {
   FinancialContext,
+  AccountType,
   SupportedCurrency,
   TransactionStatus,
   TransactionType,
@@ -34,6 +32,7 @@ type AccountOption = {
   name: string;
   currency: SupportedCurrency;
   context: FinancialContext;
+  type: AccountType;
 };
 
 type CategoryOption = {
@@ -67,18 +66,23 @@ export function TransactionForm({
   groups,
   values,
   fixedType,
+  transferAccounts,
+  onTransferSelected,
 }: {
   accounts: AccountOption[];
   categories: CategoryOption[];
   groups?: CategoryGroupItem[];
   values: TransactionFormValues;
   fixedType?: TransactionType;
+  transferAccounts?: AccountOption[];
+  onTransferSelected?: (destinationAccountId: string) => void;
 }) {
   const action = values.id ? updateTransaction : createTransaction;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [transactionType, setTransactionType] = useState<TransactionType>(
     fixedType ?? values.transactionType ?? "expense",
   );
+  const [accountId, setAccountId] = useState(values.accountId ?? "");
   const [createdCategories, setCreatedCategories] = useState<
     QuickCreatedCategory[]
   >([]);
@@ -90,9 +94,6 @@ export function TransactionForm({
   ];
   const [categoryId, setCategoryId] = useState(values.categoryId ?? "");
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  const filteredCategories = categoryOptions.filter(
-    (category) => category.kind === transactionType,
-  );
 
   const handleCategoryCreated = useCallback(
     (category: QuickCreatedCategory) => {
@@ -112,6 +113,15 @@ export function TransactionForm({
       (category) => category.id === categoryId,
     );
     if (!selected || selected.kind !== type) setCategoryId("");
+  }
+
+  function changeClassification(selection: string) {
+    if (selection.startsWith("transfer:")) {
+      setCategoryId("");
+      onTransferSelected?.(selection.slice("transfer:".length));
+      return;
+    }
+    setCategoryId(selection);
   }
 
   return (
@@ -168,7 +178,11 @@ export function TransactionForm({
           <select
             className={inputClass(Boolean(state.fieldErrors?.accountId))}
             name="accountId"
-            defaultValue={values.accountId ?? ""}
+            value={accountId}
+            onChange={(event) => {
+              setAccountId(event.target.value);
+              setCategoryId("");
+            }}
             required
             aria-invalid={Boolean(state.fieldErrors?.accountId)}
           >
@@ -185,51 +199,22 @@ export function TransactionForm({
 
         <Field label="Categoria" error={state.fieldErrors?.categoryId?.[0]}>
           <div className="grid gap-2">
-            <select
-              className={inputClass(Boolean(state.fieldErrors?.categoryId))}
+            <CategoryCombobox
               name="categoryId"
+              categories={categoryOptions}
+              transactionType={transactionType}
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              required
-              aria-invalid={Boolean(state.fieldErrors?.categoryId)}
-            >
-              <option value="" disabled>
-                Selecione
-              </option>
-              {(groups ?? []).length
-                ? (groups ?? [])
-                    .filter(
-                      (group) =>
-                        group.kind === transactionType &&
-                        group.archived_at === null &&
-                        filteredCategories.some(
-                          (category) => category.group_id === group.id,
-                        ),
-                    )
-                    .map((group) => (
-                      <optgroup
-                        key={group.id}
-                        label={`${group.name} · ${CONTEXT_LABELS[group.context]}`}
-                      >
-                        {filteredCategories
-                          .filter((category) => category.group_id === group.id)
-                          .map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {getCategoryDisplayName(
-                                category,
-                                categoryOptions,
-                              )}
-                            </option>
-                          ))}
-                      </optgroup>
-                    ))
-                : filteredCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {getCategoryDisplayName(category, categoryOptions)} ·{" "}
-                      {CONTEXT_LABELS[category.context]}
-                    </option>
-                  ))}
-            </select>
+              onValueChange={changeClassification}
+              transferAccounts={values.id ? [] : (transferAccounts ?? [])}
+              sourceAccountId={accountId}
+              invalid={Boolean(state.fieldErrors?.categoryId)}
+            />
+            {!values.id && accountId && onTransferSelected ? (
+              <p className="text-xs text-slate-500">
+                Contas compatíveis aparecem junto às categorias. Ao escolher
+                uma delas, o formulário muda para Transferência.
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={() => setQuickCreateOpen(true)}

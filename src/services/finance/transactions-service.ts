@@ -100,7 +100,7 @@ export async function getTransactionFormOptions(include?: {
   const { supabase, user } = await requireUser();
   let accountsQuery = supabase
     .from("accounts")
-    .select("id, name, currency, context")
+    .select("id, name, type, currency, context")
     .eq("user_id", user.id);
   accountsQuery = include?.accountId
     ? accountsQuery.or(
