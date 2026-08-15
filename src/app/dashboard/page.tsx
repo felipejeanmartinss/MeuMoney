@@ -4,19 +4,16 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { MonthlyEvolution } from "@/components/dashboard/monthly-evolution";
 import { SpendingTracker } from "@/components/dashboard/spending-tracker";
 import { CONTEXT_LABELS } from "@/domain/accounts";
-import {
-  currentReferenceMonth,
-  referenceMonthSchema,
-} from "@/domain/budgets";
-import {
-  CURRENCY_LABELS,
-  CURRENCY_LOCALES,
-} from "@/domain/currencies";
+import { currentReferenceMonth, referenceMonthSchema } from "@/domain/budgets";
+import { CURRENCY_LABELS, CURRENCY_LOCALES } from "@/domain/currencies";
 import { formatMoney } from "@/domain/money";
 import { RECURRENCE_FREQUENCY_LABELS } from "@/domain/recurring-transactions";
 import { getFinancialDashboard } from "@/services/reports/financial-dashboard-service";
+import type {
+  CreditCardInvoiceStatus,
+  FinancialReportBasis,
+} from "@/types/database";
 import { formatFinancialDate } from "@/utils/financial-formatters";
-import type { CreditCardInvoiceStatus } from "@/types/database";
 
 export const metadata = { title: "Visão financeira" };
 
@@ -25,6 +22,11 @@ const invoiceStatusLabels: Record<CreditCardInvoiceStatus, string> = {
   closed: "Fechada",
   paid: "Paga",
   overdue: "Vencida",
+};
+
+const basisLabels: Record<FinancialReportBasis, string> = {
+  competence: "Competência",
+  cash: "Caixa",
 };
 
 function formatReferenceMonth(referenceMonth: string) {
@@ -36,412 +38,145 @@ function formatReferenceMonth(referenceMonth: string) {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-function formatPercentage(value: number | null) {
-  return value === null
-    ? "Sem orçamento"
-    : `${value.toLocaleString("pt-BR", {
-        maximumFractionDigits: 1,
-      })}%`;
-}
-
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; basis?: string }>;
 }) {
   const params = await searchParams;
   const parsedMonth = referenceMonthSchema.safeParse(params.month);
   const referenceMonth = parsedMonth.success
     ? parsedMonth.data
     : currentReferenceMonth();
-  const data = await getFinancialDashboard(referenceMonth);
-  const firstName =
-    data.profile?.full_name?.trim().split(/\s+/)[0] || "bem-vindo";
+  const basis: FinancialReportBasis =
+    params.basis === "cash" ? "cash" : "competence";
+  const data = await getFinancialDashboard(referenceMonth, basis);
+  const firstName = data.profile?.full_name?.trim().split(/\s+/)[0];
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <section className="grid gap-5 rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-900 to-slate-950 p-6 text-white shadow-xl shadow-emerald-950/10 sm:p-9 md:grid-cols-[1fr_auto] md:items-end">
+    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-200">
+          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Visão financeira
           </p>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-5xl">
-            Olá, {firstName}.
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            {formatReferenceMonth(referenceMonth)}
           </h1>
-          <p className="mt-3 max-w-2xl leading-7 text-emerald-100">
-            Uma leitura consolidada de {formatReferenceMonth(referenceMonth)},
-            sempre separada por moeda.
+          <p className="mt-2 max-w-2xl text-slate-600">
+            {firstName ? `${firstName}, acompanhe` : "Acompanhe"} o essencial,
+            sempre separado por moeda e por regime financeiro.
           </p>
         </div>
         <form
           method="get"
-          className="grid gap-2 rounded-2xl bg-white/10 p-3 backdrop-blur"
+          className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
         >
-          <label
-            htmlFor="dashboard-month"
-            className="text-xs font-bold uppercase tracking-wider text-emerald-100"
-          >
-            Mês de referência
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+            Mês
             <input
-              id="dashboard-month"
               name="month"
               type="month"
               defaultValue={referenceMonth}
-              className="min-h-11 rounded-xl border border-white/30 bg-white px-3 text-slate-950"
+              className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900"
             />
-            <button className="min-h-11 rounded-xl bg-white px-4 font-bold text-emerald-800 hover:bg-emerald-50">
-              Atualizar
-            </button>
-          </div>
+          </label>
+          <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+            Regime
+            <select
+              name="basis"
+              defaultValue={basis}
+              className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900"
+            >
+              <option value="competence">Competência</option>
+              <option value="cash">Caixa</option>
+            </select>
+          </label>
+          <button className="min-h-11 rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800">
+            Aplicar
+          </button>
         </form>
+      </header>
+
+      <section className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
+        <strong>{basisLabels[basis]}:</strong>{" "}
+        {basis === "competence"
+          ? "compras de cartão aparecem no mês de cada parcela; o pagamento da fatura não duplica a despesa."
+          : "saídas aparecem quando o dinheiro deixa a conta, inclusive transferências para pagar cartões."}
       </section>
 
       {data.hasError ? (
-        <p
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
-        >
-          Parte dos indicadores não pôde ser carregada. Confirme a migration da
-          Sprint 7 e tente novamente.
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+          Parte dos indicadores não pôde ser carregada. Confirme a migration desta feature e tente novamente.
         </p>
       ) : null}
 
       {data.currencies.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-xl font-extrabold text-slate-950">
-            Sua visão financeira começará aqui
-          </h2>
-          <p className="mx-auto mt-2 max-w-xl text-slate-600">
-            Cadastre uma conta ou defina sua moeda preferida para acompanhar os
-            indicadores mensais.
-          </p>
-          <Link
-            href="/accounts"
-            className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-semibold text-white hover:bg-emerald-800"
-          >
-            Cadastrar conta
-          </Link>
+          <h2 className="text-xl font-extrabold text-slate-950">Sua visão financeira começará aqui</h2>
+          <p className="mx-auto mt-2 max-w-xl text-slate-600">Cadastre uma conta para acompanhar os indicadores mensais.</p>
+          <Link href="/accounts" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-semibold text-white">Cadastrar conta</Link>
         </section>
       ) : null}
 
       {data.currencies.map((section) => {
         const locale = CURRENCY_LOCALES[section.currency];
         const month = section.selectedMonth;
-        const resultTone =
-          month.result_amount_minor < 0 ? "negative" : "positive";
-        const budgetHelper =
-          month.planned_amount_minor === 0
-            ? "Defina o planejamento mensal para comparar."
-            : `${formatMoney(
-                month.expense_amount_minor,
-                section.currency,
-                locale,
-              )} de ${formatMoney(
-                month.planned_amount_minor,
-                section.currency,
-                locale,
-              )}`;
-
         return (
-          <section
-            key={section.currency}
-            aria-labelledby={`currency-${section.currency}`}
-            className="grid gap-5"
-          >
-            <header className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
+          <section key={section.currency} aria-labelledby={`currency-${section.currency}`} className="grid gap-5">
+            <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
-                  {section.currency}
-                </p>
-                <h2
-                  id={`currency-${section.currency}`}
-                  className="mt-1 text-2xl font-extrabold text-slate-950 sm:text-3xl"
-                >
-                  {CURRENCY_LABELS[section.currency]}
-                </h2>
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">{section.currency}</p>
+                <h2 id={`currency-${section.currency}`} className="mt-1 text-2xl font-black text-slate-950">{CURRENCY_LABELS[section.currency]}</h2>
               </div>
-              <p className="text-sm text-slate-500">
-                Valores desta seção nunca são somados a outras moedas.
+              <p className="text-sm text-slate-600">
+                Patrimônio líquido: <strong className={section.netWorthMinor < 0 ? "text-rose-700" : "text-emerald-800"}>{formatMoney(section.netWorthMinor, section.currency, locale)}</strong>
               </p>
             </header>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <MetricCard
-                label="Saldo atual"
-                value={formatMoney(
-                  section.accountBalanceMinor,
-                  section.currency,
-                  locale,
-                )}
-                helper={`${section.accounts.length} conta(s) ativa(s)`}
-                tone={
-                  section.accountBalanceMinor < 0 ? "negative" : "neutral"
-                }
-              />
-              <MetricCard
-                label="Receitas do mês"
-                value={formatMoney(
-                  month.income_amount_minor,
-                  section.currency,
-                  locale,
-                )}
-                helper="Somente valores realizados"
-                tone="positive"
-              />
-              <MetricCard
-                label="Despesas de consumo"
-                value={formatMoney(
-                  month.expense_amount_minor,
-                  section.currency,
-                  locale,
-                )}
-                helper="Sem transferências ou pagamento de fatura"
-                tone="negative"
-              />
-              <MetricCard
-                label="Resultado mensal"
-                value={formatMoney(
-                  month.result_amount_minor,
-                  section.currency,
-                  locale,
-                )}
-                helper="Receitas menos despesas de consumo"
-                tone={resultTone}
-              />
-              <MetricCard
-                label="Patrimônio líquido"
-                value={formatMoney(
-                  section.netWorthMinor,
-                  section.currency,
-                  locale,
-                )}
-                helper="Contas + patrimônio e investimentos − passivos e faturas"
-                tone={section.netWorthMinor < 0 ? "negative" : "positive"}
-              />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="Saldo disponível" value={formatMoney(section.accountBalanceMinor, section.currency, locale)} helper={`${section.accounts.length} conta(s) ativa(s)`} tone={section.accountBalanceMinor < 0 ? "negative" : "neutral"} />
+              <MetricCard label="Receitas" value={formatMoney(month.income_amount_minor, section.currency, locale)} helper="Valores realizados no mês" tone="positive" />
+              <MetricCard label={basis === "cash" ? "Saídas de caixa" : "Despesas de consumo"} value={formatMoney(month.expense_amount_minor, section.currency, locale)} helper={basis === "cash" ? "Inclui pagamentos de fatura" : "Inclui parcelas por competência"} tone="negative" />
+              <MetricCard label="Resultado" value={formatMoney(month.result_amount_minor, section.currency, locale)} helper={`${basisLabels[basis]} do mês`} tone={month.result_amount_minor < 0 ? "negative" : "positive"} />
             </div>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-extrabold text-slate-950">
-                    Saldo por conta
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Posição atual das contas ativas.
-                  </p>
-                </div>
-                <Link
-                  href="/accounts"
-                  className="text-sm font-semibold text-emerald-700 hover:underline"
-                >
-                  Ver contas
-                </Link>
-              </div>
-              {section.accounts.length ? (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {section.accounts.map((account) => (
-                    <Link
-                      key={account.id}
-                      href={`/accounts/${account.id}`}
-                      className="rounded-xl border border-slate-200 p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-bold text-slate-900">
-                            {account.name}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {CONTEXT_LABELS[account.context]}
-                          </p>
-                        </div>
-                        <p
-                          className={`shrink-0 font-extrabold ${
-                            account.current_balance_minor < 0
-                              ? "text-rose-700"
-                              : "text-slate-950"
-                          }`}
-                        >
-                          {formatMoney(
-                            account.current_balance_minor,
-                            section.currency,
-                            locale,
-                          )}
-                        </p>
-                      </div>
-                      <span className="mt-3 inline-flex text-xs font-bold text-emerald-700">
-                        Abrir extrato →
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                  Nenhuma conta ativa nesta moeda.
-                </p>
-              )}
-            </section>
-
-            <div className="grid gap-5 lg:grid-cols-2">
-              <MonthlyEvolution
-                rows={section.evolution}
-                currency={section.currency}
-                locale={locale}
-              />
-              <ExpenseDistribution
-                rows={section.categories}
-                currency={section.currency}
-                locale={locale}
-              />
+            <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+              <MonthlyEvolution rows={section.evolution} currency={section.currency} locale={locale} basis={basis} />
+              <ExpenseDistribution rows={section.categories} currency={section.currency} locale={locale} basis={basis} />
             </div>
 
-            <SpendingTracker
-              rows={section.spendingTracker}
-              currency={section.currency}
-              locale={locale}
-            />
-
-            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-              Orçamento consumido no mês:{" "}
-              <strong
-                className={
-                  (month.budget_percentage_consumed ?? 0) > 100
-                    ? "text-rose-700"
-                    : "text-slate-950"
-                }
-              >
-                {formatPercentage(month.budget_percentage_consumed)}
-              </strong>
-              {" · "}
-              {budgetHelper}
-            </p>
-
-            <div className="grid gap-5 lg:grid-cols-2">
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-extrabold text-slate-950">
-                      Próximas recorrências
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Próximas ocorrências ativas a partir de hoje.
-                    </p>
-                  </div>
-                  <Link
-                    href="/recurring-transactions"
-                    className="text-sm font-semibold text-emerald-700 hover:underline"
-                  >
-                    Ver todas
-                  </Link>
+            <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+              <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                  <div><h3 className="font-black text-slate-950">Contas</h3><p className="mt-1 text-sm text-slate-600">Saldos atuais e acesso ao extrato.</p></div>
+                  <Link href="/accounts" className="text-sm font-bold text-emerald-700 hover:underline">Ver todas</Link>
                 </div>
-                {section.recurrences.length ? (
-                  <div className="mt-5 divide-y divide-slate-100">
-                    {section.recurrences.map((recurrence) => (
-                      <article
-                        key={recurrence.id}
-                        className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">
-                            {recurrence.description}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatFinancialDate(
-                              recurrence.next_occurrence,
-                            )}{" "}
-                            · {RECURRENCE_FREQUENCY_LABELS[recurrence.frequency]}{" "}
-                            · {recurrence.account_name}
-                          </p>
-                        </div>
-                        <p
-                          className={`shrink-0 font-bold ${
-                            recurrence.transaction_type === "income"
-                              ? "text-emerald-700"
-                              : "text-rose-700"
-                          }`}
-                        >
-                          {recurrence.transaction_type === "income" ? "+" : "-"}
-                          {formatMoney(
-                            recurrence.amount_minor,
-                            section.currency,
-                            locale,
-                          )}
-                        </p>
-                      </article>
+                {section.accounts.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {section.accounts.slice(0, 6).map((account) => (
+                      <Link key={account.id} href={`/accounts/${account.id}`} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-emerald-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
+                        <div className="min-w-0"><p className="truncate font-bold text-slate-900">{account.name}</p><p className="text-xs text-slate-500">{CONTEXT_LABELS[account.context]}</p></div>
+                        <p className={`shrink-0 font-extrabold ${account.current_balance_minor < 0 ? "text-rose-700" : "text-slate-950"}`}>{formatMoney(account.current_balance_minor, section.currency, locale)}</p>
+                      </Link>
                     ))}
                   </div>
-                ) : (
-                  <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                    Nenhuma recorrência futura nesta moeda.
-                  </p>
-                )}
+                ) : <p className="p-5 text-sm text-slate-600">Nenhuma conta ativa nesta moeda.</p>}
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-extrabold text-slate-950">
-                      Faturas abertas ou vencidas
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Faturas ainda não pagas, ordenadas pelo vencimento.
-                    </p>
-                  </div>
-                  <Link
-                    href="/credit-cards"
-                    className="text-sm font-semibold text-emerald-700 hover:underline"
-                  >
-                    Ver cartões
-                  </Link>
-                </div>
-                {section.invoices.length ? (
-                  <div className="mt-5 divide-y divide-slate-100">
-                    {section.invoices.map((invoice) => (
-                      <article
-                        key={invoice.id}
-                        className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate font-semibold text-slate-900">
-                              {invoice.credit_card_name}
-                            </p>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                                invoice.effective_status === "overdue"
-                                  ? "bg-rose-100 text-rose-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              {
-                                invoiceStatusLabels[
-                                  invoice.effective_status
-                                ]
-                              }
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Vence em {formatFinancialDate(invoice.due_date)}
-                          </p>
-                        </div>
-                        <p className="shrink-0 font-bold text-slate-950">
-                          {formatMoney(
-                            invoice.outstanding_amount_minor,
-                            section.currency,
-                            locale,
-                          )}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                    Nenhuma fatura pendente nesta moeda.
-                  </p>
-                )}
+              <section className="grid gap-4">
+                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3"><h3 className="font-black text-slate-950">Próximas recorrências</h3><Link href="/recurring-transactions" className="text-sm font-bold text-emerald-700">Ver todas</Link></div>
+                  {section.recurrences.length ? <div className="mt-3 divide-y divide-slate-100">{section.recurrences.slice(0, 3).map((row) => <div key={row.id} className="flex justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{row.description}</p><p className="text-xs text-slate-500">{formatFinancialDate(row.next_occurrence)} · {RECURRENCE_FREQUENCY_LABELS[row.frequency]}</p></div><p className={`shrink-0 text-sm font-bold ${row.transaction_type === "income" ? "text-emerald-700" : "text-rose-700"}`}>{row.transaction_type === "income" ? "+" : "−"}{formatMoney(row.amount_minor, section.currency, locale)}</p></div>)}</div> : <p className="mt-3 text-sm text-slate-600">Nenhuma recorrência próxima.</p>}
+                </article>
+                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3"><h3 className="font-black text-slate-950">Faturas pendentes</h3><Link href="/credit-cards" className="text-sm font-bold text-emerald-700">Ver cartões</Link></div>
+                  {section.invoices.length ? <div className="mt-3 divide-y divide-slate-100">{section.invoices.slice(0, 3).map((invoice) => <Link key={invoice.id} href={`/credit-cards/${invoice.credit_card_id}/invoices/${invoice.id}`} className="flex justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{invoice.credit_card_name}</p><p className={`text-xs ${invoice.effective_status === "overdue" ? "text-rose-700" : "text-slate-500"}`}>{invoiceStatusLabels[invoice.effective_status]} · {formatFinancialDate(invoice.due_date)}</p></div><p className="shrink-0 text-sm font-bold text-slate-950">{formatMoney(invoice.outstanding_amount_minor, section.currency, locale)}</p></Link>)}</div> : <p className="mt-3 text-sm text-slate-600">Nenhuma fatura pendente.</p>}
+                </article>
               </section>
             </div>
+
+            {basis === "competence" ? <SpendingTracker rows={section.spendingTracker} currency={section.currency} locale={locale} /> : null}
           </section>
         );
       })}

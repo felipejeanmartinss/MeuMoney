@@ -1,0 +1,558 @@
+import { z } from "zod";
+import { parseImportAmountToMinor, parseImportDate } from "./file-imports";
+import type { PdfTextDocument, PdfTextPage } from "./pdf-imports";
+
+export const FINANCING_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+export type FinancingPaymentStatus = "paid" | "scheduled";
+export type FinancingReductionType = "term" | "payment";
+export type FinancingProductType = "financing" | "loan";
+
+export type ParsedFinancingContract = {
+  institution: string;
+  contractReference: string;
+  currency: "BRL";
+  amortizationSystem: string | null;
+  indexer: string | null;
+  originalPrincipalMinor: number;
+  originalTermMonths: number | null;
+  contractDate: string;
+  releaseDate: string | null;
+  currentBalanceMinor: number;
+  balanceDate: string;
+  nominalAnnualRate: string | null;
+  effectiveAnnualRate: string | null;
+  cetAnnualRate: string | null;
+  ceshAnnualRate: string | null;
+  sourcePageCount: number;
+};
+
+export type ParsedFinancingScheduleEntry = {
+  source_sequence: number;
+  installment_number: number;
+  due_date: string;
+  total_amount_minor: number;
+  principal_minor: number;
+  interest_minor: number;
+  correction_factor: string | null;
+  insurance_mip_minor: number;
+  insurance_dfi_minor: number;
+  service_fee_minor: number;
+  penalty_minor: number;
+  late_interest_minor: number;
+  fgts_minor: number;
+  balance_correction_factor: string | null;
+  outstanding_balance_minor: number;
+  payment_status: FinancingPaymentStatus;
+  payment_date: string | null;
+  paid_amount_minor: number;
+  source_pages: number[];
+};
+
+export type ParsedFinancingExtraAmortization = {
+  source_sequence: number;
+  event_date: string;
+  reduction_type: FinancingReductionType;
+  cash_amount_minor: number;
+  fgts_amount_minor: number;
+  installments_reduced: number | null;
+  source_pages: number[];
+};
+
+export type ParsedFinancingDocument = {
+  adapter: FinancingPdfAdapterInfo;
+  contract: ParsedFinancingContract;
+  schedule: ParsedFinancingScheduleEntry[];
+  extraAmortizations: ParsedFinancingExtraAmortization[];
+};
+
+export type FinancingPdfAdapterInfo = {
+  id: string;
+  bankName: string;
+  documentType: "financing_statement";
+  layoutVersion: string;
+};
+
+export interface FinancingPdfAdapter {
+  readonly info: FinancingPdfAdapterInfo;
+  detect(document: PdfTextDocument): number;
+  parse(document: PdfTextDocument): ParsedFinancingDocument;
+}
+
+export class FinancingImportError extends Error {
+  constructor(
+    public readonly code: "unsupported_layout" | "invalid_data",
+    message: string,
+  ) {
+    super(message);
+    this.name = "FinancingImportError";
+  }
+}
+
+const BRADESCO_FINANCING_ADAPTER: FinancingPdfAdapterInfo = {
+  id: "bradesco-financing-statement-v1",
+  bankName: "Bradesco",
+  documentType: "financing_statement",
+  layoutVersion: "1",
+};
+
+function normalized(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\uFFFD/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function allLines(document: PdfTextDocument) {
+  return document.pages.flatMap((page) =>
+    financingPageLines(page).map((text) => ({
+      text: text.trim(),
+      page: page.pageNumber,
+    })),
+  );
+}
+
+function transposedPositionedLines(page: PdfTextPage) {
+  const items = page.positionedLines?.flatMap((line) => line.items) ?? [];
+  const rows: Array<{ axis: number; items: typeof items }> = [];
+
+  for (const item of [...items].sort(
+    (left, right) => left.x - right.x || left.y - right.y,
+  )) {
+    const row = rows.find((candidate) => Math.abs(candidate.axis - item.x) <= 2);
+    if (row) {
+      row.items.push(item);
+    } else {
+      rows.push({ axis: item.x, items: [item] });
+    }
+  }
+
+  return rows
+    .sort((left, right) => left.axis - right.axis)
+    .map((row) =>
+      row.items
+        .sort((left, right) => left.y - right.y)
+        .map((item) => item.text.trim())
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+}
+
+function financingLayoutScore(lines: string[]) {
+  const text = normalized(lines.join("\n"));
+  const markers = [
+    "DATA DO CONTRATO",
+    "VALOR FINANCIAMENTO",
+    "SISTEMA AMORTIZACAO",
+    "SALDO DEVEDOR",
+  ];
+  const markerScore = markers.filter((marker) => text.includes(marker)).length;
+  const structuredLines = lines.filter(
+    (line) =>
+      (/DATA DO CONTRATO/i.test(normalized(line)) &&
+        /\d{2}\/\d{2}\/\d{4}/.test(line)) ||
+      (/VALOR FINANCIAMENTO/i.test(normalized(line)) &&
+        moneyValues(line).length > 0) ||
+      /^\d+\s+\d{2}\/\d{2}\/\d{4}\s+/.test(line),
+  ).length;
+  return markerScore * 10 + structuredLines;
+}
+
+function financingPageLines(page: PdfTextPage) {
+  const transposed = transposedPositionedLines(page);
+  return financingLayoutScore(transposed) > financingLayoutScore(page.lines)
+    ? transposed
+    : page.lines;
+}
+
+function parseMoney(value: string) {
+  return parseImportAmountToMinor(value, ",");
+}
+
+function parseFactor(value: string | undefined) {
+  if (!value) return null;
+  const result = value.replace(/\./g, "").replace(",", ".");
+  return /^\d+(?:\.\d+)?$/.test(result) ? result : null;
+}
+
+function parseRate(value: string | undefined) {
+  if (!value) return null;
+  const result = value.replace("%", "").replace(/\./g, "").replace(",", ".");
+  return /^\d+(?:\.\d+)?$/.test(result) ? result : null;
+}
+
+function requiredDate(value: string | undefined, label: string) {
+  const parsed = value ? parseImportDate(value, "DD/MM/YYYY") : null;
+  if (!parsed) {
+    throw new FinancingImportError(
+      "invalid_data",
+      `O extrato não informou ${label} em um formato reconhecido.`,
+    );
+  }
+  return parsed;
+}
+
+function moneyValues(value: string) {
+  const withoutPercentages = value.replace(/\d+(?:[.,]\d+)?%/g, "");
+  return (
+    withoutPercentages.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/g) ?? []
+  );
+}
+
+function percentageValues(value: string) {
+  return value.match(/\d+(?:[.,]\d+)?%/g) ?? [];
+}
+
+function findFollowingLine(
+  lines: Array<{ text: string; page: number }>,
+  marker: string,
+) {
+  const index = lines.findIndex((line) => normalized(line.text).includes(marker));
+  return index >= 0 ? lines[index + 1]?.text : undefined;
+}
+
+function findNearbyLine(
+  lines: Array<{ text: string; page: number }>,
+  marker: string,
+  predicate: (line: string) => boolean,
+  distance = 4,
+) {
+  const index = lines.findIndex((line) => normalized(line.text).includes(marker));
+  if (index < 0) return undefined;
+  return lines
+    .slice(index, index + distance + 1)
+    .find((line) => predicate(line.text))?.text;
+}
+
+function findMoneyNearMarker(
+  lines: Array<{ text: string; page: number }>,
+  marker: string,
+) {
+  const index = lines.findIndex((line) => normalized(line.text).includes(marker));
+  if (index < 0) return undefined;
+
+  const markerValues = moneyValues(lines[index].text);
+  if (markerValues.length > 0) return markerValues.at(-1);
+
+  const nearbyText = lines
+    .slice(index + 1, index + 3)
+    .map((line) => line.text)
+    .join(" ");
+  return moneyValues(nearbyText).at(-1);
+}
+
+function parseBradescoHeader(
+  document: PdfTextDocument,
+): ParsedFinancingContract {
+  const lines = allLines(document);
+  const firstPageLines = lines.filter((line) => line.page === 1);
+  const contractLine = firstPageLines.find(
+    (line) =>
+      normalized(line.text).includes("CONTRATO") &&
+      !normalized(line.text).includes("DATA DO CONTRATO"),
+  )?.text;
+  const contractReference = contractLine?.match(/CONTRATO\s+([^\s]+)/i)?.[1];
+  const contractDateLine = firstPageLines.find((line) =>
+    normalized(line.text).includes("DATA DO CONTRATO"),
+  )?.text;
+  const contractDate = contractDateLine?.match(/\d{2}\/\d{2}\/\d{4}/)?.[0];
+
+  const currentBalanceText = findMoneyNearMarker(
+    firstPageLines,
+    "DADOS FINANCEIROS TAXAS SALDO DEVEDOR",
+  );
+
+  const financingLabelsLine = findFollowingLine(
+    firstPageLines,
+    "NOME VALOR FINANCIAMENTO INDEXADOR",
+  );
+  const financingDataLine = findNearbyLine(
+    firstPageLines,
+    "VALOR FINANCIAMENTO",
+    (line) => moneyValues(line).length > 0 && percentageValues(line).length > 0,
+  ) ?? financingLabelsLine;
+  const originalPrincipalText = financingDataLine
+    ? moneyValues(financingDataLine)[0]
+    : undefined;
+  const nominalRates = financingDataLine
+    ? percentageValues(financingDataLine)
+    : [];
+  const indexer = financingDataLine
+    ?.match(/\d{1,3}(?:\.\d{3})*,\d{2}\s+([A-Z0-9-]+)/i)?.[1]
+    ?.toUpperCase();
+
+  const amortizationLine = findNearbyLine(
+    firstPageLines,
+    "SISTEMA AMORTIZACAO",
+    (line) => /\b(SAC|PRICE|SACRE)\b/i.test(normalized(line)),
+  );
+  const amortizationSystem = amortizationLine
+    ?.match(/\b(SAC|PRICE|SACRE)\b/i)?.[1]
+    ?.toUpperCase();
+  const amortizationRates = amortizationLine
+    ? percentageValues(amortizationLine)
+    : [];
+  const releaseDate = amortizationLine?.match(/\d{2}\/\d{2}\/\d{4}/)?.[0];
+
+  const termLine = firstPageLines.find((line) =>
+    normalized(line.text).includes("PRAZO"),
+  )?.text;
+  const originalTermMonths = termLine
+    ? Number(termLine.match(/\d+\s*\/\s*(\d+)/)?.[1])
+    : null;
+
+  const effectiveLine = firstPageLines.find((line) => {
+    const rates = percentageValues(line.text);
+    return (
+      rates.length >= 2 &&
+      /\d{2}\/\d{2}\/\d{4}/.test(line.text) &&
+      normalized(line.text) !== normalized(amortizationLine ?? "")
+    );
+  })?.text;
+  const effectiveRates = effectiveLine ? percentageValues(effectiveLine) : [];
+  const balanceDate = effectiveLine
+    ?.match(/\d{2}\/\d{2}\/\d{4}/g)
+    ?.at(-1);
+
+  if (
+    !contractReference ||
+    !contractDate ||
+    !currentBalanceText ||
+    !originalPrincipalText ||
+    !balanceDate
+  ) {
+    throw new FinancingImportError(
+      "invalid_data",
+      "O cabeçalho financeiro do Bradesco está incompleto ou mudou de layout.",
+    );
+  }
+
+  return {
+    institution: "Bradesco",
+    contractReference,
+    currency: "BRL",
+    amortizationSystem: amortizationSystem ?? null,
+    indexer: indexer ?? null,
+    originalPrincipalMinor: parseMoney(originalPrincipalText),
+    originalTermMonths:
+      originalTermMonths !== null &&
+      Number.isSafeInteger(originalTermMonths) &&
+      originalTermMonths > 0
+        ? originalTermMonths
+        : null,
+    contractDate: requiredDate(contractDate, "a data do contrato"),
+    releaseDate: releaseDate
+      ? requiredDate(releaseDate, "a data de liberação")
+      : null,
+    currentBalanceMinor: parseMoney(currentBalanceText),
+    balanceDate: requiredDate(balanceDate, "a data-base do saldo"),
+    nominalAnnualRate: parseRate(nominalRates[0]),
+    effectiveAnnualRate: parseRate(effectiveRates[0]),
+    cetAnnualRate: parseRate(amortizationRates[0]),
+    ceshAnnualRate: parseRate(amortizationRates[1]),
+    sourcePageCount: document.pageCount,
+  };
+}
+
+function parseBradescoRows(document: PdfTextDocument) {
+  const schedule: ParsedFinancingScheduleEntry[] = [];
+  const extraAmortizations: ParsedFinancingExtraAmortization[] = [];
+  let scheduleSequence = 0;
+  let extraSequence = 0;
+
+  for (const page of document.pages) {
+    let reductionType: FinancingReductionType | null = null;
+
+    for (const rawLine of financingPageLines(page)) {
+      const line = rawLine.replace(/\s+/g, " ").trim();
+      const normalizedLine = normalized(line);
+
+      if (normalizedLine.includes("AMORTIZACAO REDUCAO QTDE PRESTACOES")) {
+        reductionType = "term";
+        continue;
+      }
+      if (normalizedLine.includes("AMORTIZACAO REDUCAO VALOR PRESTACAO")) {
+        reductionType = "payment";
+        continue;
+      }
+      if (normalizedLine === "ENCARGOS") {
+        reductionType = null;
+        continue;
+      }
+
+      if (reductionType) {
+        const event = line.match(
+          /^(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d[\d.]*,\d{2})\s+(\d[\d.]*,\d{2})(?:\s+(\d+))?$/,
+        );
+        if (event) {
+          extraSequence += 1;
+          extraAmortizations.push({
+            source_sequence: extraSequence,
+            event_date: requiredDate(event[2], "a data da amortização"),
+            reduction_type: reductionType,
+            cash_amount_minor: parseMoney(event[3]),
+            fgts_amount_minor: parseMoney(event[4]),
+            installments_reduced: event[5] ? Number(event[5]) : null,
+            source_pages: [page.pageNumber],
+          });
+          continue;
+        }
+      }
+
+      const prefix = line.match(/^(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+(.+)$/);
+      if (!prefix) continue;
+      const values = prefix[3].split(/\s+/);
+      const statusIndex = values.findIndex(
+        (value, index) =>
+          normalized(value) === "PAGA" ||
+          (normalized(value) === "A" && normalized(values[index + 1] ?? "") === "VENCER"),
+      );
+      if (statusIndex < 12) continue;
+
+      const numeric = values.slice(0, statusIndex);
+      if (numeric.length !== 12) continue;
+      const paid = normalized(values[statusIndex]) === "PAGA";
+      const paymentOffset = paid ? statusIndex + 1 : statusIndex + 2;
+      const paymentDateText = values[paymentOffset];
+      const paidAmountText = values[paymentOffset + 1];
+      if (!paidAmountText) continue;
+
+      scheduleSequence += 1;
+      schedule.push({
+        source_sequence: scheduleSequence,
+        installment_number: Number(prefix[1]),
+        due_date: requiredDate(prefix[2], "a data da parcela"),
+        total_amount_minor: parseMoney(numeric[0]),
+        principal_minor: parseMoney(numeric[1]),
+        interest_minor: parseMoney(numeric[2]),
+        correction_factor: parseFactor(numeric[3]),
+        insurance_mip_minor: parseMoney(numeric[4]),
+        insurance_dfi_minor: parseMoney(numeric[5]),
+        service_fee_minor: parseMoney(numeric[6]),
+        penalty_minor: parseMoney(numeric[7]),
+        late_interest_minor: parseMoney(numeric[8]),
+        fgts_minor: parseMoney(numeric[9]),
+        balance_correction_factor: parseFactor(numeric[10]),
+        outstanding_balance_minor: parseMoney(numeric[11]),
+        payment_status: paid ? "paid" : "scheduled",
+        payment_date:
+          paid && paymentDateText !== "-"
+            ? requiredDate(paymentDateText, "a data de pagamento")
+            : null,
+        paid_amount_minor: parseMoney(paidAmountText),
+        source_pages: [page.pageNumber],
+      });
+    }
+  }
+
+  if (schedule.length === 0) {
+    throw new FinancingImportError(
+      "invalid_data",
+      "Nenhuma parcela foi reconhecida no extrato financeiro.",
+    );
+  }
+
+  return { schedule, extraAmortizations };
+}
+
+export const bradescoFinancingStatementAdapter: FinancingPdfAdapter = {
+  info: BRADESCO_FINANCING_ADAPTER,
+  detect(document) {
+    const text = normalized(document.pages.flatMap((page) => page.lines).join("\n"));
+    const markers = [
+      "EXTRATO FINANCEIRO",
+      "CONTRATO",
+      "SALDO DEVEDOR",
+      "ENCARGOS",
+      "MIP",
+      "DFI",
+      "TSA",
+    ];
+    const score = markers.filter((marker) => text.includes(marker)).length;
+    return score === markers.length ? 1 : score / markers.length;
+  },
+  parse(document) {
+    const contract = parseBradescoHeader(document);
+    const { schedule, extraAmortizations } = parseBradescoRows(document);
+    return {
+      adapter: BRADESCO_FINANCING_ADAPTER,
+      contract,
+      schedule,
+      extraAmortizations,
+    };
+  },
+};
+
+export const FINANCING_PDF_ADAPTERS = [
+  bradescoFinancingStatementAdapter,
+] as const satisfies readonly FinancingPdfAdapter[];
+
+export function parseSupportedFinancingPdf(
+  document: PdfTextDocument,
+  adapters: readonly FinancingPdfAdapter[] = FINANCING_PDF_ADAPTERS,
+) {
+  const selected = adapters
+    .map((adapter) => ({ adapter, score: adapter.detect(document) }))
+    .sort((left, right) => right.score - left.score)[0];
+
+  if (!selected || selected.score < 0.85) {
+    throw new FinancingImportError(
+      "unsupported_layout",
+      "Este banco ou modelo de extrato de financiamento ainda não é suportado.",
+    );
+  }
+  return selected.adapter.parse(document);
+}
+
+export type FinancingIndicators = {
+  totalPaidMinor: number;
+  principalPaidMinor: number;
+  interestPaidMinor: number;
+  chargesPaidMinor: number;
+  extraCashMinor: number;
+  extraFgtsMinor: number;
+};
+
+export function calculateFinancingIndicators(
+  schedule: ParsedFinancingScheduleEntry[],
+  extraAmortizations: ParsedFinancingExtraAmortization[],
+): FinancingIndicators {
+  const paid = schedule.filter((entry) => entry.payment_status === "paid");
+  return {
+    totalPaidMinor: paid.reduce((total, entry) => total + entry.paid_amount_minor, 0),
+    principalPaidMinor: paid.reduce((total, entry) => total + entry.principal_minor, 0),
+    interestPaidMinor: paid.reduce((total, entry) => total + entry.interest_minor, 0),
+    chargesPaidMinor: paid.reduce(
+      (total, entry) =>
+        total +
+        entry.insurance_mip_minor +
+        entry.insurance_dfi_minor +
+        entry.service_fee_minor +
+        entry.penalty_minor +
+        entry.late_interest_minor,
+      0,
+    ),
+    extraCashMinor: extraAmortizations.reduce(
+      (total, entry) => total + entry.cash_amount_minor,
+      0,
+    ),
+    extraFgtsMinor: extraAmortizations.reduce(
+      (total, entry) => total + entry.fgts_amount_minor,
+      0,
+    ),
+  };
+}
+
+export const financingImportJobIdSchema = z.uuid("Importação inválida.");
+
+export const financingImportConfirmationSchema = z.object({
+  name: z.string().trim().min(1, "Informe um nome.").max(100),
+  productType: z.enum(["financing", "loan"]),
+  context: z.enum(["personal", "professional"]),
+});

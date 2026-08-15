@@ -12,19 +12,22 @@ import { requireUser } from "@/services/auth/server-auth";
 import type {
   AccountBalance,
   FinancialDashboardExpenseCategory,
+  FinancialDashboardExpenseCategoryBasis,
   FinancialDashboardInvoice,
+  FinancialDashboardMonthlyBasisSummary,
   FinancialDashboardMonthlySummary,
   FinancialDashboardUpcomingRecurrence,
   MonthlyBudgetProgress,
   NetWorthSummary,
   Profile,
+  FinancialReportBasis,
   SupportedCurrency,
 } from "@/types/database";
 
 const monthlySummaryColumns =
-  "user_id, reference_month, currency, income_amount_minor, expense_amount_minor, result_amount_minor, planned_amount_minor, budget_percentage_consumed";
+  "basis, user_id, reference_month, currency, income_amount_minor, expense_amount_minor, result_amount_minor, planned_amount_minor, budget_percentage_consumed";
 const categoryColumns =
-  "user_id, reference_month, currency, category_id, category_name, context, expense_amount_minor";
+  "basis, user_id, reference_month, currency, category_id, category_name, context, expense_amount_minor";
 const recurrenceColumns =
   "id, user_id, currency, account_name, category_name, context, transaction_type, description, amount_minor, frequency, next_occurrence";
 const invoiceColumns =
@@ -37,8 +40,8 @@ const netWorthColumns =
   "user_id, currency, assets_minor, manual_assets_minor, investments_minor, liabilities_minor, net_worth_minor";
 
 function normalizeMonthlySummary(
-  row: FinancialDashboardMonthlySummary,
-): FinancialDashboardMonthlySummary {
+  row: FinancialDashboardMonthlyBasisSummary,
+): FinancialDashboardMonthlyBasisSummary {
   return {
     ...row,
     income_amount_minor: coerceMinorUnits(row.income_amount_minor),
@@ -61,8 +64,8 @@ function normalizeAccount(row: AccountBalance): AccountBalance {
 }
 
 function normalizeCategory(
-  row: FinancialDashboardExpenseCategory,
-): FinancialDashboardExpenseCategory {
+  row: FinancialDashboardExpenseCategoryBasis,
+): FinancialDashboardExpenseCategoryBasis {
   return {
     ...row,
     expense_amount_minor: coerceMinorUnits(row.expense_amount_minor),
@@ -142,6 +145,7 @@ export type FinancialDashboardData = {
 
 export async function getFinancialDashboard(
   referenceMonth: string,
+  basis: FinancialReportBasis = "competence",
 ): Promise<FinancialDashboardData> {
   const { supabase, user } = await requireUser();
   const months = referenceMonthsEndingAt(referenceMonth);
@@ -171,16 +175,18 @@ export async function getFinancialDashboard(
       .is("archived_at", null)
       .order("name"),
     supabase
-      .from("financial_dashboard_monthly_summary")
+      .from("financial_dashboard_monthly_basis")
       .select(monthlySummaryColumns)
       .eq("user_id", user.id)
+      .eq("basis", basis)
       .gte("reference_month", firstReferenceMonth)
       .lte("reference_month", selectedReferenceMonth)
       .order("reference_month"),
     supabase
-      .from("financial_dashboard_expense_categories")
+      .from("financial_dashboard_expense_categories_basis")
       .select(categoryColumns)
       .eq("user_id", user.id)
+      .eq("basis", basis)
       .eq("reference_month", selectedReferenceMonth)
       .order("expense_amount_minor", { ascending: false }),
     supabase
@@ -302,7 +308,8 @@ export async function getFinancialDashboard(
         categories
           .filter((row) => row.currency === currency)
           .map((row) => ({
-            categoryId: row.category_id,
+            categoryId:
+              row.category_id ?? `cash-card-payment-${row.context}`,
             categoryName: row.category_name,
             context: row.context,
             amountMinor: row.expense_amount_minor,

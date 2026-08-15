@@ -174,6 +174,19 @@ até 100 lançamentos, 50 recorrências e 20 jobs de importação. Criar lançam
 recorrência ou importação a partir desse detalhe envia somente o identificador
 predefinido; o serviço e o banco continuam validando propriedade e RLS.
 
+## Regimes financeiros e extratos de financiamento
+
+O dashboard envia `month` e `basis` à camada de relatórios. As views agregadas
+do PostgreSQL calculam competência e caixa separadamente; o Server Component
+recebe apenas os meses e moedas solicitados. A interface não recompõe o
+histórico nem mistura os dois regimes no navegador.
+
+Extratos de financiamento seguem a porta `FinancingPdfAdapter`: detecção,
+versão do layout e parser vivem no domínio; extração do PDF e persistência ficam
+em serviços exclusivos do servidor. O arquivo é lido em memória e convertido
+em staging estruturado. RPCs autenticadas fazem confirmação ou cancelamento de
+forma atômica, sob RLS e chaves compostas de proprietário.
+
 O simulador patrimonial é o único novo Client Component com cálculo financeiro.
 A função pura `projectSavings` recebe dinheiro inteiro, taxa em pontos-base e
 prazo inteiro. O componente apenas coleta entradas e apresenta a projeção; não

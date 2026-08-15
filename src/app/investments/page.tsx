@@ -11,10 +11,12 @@ import {
 } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
 import { NET_WORTH_ITEM_TYPE_LABELS } from "@/domain/net-worth";
+import { listCurrentUserFinancingContracts } from "@/services/finance/financing-imports-service";
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
 import { listCurrentUserNetWorth } from "@/services/finance/net-worth-service";
 import type {
   InvestmentPositionSummary,
+  FinancingContractSummary,
   NetWorthItem,
   SupportedCurrency,
 } from "@/types/database";
@@ -26,6 +28,8 @@ const messages: Record<string, string> = {
   updated: "Posição e fotografia histórica atualizadas com sucesso.",
   "status-updated": "Estado da posição atualizado com sucesso.",
   "status-error": "Não foi possível alterar o estado da posição.",
+  "import-cancelled": "Prévia de financiamento cancelada.",
+  "import-error": "Não foi possível concluir a importação do financiamento.",
 };
 
 function formatDate(value: string) {
@@ -261,11 +265,23 @@ function PositionsView({
   );
 }
 
-function FinancingsView({ items }: { items: NetWorthItem[] }) {
+function FinancingsView({
+  items,
+  contracts,
+}: {
+  items: NetWorthItem[];
+  contracts: FinancingContractSummary[];
+}) {
+  const importedItemIds = new Set(
+    contracts.map((contract) => contract.net_worth_item_id),
+  );
   const financings = items.filter(
     (item) =>
       item.kind === "liability" &&
       ["financing", "loan"].includes(item.item_type),
+  );
+  const manualFinancings = financings.filter(
+    (item) => !importedItemIds.has(item.id),
   );
   const totals = new Map<SupportedCurrency, number>();
   for (const item of financings.filter((row) => row.is_active)) {
@@ -292,6 +308,61 @@ function FinancingsView({ items }: { items: NetWorthItem[] }) {
           </article>
         ))}
       </section>
+      <section className="flex flex-wrap gap-2">
+        <Link
+          href="/investments/financing-imports/new"
+          className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+        >
+          Importar PDF do banco
+        </Link>
+        <Link
+          href="/net-worth/new?itemType=financing"
+          className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
+        >
+          Cadastrar manualmente
+        </Link>
+      </section>
+
+      {contracts.length ? (
+        <section className="grid gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">
+              Contratos estruturados
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Indicadores derivados dos extratos financeiros revisados.
+            </p>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {contracts.map((contract) => (
+              <Link
+                key={contract.id}
+                href={`/investments/financings/${contract.id}`}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/30"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-extrabold text-slate-950">
+                      {contract.name}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {contract.institution} · {contract.amortization_system ?? "Sistema não informado"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                    {contract.status === "active" ? "Ativo" : contract.status === "settled" ? "Quitado" : "Arquivado"}
+                  </span>
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div><dt className="text-slate-500">Saldo devedor</dt><dd className="mt-1 font-extrabold text-slate-950">{formatMoney(contract.current_balance_minor, contract.currency)}</dd></div>
+                  <div><dt className="text-slate-500">Juros pagos</dt><dd className="mt-1 font-extrabold text-slate-950">{formatMoney(contract.interest_paid_minor, contract.currency)}</dd></div>
+                </dl>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {financings.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <h2 className="text-xl font-extrabold text-slate-950">
@@ -301,25 +372,14 @@ function FinancingsView({ items }: { items: NetWorthItem[] }) {
             Estes registros continuam no patrimônio e apenas são apresentados
             nesta central.
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <Link
-              href="/net-worth/new?itemType=financing"
-              className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white"
-            >
-              Novo financiamento
-            </Link>
-            <Link
-              href="/net-worth/new?itemType=loan"
-              className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
-            >
-              Novo empréstimo
-            </Link>
-          </div>
         </section>
-      ) : (
+      ) : manualFinancings.length ? (
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="font-black text-slate-950">Registros manuais</h2>
+          </div>
           <div className="grid divide-y divide-slate-100">
-            {financings.map((item) => {
+            {manualFinancings.map((item) => {
               const total = totals.get(item.currency) ?? 0;
               return (
                 <Link
@@ -371,7 +431,7 @@ function FinancingsView({ items }: { items: NetWorthItem[] }) {
             })}
           </div>
         </section>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -381,14 +441,18 @@ export default async function InvestmentsPage({
 }: {
   searchParams: Promise<{ message?: string; tab?: string }>;
 }) {
-  const [investmentResult, netWorthResult, params] = await Promise.all([
+  const [investmentResult, netWorthResult, financingResult, params] = await Promise.all([
     listCurrentUserInvestmentPositions(),
     listCurrentUserNetWorth(),
+    listCurrentUserFinancingContracts(),
     searchParams,
   ]);
   const activeTab = params.tab === "financing" ? "financing" : "positions";
   const feedback = params.message ? messages[params.message] : undefined;
-  const hasError = investmentResult.hasError || netWorthResult.hasError;
+  const hasError =
+    investmentResult.hasError ||
+    netWorthResult.hasError ||
+    financingResult.hasError;
 
   return (
     <main className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
@@ -406,10 +470,10 @@ export default async function InvestmentsPage({
           </p>
         </div>
         <Link
-          href={activeTab === "positions" ? "/investments/new" : "/net-worth/new?itemType=financing"}
+          href={activeTab === "positions" ? "/investments/new" : "/investments/financing-imports/new"}
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
-          {activeTab === "positions" ? "Nova posição" : "Novo financiamento"}
+          {activeTab === "positions" ? "Nova posição" : "Importar financiamento"}
         </Link>
       </header>
 
@@ -461,7 +525,10 @@ export default async function InvestmentsPage({
       {activeTab === "positions" ? (
         <PositionsView positions={investmentResult.positions} />
       ) : (
-        <FinancingsView items={netWorthResult.items} />
+        <FinancingsView
+          items={netWorthResult.items}
+          contracts={financingResult.contracts}
+        />
       )}
     </main>
   );

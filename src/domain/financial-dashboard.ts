@@ -2,6 +2,7 @@ import { referenceMonthSchema, toReferenceMonth } from "./budgets";
 import { assertMinorUnits } from "./money";
 import type {
   FinancialContext,
+  FinancialReportBasis,
   SupportedCurrency,
   TransactionOriginType,
   TransactionStatus,
@@ -98,10 +99,12 @@ function emptyCurrencySummary(
 export function calculateFinancialDashboardMonth(input: {
   userId: string;
   referenceMonth: string;
+  basis?: FinancialReportBasis;
   budgets: DashboardBudgetInput[];
   entries: DashboardEntry[];
 }): DashboardCurrencySummary[] {
   const referenceMonth = toReferenceMonth(input.referenceMonth);
+  const basis = input.basis ?? "competence";
   const summaries = new Map<SupportedCurrency, DashboardCurrencySummary>();
   const categories = new Map<
     SupportedCurrency,
@@ -142,6 +145,7 @@ export function calculateFinancialDashboardMonth(input: {
 
   for (const budget of input.budgets) {
     if (
+      basis !== "competence" ||
       budget.userId !== input.userId ||
       budget.referenceMonth !== referenceMonth
     ) {
@@ -171,6 +175,33 @@ export function calculateFinancialDashboardMonth(input: {
           summary.incomeAmountMinor,
           entry.amountMinor,
         );
+      } else if (basis === "cash") {
+        const summary = getSummary(entry.currency);
+        if (entry.categoryId !== null) {
+          addExpense(entry, summary);
+        } else {
+          summary.expenseAmountMinor = addMinorUnits(
+            summary.expenseAmountMinor,
+            entry.amountMinor,
+          );
+          if (entry.originType === "credit_card_invoice_payment") {
+            const currencyCategories =
+              categories.get(entry.currency) ??
+              new Map<string, DashboardCategoryExpense>();
+            const category = currencyCategories.get("cash-card-payments") ?? {
+              categoryId: "cash-card-payments",
+              categoryName: "Pagamento de cartões",
+              context: entry.context ?? "personal",
+              amountMinor: 0,
+            };
+            category.amountMinor = addMinorUnits(
+              category.amountMinor,
+              entry.amountMinor,
+            );
+            currencyCategories.set(category.categoryId, category);
+            categories.set(entry.currency, currencyCategories);
+          }
+        }
       } else if (
         entry.originType !== "credit_card_invoice_payment" &&
         entry.categoryId !== null
@@ -181,6 +212,7 @@ export function calculateFinancialDashboardMonth(input: {
     }
 
     if (
+      basis === "competence" &&
       entry.competenceDate === referenceMonth &&
       entry.purchaseActive &&
       !entry.installmentCancelled

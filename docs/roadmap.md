@@ -1,5 +1,14 @@
 # Roadmap
 
+## Incremento — Caixa do cartão e financiamentos estruturados
+
+- pagamento de fatura registrado como transferência de caixa da conta pagadora para o cartão;
+- dashboard mensal alternável entre competência e caixa, sem dupla contagem;
+- importação assistida de extrato financeiro Bradesco com prévia e confirmação atômica;
+- indicadores de valor pago, principal, juros, encargos e amortizações extraordinárias;
+- arquitetura de adaptadores para novos bancos condicionada a fixtures anônimas representativas;
+- revisão minimalista do dashboard para melhor leitura em desktop.
+
 ## Incremento — administração flexível de categorias e contas
 
 - Exclusão atômica de categorias com realocação de vínculos financeiros.

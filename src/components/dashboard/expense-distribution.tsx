@@ -2,6 +2,7 @@ import { CONTEXT_LABELS } from "@/domain/accounts";
 import { formatMoney } from "@/domain/money";
 import type {
   FinancialDashboardExpenseCategory,
+  FinancialReportBasis,
   SupportedCurrency,
 } from "@/types/database";
 
@@ -9,10 +10,12 @@ export function ExpenseDistribution({
   rows,
   currency,
   locale,
+  basis = "competence",
 }: {
   rows: FinancialDashboardExpenseCategory[];
   currency: SupportedCurrency;
   locale: string;
+  basis?: FinancialReportBasis;
 }) {
   const total = rows.reduce(
     (sum, row) => sum + row.expense_amount_minor,
@@ -25,7 +28,9 @@ export function ExpenseDistribution({
         Despesas por categoria
       </h3>
       <p className="mt-1 text-sm text-slate-600">
-        Distribuição do consumo realizado no mês.
+        {basis === "cash"
+          ? "Distribuição das saídas efetivas da conta."
+          : "Distribuição do consumo reconhecido no mês."}
       </p>
       {rows.length ? (
         <div className="mt-5 grid gap-4">
@@ -71,7 +76,7 @@ export function ExpenseDistribution({
         </div>
       ) : (
         <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-          Nenhuma despesa de consumo realizada neste mês.
+          Nenhuma despesa reconhecida neste mês.
         </p>
       )}
     </section>

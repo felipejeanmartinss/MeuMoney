@@ -2,7 +2,10 @@ import { formatMoney } from "@/domain/money";
 import type {
   DashboardMonthlySummary,
 } from "@/domain/financial-dashboard";
-import type { SupportedCurrency } from "@/types/database";
+import type {
+  FinancialReportBasis,
+  SupportedCurrency,
+} from "@/types/database";
 
 function shortMonth(referenceMonth: string) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -18,10 +21,12 @@ export function MonthlyEvolution({
   rows,
   currency,
   locale,
+  basis = "competence",
 }: {
   rows: DashboardMonthlySummary[];
   currency: SupportedCurrency;
   locale: string;
+  basis?: FinancialReportBasis;
 }) {
   const maximum = Math.max(
     1,
@@ -38,7 +43,7 @@ export function MonthlyEvolution({
           Evolução em seis meses
         </h3>
         <p className="mt-1 text-sm text-slate-600">
-          Receitas e despesas de consumo realizadas.
+          Receitas e {basis === "cash" ? "saídas de caixa" : "despesas por competência"}.
         </p>
       </div>
       <div

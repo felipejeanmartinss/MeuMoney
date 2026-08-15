@@ -26,13 +26,13 @@ Compras são `active` ou `cancelled`. Parcelas são `pending`, `invoiced`, `paid
 
 O fechamento atualiza parcelas pendentes para faturadas e é idempotente. Uma compra só pode ter estrutura ou atividade alterada enquanto todas as suas faturas estiverem abertas e nenhuma parcela tiver sido paga.
 
-## Pagamento e saldo
+## Pagamento, transferência e saldo
 
-Uma compra não movimenta o saldo bancário. O pagamento integral exige fatura fechada, conta ativa do mesmo usuário e moeda idêntica. A RPC cria uma despesa técnica realizada em `transactions`, marca parcelas como pagas e liquida a fatura atomicamente.
+Uma compra não movimenta o saldo bancário. O pagamento integral exige fatura fechada, conta ativa do mesmo usuário e moeda idêntica. A RPC cria uma saída técnica realizada na conta bancária e um registro canônico em `credit_card_payments`, que representa a transferência de caixa para o cartão. Na mesma transação, as parcelas e a fatura são marcadas como pagas.
 
 A transação usa `origin_type = credit_card_invoice_payment`, categoria nula e vínculo obrigatório com a fatura. Ela aparece em Movimentações como item técnico, mas não pode ser editada ou inativada diretamente. O estorno deve ser feito pela fatura; ele inativa a transação técnica e restaura os estados anteriores na mesma transação.
 
-O consumo é exibido e categorizado na compra. A saída técnica representa apenas a liquidação, portanto relatórios futuros devem excluir essa origem ao medir despesas de consumo.
+O consumo é exibido e categorizado na compra. No regime de competência, a saída técnica é excluída e as parcelas são reconhecidas em seus meses. No regime de caixa, as parcelas são excluídas e a transferência para o cartão é reconhecida na data do pagamento. Os dois regimes nunca são somados entre si.
 
 ## Limite
 

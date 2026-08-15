@@ -232,3 +232,25 @@ As duas estruturas possuem RLS por proprietário, privilégios explícitos por
 coluna e índices que começam pelas colunas usadas nas chaves estrangeiras ou
 filtros de proprietário. A migration é cumulativa e migra todas as categorias
 e posições existentes para valores compatíveis.
+
+## Caixa de cartões e contratos de financiamento
+
+`credit_card_payments` é o registro canônico da transferência que liquida uma
+fatura. Ele liga cartão, fatura, conta de origem e a transação técnica. Uma
+fatura possui no máximo um pagamento ativo; o estorno preserva o histórico e
+inativa o efeito no caixa. A view `credit_card_cash_transfers` expõe somente a
+leitura protegida por RLS.
+
+As views `financial_dashboard_monthly_basis` e
+`financial_dashboard_expense_categories_basis` usam `security_invoker` e
+publicam linhas distintas para `competence` e `cash`. A primeira reutiliza o
+consumo mensal por competência; a segunda reconhece transações realizadas e o
+pagamento da fatura na data da saída.
+
+`financing_import_jobs`, `financing_import_schedule_rows` e
+`financing_import_extra_amortizations` formam o staging. Após confirmação,
+`financing_contracts`, `financing_schedule_entries` e
+`financing_extra_amortizations` recebem o contrato estruturado. O contrato usa
+chave composta com o proprietário e vínculo único a `net_worth_items`; a view
+`financing_contract_summaries` agrega os indicadores sem carregar o cronograma
+inteiro no navegador.
