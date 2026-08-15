@@ -173,7 +173,7 @@ export type ExecutiveNetWorthCurrencySummary = {
   transactionalLiabilitiesMinor: number;
   manualAssetsMinor: number;
   investmentsMinor: number;
-  pendingInvoicesMinor: number;
+  cardBalancesMinor: number;
   otherLiabilitiesMinor: number;
   assetsMinor: number;
   liabilitiesMinor: number;
@@ -195,14 +195,18 @@ export function calculateExecutiveNetWorthByCurrency(input: {
     investmentsMinor: number;
     liabilitiesMinor: number;
   }>;
-  invoices: Array<{
+  cardBalances: Array<{
     userId: string;
     currency: SupportedCurrency;
-    outstandingMinor: number;
+    currentBalanceMinor: number;
   }>;
 }): ExecutiveNetWorthCurrencySummary[] {
   const currencies = new Set<SupportedCurrency>();
-  for (const row of [...input.accounts, ...input.summaries, ...input.invoices]) {
+  for (const row of [
+    ...input.accounts,
+    ...input.summaries,
+    ...input.cardBalances,
+  ]) {
     if (row.userId === input.currentUserId) currencies.add(row.currency);
   }
 
@@ -243,7 +247,7 @@ export function calculateExecutiveNetWorthByCurrency(input: {
       const otherLiabilitiesMinor = assertMinorUnits(
         sourceSummary?.liabilitiesMinor ?? 0,
       );
-      const pendingInvoicesMinor = input.invoices
+      const cardBalancesMinor = input.cardBalances
         .filter(
           (row) =>
             row.userId === input.currentUserId && row.currency === currency,
@@ -251,7 +255,7 @@ export function calculateExecutiveNetWorthByCurrency(input: {
         .reduce(
           (total, row) =>
             assertMinorUnits(
-              total + assertMinorUnits(row.outstandingMinor),
+              total + Math.max(0, assertMinorUnits(row.currentBalanceMinor)),
             ),
           0,
         );
@@ -260,7 +264,7 @@ export function calculateExecutiveNetWorthByCurrency(input: {
       );
       const liabilitiesMinor = assertMinorUnits(
         transactionalLiabilitiesMinor +
-          pendingInvoicesMinor +
+          cardBalancesMinor +
           otherLiabilitiesMinor,
       );
 
@@ -270,7 +274,7 @@ export function calculateExecutiveNetWorthByCurrency(input: {
         transactionalLiabilitiesMinor,
         manualAssetsMinor,
         investmentsMinor,
-        pendingInvoicesMinor,
+        cardBalancesMinor,
         otherLiabilitiesMinor,
         assetsMinor,
         liabilitiesMinor,

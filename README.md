@@ -64,6 +64,7 @@ rentabilidade sem histórico suficiente permanecem fora da Sprint 9.
 - QIF de contas do Microsoft Money, com categorias sugeridas e transferências
   entre contas revisadas explicitamente;
 - PDF pesquisável de Bradesco e Nubank por adaptadores versionados e testados;
+- PDF pesquisável de financiamento Bradesco com parcelas, juros, principal e amortizações extraordinárias;
 - arquivo original lido em memória e descartado antes da criação do job;
 - prévia com associação de conta e categoria, correção e linhas ignoradas;
 - assinatura estável e duplicidades verificadas antes da confirmação;
@@ -77,6 +78,10 @@ divididos, XLS, OCR e
 categorização automática permanecem fora do escopo. Consulte
 [docs/file-imports.md](docs/file-imports.md) e
 [docs/pdf-imports.md](docs/pdf-imports.md).
+
+Financiamentos estruturados estão documentados em
+[docs/financing-imports.md](docs/financing-imports.md). O dashboard permite
+alternar entre competência e caixa sem duplicar compras e pagamentos de fatura.
 
 ## Qualidade
 

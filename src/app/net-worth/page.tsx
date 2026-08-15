@@ -51,8 +51,8 @@ function Composition({
       kind: "asset",
     },
     {
-      label: "Faturas pendentes",
-      value: summary.pendingInvoicesMinor,
+      label: "Saldos de cartões",
+      value: summary.cardBalancesMinor,
       kind: "liability",
     },
     {
@@ -224,10 +224,10 @@ export default async function NetWorthPage({
       investmentsMinor: summary.investments_minor,
       liabilitiesMinor: summary.liabilities_minor,
     })),
-    invoices: result.invoices.map((invoice) => ({
-      userId: invoice.user_id,
-      currency: invoice.currency,
-      outstandingMinor: invoice.outstanding_amount_minor,
+    cardBalances: result.cardBalances.map((card) => ({
+      userId: card.user_id,
+      currency: card.currency,
+      currentBalanceMinor: card.current_balance_minor,
     })),
   });
   const assets = result.items.filter((item) => item.kind === "asset");

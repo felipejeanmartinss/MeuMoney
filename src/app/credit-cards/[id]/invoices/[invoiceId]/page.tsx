@@ -15,7 +15,7 @@ import { toIsoDate } from "@/utils/dates";
 
 const messages: Record<string, string> = {
   "invoice-closed": "Fatura fechada. Novas alterações estruturais foram bloqueadas.",
-  "invoice-paid": "Pagamento registrado e saldo da conta atualizado.",
+  "invoice-paid": "Transferência para o cartão registrada e saldo da conta atualizado.",
   "payment-reversed": "Pagamento estornado com segurança.",
   "invoice-error": "Não foi possível concluir a operação.",
 };
@@ -144,9 +144,10 @@ export default async function CreditCardInvoicePage({
 
       {invoice.status === "closed" || invoice.status === "overdue" ? (
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-950">Pagar fatura</h2>
+          <h2 className="text-xl font-bold text-slate-950">Transferir para o cartão</h2>
           <p className="mt-1 text-sm text-slate-600">
-            O pagamento integral cria uma movimentação técnica realizada.
+            A saída reduz a conta no regime de caixa; as parcelas permanecem
+            como despesas no regime de competência.
           </p>
           <div className="mt-5">
             <InvoicePaymentForm

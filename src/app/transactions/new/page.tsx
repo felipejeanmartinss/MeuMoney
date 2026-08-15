@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountEntryForm } from "@/components/forms/account-entry-form";
+import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
 import { getTransactionFormOptions } from "@/services/finance/transactions-service";
 import { toIsoDate } from "@/utils/dates";
 
@@ -11,9 +12,11 @@ export default async function NewTransactionPage({
   searchParams: Promise<{ accountId?: string; type?: string }>;
 }) {
   const { accountId, type } = await searchParams;
-  const { accounts, categories, groups, hasError } = await getTransactionFormOptions(
-    accountId ? { accountId } : undefined,
-  );
+  const [formOptions, creditCardOptions] = await Promise.all([
+    getTransactionFormOptions(accountId ? { accountId } : undefined),
+    listCurrentUserTransferCreditCardDestinations(),
+  ]);
+  const { accounts, categories, groups, hasError } = formOptions;
   const selectedAccountId = accounts.some(
     (account) => account.id === accountId,
   )
@@ -48,6 +51,7 @@ export default async function NewTransactionPage({
             accounts={accounts}
             categories={categories}
             groups={groups}
+            creditCards={creditCardOptions.destinations}
             accountId={selectedAccountId}
             transactionDate={toIsoDate(new Date())}
             initialMode={

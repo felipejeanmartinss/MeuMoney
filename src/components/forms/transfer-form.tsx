@@ -11,6 +11,13 @@ import {
   TRANSACTION_STATUS_LABELS,
 } from "@/domain/transactions";
 import { CONTEXT_LABELS } from "@/domain/accounts";
+import {
+  accountTransferDestinationValue,
+  creditCardTransferDestinationValue,
+  parseTransferDestinationTarget,
+  type CreditCardTransferDestination,
+} from "@/domain/transfers";
+import { formatMoney } from "@/domain/money";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import type {
   FinancialContext,
@@ -29,6 +36,8 @@ type TransferFormValues = {
   id?: string;
   sourceAccountId?: string;
   destinationAccountId?: string;
+  destinationCreditCardId?: string;
+  destinationTarget?: string;
   amountMinor?: string;
   transactionDate?: string;
   status?: TransactionStatus;
@@ -40,36 +49,70 @@ const initialState: FinancialFormState = { status: "idle" };
 
 export function TransferForm({
   accounts,
+  creditCards = [],
   values,
 }: {
   accounts: AccountOption[];
+  creditCards?: CreditCardTransferDestination[];
   values: TransferFormValues;
 }) {
   const action = values.id ? updateTransfer : createTransfer;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [sourceId, setSourceId] = useState(values.sourceAccountId ?? "");
-  const [destinationId, setDestinationId] = useState(
-    values.destinationAccountId ?? "",
+  const [destinationTarget, setDestinationTarget] = useState(
+    values.destinationTarget ??
+      (values.destinationAccountId
+      ? accountTransferDestinationValue(values.destinationAccountId)
+      : values.destinationCreditCardId
+        ? creditCardTransferDestinationValue(values.destinationCreditCardId)
+        : ""),
   );
+  const [amountInput, setAmountInput] = useState(values.amountMinor ?? "0,00");
   const source = accounts.find((account) => account.id === sourceId);
+  const parsedDestination = parseTransferDestinationTarget(destinationTarget);
+  const destinationAccountId =
+    parsedDestination?.kind === "account" ? parsedDestination.id : "";
+  const selectedCreditCard =
+    parsedDestination?.kind === "credit_card"
+      ? creditCards.find(
+          (destination) => destination.id === parsedDestination.id,
+        )
+      : undefined;
   const destinationOptions = accounts.filter(
     (account) =>
       account.id !== sourceId &&
       (!source || account.currency === source.currency),
   );
+  const creditCardOptions = creditCards.filter(
+    (destination) => !source || destination.currency === source.currency,
+  );
+
+  function destinationCurrency(target: string) {
+    const parsed = parseTransferDestinationTarget(target);
+    if (parsed?.kind === "account") {
+      return accounts.find((account) => account.id === parsed.id)?.currency;
+    }
+    if (parsed?.kind === "credit_card") {
+      return creditCards.find(
+        (destination) => destination.id === parsed.id,
+      )?.currency;
+    }
+    return undefined;
+  }
+
+  function changeDestination(target: string) {
+    setDestinationTarget(target);
+  }
 
   function changeSource(id: string) {
     setSourceId(id);
     const nextSource = accounts.find((account) => account.id === id);
-    const destination = accounts.find(
-      (account) => account.id === destinationId,
-    );
     if (
-      !destination ||
-      destination.id === id ||
-      destination.currency !== nextSource?.currency
+      !destinationTarget ||
+      destinationAccountId === id ||
+      destinationCurrency(destinationTarget) !== nextSource?.currency
     ) {
-      setDestinationId("");
+      setDestinationTarget("");
     }
   }
 
@@ -105,29 +148,60 @@ export function TransferForm({
         </Field>
 
         <Field
-          label="Conta de destino"
-          error={state.fieldErrors?.destinationAccountId?.[0]}
+          label="Conta ou cartão de destino"
+          error={
+            state.fieldErrors?.destinationTarget?.[0] ??
+            state.fieldErrors?.destinationAccountId?.[0]
+          }
         >
           <select
             className={inputClass(
-              Boolean(state.fieldErrors?.destinationAccountId),
+              Boolean(
+                state.fieldErrors?.destinationTarget ??
+                  state.fieldErrors?.destinationAccountId,
+              ),
             )}
-            name="destinationAccountId"
-            value={destinationId}
-            onChange={(event) => setDestinationId(event.target.value)}
+            name="destinationTarget"
+            value={destinationTarget}
+            onChange={(event) => changeDestination(event.target.value)}
             required
           >
             <option value="" disabled>
               {sourceId
-                ? "Selecione uma conta da mesma moeda"
+                ? "Selecione uma conta ou cartão da mesma moeda"
                 : "Escolha primeiro a origem"}
             </option>
-            {destinationOptions.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} · {account.currency} ·{" "}
-                {CONTEXT_LABELS[account.context]}
-              </option>
-            ))}
+            {destinationOptions.length > 0 ? (
+              <optgroup label="Contas">
+                {destinationOptions.map((account) => (
+                  <option
+                    key={account.id}
+                    value={accountTransferDestinationValue(account.id)}
+                  >
+                    {account.name} · {account.currency} ·{" "}
+                    {CONTEXT_LABELS[account.context]}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {creditCardOptions.length > 0 ? (
+              <optgroup label="Cartões de crédito">
+                {creditCardOptions.map((destination) => (
+                  <option
+                    key={destination.id}
+                    value={creditCardTransferDestinationValue(
+                      destination.id,
+                    )}
+                  >
+                    {destination.cardName} · saldo{" "}
+                    {formatMoney(
+                      destination.currentBalanceMinor,
+                      destination.currency,
+                    )}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
         </Field>
       </div>
@@ -137,7 +211,8 @@ export function TransferForm({
           <input
             className={inputClass(Boolean(state.fieldErrors?.amountMinor))}
             name="amountMinor"
-            defaultValue={values.amountMinor}
+            value={amountInput}
+            onChange={(event) => setAmountInput(event.target.value)}
             inputMode="decimal"
             placeholder="0,00"
             required
@@ -172,6 +247,14 @@ export function TransferForm({
         </Field>
       </div>
 
+      {selectedCreditCard ? (
+        <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+          A transferência reduz o caixa da conta de origem e o saldo devedor
+          de {selectedCreditCard.cardName}. Ela entra apenas no regime de
+          caixa; as compras continuam no mês de competência.
+        </p>
+      ) : null}
+
       <Field
         label="Descrição opcional"
         error={state.fieldErrors?.description?.[0]}
@@ -196,7 +279,11 @@ export function TransferForm({
       </Field>
 
       <SubmitButton pending={pending}>
-        {values.id ? "Salvar alterações" : "Criar transferência"}
+        {values.id
+          ? "Salvar alterações"
+          : selectedCreditCard
+            ? "Transferir para o cartão"
+            : "Criar transferência"}
       </SubmitButton>
     </form>
   );

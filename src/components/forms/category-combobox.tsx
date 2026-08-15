@@ -7,6 +7,7 @@ import {
 import type {
   CategorySelectionAccount,
   CategorySelectionCategory,
+  CategorySelectionCreditCard,
 } from "@/domain/category-selection";
 import type { TransactionType } from "@/types/database";
 import { SearchableSelect } from "./searchable-select";
@@ -19,6 +20,7 @@ export function CategoryCombobox({
   defaultValue,
   onValueChange,
   transferAccounts = [],
+  transferCreditCards = [],
   sourceAccountId = null,
   prefixCategoryValue = false,
   invalid = false,
@@ -30,6 +32,7 @@ export function CategoryCombobox({
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   transferAccounts?: CategorySelectionAccount[];
+  transferCreditCards?: CategorySelectionCreditCard[];
   sourceAccountId?: string | null;
   prefixCategoryValue?: boolean;
   invalid?: boolean;
@@ -38,7 +41,11 @@ export function CategoryCombobox({
     ...buildCategorySelectionOptions(categories, transactionType, {
       prefixValue: prefixCategoryValue,
     }),
-    ...buildTransferSelectionOptions(transferAccounts, sourceAccountId),
+    ...buildTransferSelectionOptions(
+      transferAccounts,
+      sourceAccountId,
+      transferCreditCards,
+    ),
   ];
 
   return (

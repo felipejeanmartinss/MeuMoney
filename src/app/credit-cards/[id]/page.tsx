@@ -84,7 +84,7 @@ export default async function CreditCardPage({
       <section className="grid gap-4 sm:grid-cols-3">
         {[
           ["Limite total", card.credit_limit],
-          ["Limite utilizado", card.used_limit],
+          ["Saldo atual do cartão", card.current_balance_minor],
           ["Limite disponível", card.available_limit],
         ].map(([label, value]) => (
           <article key={String(label)} className="rounded-2xl border bg-white p-5">

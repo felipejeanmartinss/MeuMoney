@@ -29,9 +29,13 @@ export default async function EditTransferPage({
     options.accounts.some(
       (account) => account.id === transfer.source_account_id,
     ) &&
-    options.accounts.some(
-      (account) => account.id === transfer.destination_account_id,
-    );
+    (transfer.destination_account_id
+      ? options.accounts.some(
+          (account) => account.id === transfer.destination_account_id,
+        )
+      : options.creditCards.some(
+          (card) => card.id === transfer.destination_credit_card_id,
+        ));
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -64,7 +68,7 @@ export default async function EditTransferPage({
           role="alert"
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950"
         >
-          Reative as contas de origem e destino para editar esta transferência.
+          Reative a origem e o destino para editar esta transferência.
           Você ainda pode inativá-la pela lista de transferências.
         </p>
       ) : null}
@@ -73,10 +77,14 @@ export default async function EditTransferPage({
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <TransferForm
             accounts={options.accounts}
+            creditCards={options.creditCards}
             values={{
               id: transfer.id,
               sourceAccountId: transfer.source_account_id,
-              destinationAccountId: transfer.destination_account_id,
+              destinationAccountId:
+                transfer.destination_account_id ?? undefined,
+              destinationCreditCardId:
+                transfer.destination_credit_card_id ?? undefined,
               amountMinor: minorUnitsToInput(transfer.amount_minor),
               transactionDate: transfer.transaction_date,
               status: transfer.status,

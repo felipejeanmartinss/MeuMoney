@@ -52,9 +52,9 @@
 - Somente lançamentos ativos e realizados participam do saldo atual. Lançamentos previstos e inativos permanecem no histórico sem efeito financeiro.
 - Editar conta, tipo, valor, status ou atividade não exige ajustar um saldo persistido: o saldo é recalculado a partir dos registros vigentes.
 - Transferência não é receita nem despesa e não recebe categoria.
-- Origem e destino devem ser contas ativas distintas do mesmo usuário e, nesta sprint, da mesma moeda.
-- Cada transferência possui um registro canônico e exatamente duas movimentações vinculadas: saída na origem e entrada no destino.
-- Criar, editar, inativar ou reativar uma transferência altera os dois lados na mesma transação SQL. Uma falha reverte toda a operação.
+- A origem deve ser uma conta ativa. O destino pode ser outra conta ativa ou um cartão de crédito ativo do mesmo usuário e da mesma moeda.
+- Uma transferência entre contas possui duas movimentações vinculadas: saída na origem e entrada no destino. Uma transferência para cartão possui somente a saída vinculada à conta; o destino é registrado no próprio cartão.
+- Criar, editar, inativar ou reativar uma transferência altera seus registros vinculados na mesma transação SQL. Uma falha reverte toda a operação.
 - Transferências previstas ou inativas não afetam o saldo realizado.
 - Lançamentos e transferências não são excluídos fisicamente pela interface.
 - O saldo atual é o saldo inicial, mais receitas realizadas ativas, menos despesas realizadas ativas, mais transferências recebidas realizadas ativas e menos transferências enviadas realizadas ativas.
@@ -66,12 +66,12 @@
 ## Cartões de crédito — Sprint 4
 
 - Compra de cartão é despesa de consumo e exige categoria de Despesa ativa do mesmo usuário.
-- Compra não altera saldo de conta. A conta só recebe uma saída técnica quando a fatura integral é paga.
+- Compra não altera saldo de conta. Uma transferência realizada para o cartão reduz o saldo da conta de origem e o saldo devedor atual do cartão, sem exigir vínculo com uma fatura.
 - Valores são positivos e exatos em unidades menores; parcelas nunca possuem valor zero. Eventual resto da divisão fica na última parcela.
 - Compra realizada até o dia de fechamento pertence à competência atual; após esse dia, pertence à seguinte. Dias inexistentes em um mês são limitados ao último dia real.
-- O limite utilizado soma todas as parcelas ativas pendentes ou faturadas, inclusive futuras. O limite disponível é o limite total menos esse valor e pode ficar negativo.
+- O saldo devedor atual soma parcelas ativas pendentes ou faturadas e deduz transferências realizadas para o cartão. O limite utilizado não fica negativo; eventual pagamento excedente permanece visível como crédito no saldo atual.
 - Fechamento é idempotente. Uma fatura fechada ou paga impede mudanças estruturais nas compras que a compõem.
-- Pagamento exige conta ativa, do mesmo usuário e na mesma moeda do cartão. A transação técnica é realizada, não possui categoria e não pode ser editada pela interface de movimentações.
+- A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
 - Cartões e compras não são excluídos fisicamente pela interface.
 
@@ -101,14 +101,15 @@
 - Copiar o mês anterior mantém contexto e moeda, ignora categorias inativas e não sobrescreve linhas que já existem no mês de destino. A operação é idempotente.
 - O cliente não exclui orçamentos fisicamente. Um valor planejado igual a zero representa uma categoria sem verba no mês.
 
-## Dashboard financeiro — Sprint 7
+## Dashboard financeiro — competência e caixa
 
 - Todo indicador consolidado é calculado por mês e moeda. Valores em BRL, USD e EUR nunca são somados entre si e não há conversão cambial implícita.
 - Receita mensal considera apenas receitas ativas e realizadas na data do lançamento.
-- Despesa mensal considera somente consumo ativo e realizado: despesas categorizadas em conta e parcelas de cartão reconhecidas no mês de competência.
-- Transferências e pagamentos técnicos de fatura não compõem receitas, despesas, resultado, orçamento consumido ou distribuição por categoria.
+- Em competência, despesa mensal considera consumo ativo e realizado: despesas categorizadas em conta e parcelas de cartão reconhecidas na competência. O pagamento da fatura não é novo consumo.
+- Em caixa, despesa mensal considera as saídas ativas e realizadas na data em que o dinheiro deixa a conta. A compra do cartão não entra novamente; entra qualquer transferência realizada para o cartão, com ou sem associação a uma fatura.
+- Transferências entre contas próprias não compõem receita ou despesa em nenhum regime. A transferência para cartão é a exceção explícita do regime de caixa porque liquida uma obrigação externa já reconhecida em competência.
 - Resultado mensal é `receitas realizadas - despesas de consumo`.
-- Orçamento consumido compara todas as despesas de consumo do mês com todo o valor planejado na mesma moeda, incluindo consumo sem orçamento no numerador.
+- Orçamento consumido compara todas as despesas por competência do mês com todo o valor planejado na mesma moeda. No regime de caixa ele não é calculado.
 - Saldo por conta representa a posição atual, derivada do saldo inicial e de movimentações realizadas. Ele não é reconstruído para o encerramento do mês histórico selecionado.
 - A evolução apresenta o mês selecionado e os cinco meses anteriores, preenchendo meses sem movimento com zero.
 - Próximas recorrências exibem apenas modelos ativos, não encerrados e com próxima ocorrência a partir da data atual.
@@ -173,7 +174,8 @@
 - A busca de categorias ignora diferenças entre maiúsculas, minúsculas e acentos e procura tanto no nome principal quanto na subcategoria.
 - No lançamento por conta e na revisão de importação, contas ativas e de mesma moeda podem aparecer no seletor como destinos de transferência. A escolha cria ou reclassifica uma transferência canônica e nunca grava uma categoria fictícia.
 - Uma linha em staging pode ser corrigida de lançamento para transferência ou de transferência para lançamento. A troca limpa a referência incompatível, revalida proprietário, moeda e natureza e atualiza o job na mesma transação SQL.
-- Cartões de crédito não são destinos genéricos de transferência. O pagamento continua associado à fatura e à sua movimentação técnica para impedir a duplicação das despesas de consumo.
+- Cartões de crédito não são destinos genéricos de transferência. Faturas fechadas ou vencidas aparecem no formulário de transferência como destinos explícitos de pagamento, identificados pelo cartão, competência e valor integral. A escolha continua associada à fatura e usa a movimentação técnica para impedir a duplicação das despesas de consumo.
+- O pagamento iniciado por Novo lançamento ou por Nova transferência exige uma conta ativa da mesma moeda, confirmação explícita e sempre registra o valor integral da fatura como realizado. Faturas abertas, pagas ou sem valor não aparecem como destinos.
 
 ## Importação assistida por PDF — Sprint 11
 
@@ -201,6 +203,17 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - Contas de investimento registram caixa, aportes e resgates; posições de investimento continuam separadas para evitar dupla contagem.
 - Posições distinguem produto operacional: Tesouro, CDB, LCI/LCA, debênture, outras rendas fixas, ações, FIIs, ETFs, fundos, previdência e criptoativos.
 - Financiamentos e empréstimos continuam passivos patrimoniais, apenas apresentados na central de Investimentos; cartões de crédito não integram essa aba.
+
+## Importação de financiamentos
+
+- O extrato de financiamento é processado somente no servidor e o PDF original é descartado depois da extração em memória.
+- Nenhum passivo é criado antes da revisão e confirmação explícita do usuário.
+- A confirmação cria atomicamente um passivo patrimonial, um contrato, seu cronograma e as amortizações extraordinárias. Qualquer falha reverte toda a operação.
+- O contrato e o passivo usam vínculo um-para-um; o patrimônio considera apenas o passivo para impedir dupla contagem.
+- Valores monetários são inteiros em unidades menores. Taxas e fatores usam decimal exato no banco e texto decimal no domínio.
+- Valor pago, principal, juros e encargos consideram apenas parcelas marcadas como pagas no documento. Amortizações extraordinárias são somadas separadamente por recursos próprios e FGTS.
+- As páginas de origem são preservadas nos registros estruturados, mas dados cadastrais do cliente não são persistidos.
+- Apenas layouts cobertos por adaptador versionado e fixture anônima podem ser anunciados como suportados. OCR e PDFs protegidos ou digitalizados não são inferidos.
 
 ## Consolidação patrimonial executiva
 

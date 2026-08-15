@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CategoryGroupItem } from "@/domain/categories";
+import type { CreditCardTransferDestination } from "@/domain/transfers";
 import type {
   AccountType,
   FinancialContext,
@@ -42,6 +43,7 @@ export function AccountEntryForm({
   accounts,
   categories,
   groups,
+  creditCards,
   accountId,
   transactionDate,
   initialMode,
@@ -49,12 +51,13 @@ export function AccountEntryForm({
   accounts: AccountOption[];
   categories: CategoryOption[];
   groups: CategoryGroupItem[];
+  creditCards: CreditCardTransferDestination[];
   accountId?: string;
   transactionDate: string;
   initialMode: EntryMode;
 }) {
   const [mode, setMode] = useState<EntryMode>(initialMode);
-  const [transferDestinationAccountId, setTransferDestinationAccountId] =
+  const [transferDestinationTarget, setTransferDestinationTarget] =
     useState("");
 
   return (
@@ -86,9 +89,10 @@ export function AccountEntryForm({
         <TransferForm
           key="transfer"
           accounts={accounts}
+          creditCards={creditCards}
           values={{
             sourceAccountId: accountId,
-            destinationAccountId: transferDestinationAccountId,
+            destinationTarget: transferDestinationTarget,
             transactionDate,
             status: "completed",
             amountMinor: "0,00",
@@ -102,8 +106,9 @@ export function AccountEntryForm({
           groups={groups}
           fixedType={mode}
           transferAccounts={accounts}
-          onTransferSelected={(destinationAccountId) => {
-            setTransferDestinationAccountId(destinationAccountId);
+          transferCreditCards={creditCards}
+          onTransferSelected={(destinationTarget) => {
+            setTransferDestinationTarget(destinationTarget);
             setMode("transfer");
           }}
           values={{

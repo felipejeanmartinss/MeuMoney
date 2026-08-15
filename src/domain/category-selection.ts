@@ -21,10 +21,19 @@ export type CategorySelectionAccount = {
   currency: SupportedCurrency;
 };
 
+export type CategorySelectionCreditCard = {
+  id: string;
+  cardName: string;
+  currency: SupportedCurrency;
+};
+
 export type SearchableSelectionOption = {
   value: string;
   label: string;
-  group: "Categorias" | "Transferências entre contas";
+  group:
+    | "Categorias"
+    | "Transferências entre contas"
+    | "Transferências para cartões";
   keywords: string;
 };
 
@@ -85,11 +94,12 @@ export function buildCategorySelectionOptions(
 export function buildTransferSelectionOptions(
   accounts: CategorySelectionAccount[],
   sourceAccountId: string | null,
+  creditCards: CategorySelectionCreditCard[] = [],
 ): SearchableSelectionOption[] {
   const source = accounts.find((account) => account.id === sourceAccountId);
   if (!source) return [];
 
-  return accounts
+  const accountOptions = accounts
     .filter(
       (account) =>
         account.id !== source.id && account.currency === source.currency,
@@ -101,6 +111,19 @@ export function buildTransferSelectionOptions(
       group: "Transferências entre contas" as const,
       keywords: `transferencia ${account.name} ${ACCOUNT_TYPE_LABELS[account.type]} ${account.currency}`,
     }));
+  const creditCardOptions = creditCards
+    .filter((card) => card.currency === source.currency)
+    .sort((left, right) =>
+      portugueseCollator.compare(left.cardName, right.cardName),
+    )
+    .map((card) => ({
+      value: `credit-card:${card.id}`,
+      label: `Transferência · ${card.cardName} · Cartão de crédito`,
+      group: "Transferências para cartões" as const,
+      keywords: `transferencia pagamento cartao credito ${card.cardName} ${card.currency}`,
+    }));
+
+  return [...accountOptions, ...creditCardOptions];
 }
 
 export function filterSelectionOptions(
