@@ -85,6 +85,17 @@ export type ImportRowStatus =
   | "ignored"
   | "imported"
   | "error";
+export type FinancialReportBasis = "competence" | "cash";
+export type CreditCardPaymentState = "active" | "reversed";
+export type FinancingProductType = "financing" | "loan";
+export type FinancingContractStatus = "active" | "settled" | "archived";
+export type FinancingPaymentStatus = "paid" | "scheduled";
+export type FinancingReductionType = "term" | "payment";
+export type FinancingImportStatus =
+  | "review"
+  | "completed"
+  | "cancelled"
+  | "failed";
 
 export type Profile = {
   id: string;
@@ -239,16 +250,40 @@ export type CreditCardInstallment = {
   updated_at: string;
 };
 
+export type CreditCardPayment = {
+  id: string;
+  user_id: string;
+  credit_card_id: string;
+  invoice_id: string;
+  source_account_id: string;
+  payment_transaction_id: string;
+  amount_minor: number;
+  payment_date: string;
+  state: CreditCardPaymentState;
+  reversed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreditCardCashTransfer = Omit<CreditCardPayment, "updated_at"> & {
+  credit_card_name: string;
+  reference_month: string;
+  source_account_name: string;
+  currency: SupportedCurrency;
+};
+
 export type CreditCardSummary = CreditCard & {
   used_limit: number;
   available_limit: number;
+  current_balance_minor: number;
 };
 
 export type Transfer = {
   id: string;
   user_id: string;
   source_account_id: string;
-  destination_account_id: string;
+  destination_account_id: string | null;
+  destination_credit_card_id: string | null;
   amount_minor: number;
   currency: SupportedCurrency;
   transaction_date: string;
@@ -333,6 +368,19 @@ export type FinancialDashboardExpenseCategory = {
   category_name: string;
   context: FinancialContext;
   expense_amount_minor: number;
+};
+
+export type FinancialDashboardMonthlyBasisSummary =
+  FinancialDashboardMonthlySummary & {
+    basis: FinancialReportBasis;
+  };
+
+export type FinancialDashboardExpenseCategoryBasis = Omit<
+  FinancialDashboardExpenseCategory,
+  "category_id"
+> & {
+  basis: FinancialReportBasis;
+  category_id: string | null;
 };
 
 export type FinancialDashboardUpcomingRecurrence = {
@@ -453,6 +501,130 @@ export type InvestmentPositionSummary = InvestmentPosition & {
   income_minor: number;
   unrealized_appreciation_minor: number;
   total_result_minor: number | null;
+};
+
+export type FinancingImportJob = {
+  id: string;
+  user_id: string;
+  file_name: string;
+  file_sha256: string;
+  adapter_id: string;
+  adapter_version: string;
+  status: FinancingImportStatus;
+  institution: string;
+  contract_reference: string;
+  currency: SupportedCurrency;
+  amortization_system: string | null;
+  indexer: string | null;
+  original_principal_minor: number;
+  original_term_months: number | null;
+  contract_date: string;
+  release_date: string | null;
+  current_balance_minor: number;
+  balance_date: string;
+  nominal_annual_rate: string | null;
+  effective_annual_rate: string | null;
+  cet_annual_rate: string | null;
+  cesh_annual_rate: string | null;
+  source_page_count: number;
+  original_file_discarded_at: string;
+  contract_id: string | null;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancingScheduleEntry = {
+  id: string;
+  contract_id: string;
+  user_id: string;
+  source_sequence: number;
+  installment_number: number;
+  due_date: string;
+  total_amount_minor: number;
+  principal_minor: number;
+  interest_minor: number;
+  correction_factor: string | null;
+  insurance_mip_minor: number;
+  insurance_dfi_minor: number;
+  service_fee_minor: number;
+  penalty_minor: number;
+  late_interest_minor: number;
+  fgts_minor: number;
+  balance_correction_factor: string | null;
+  outstanding_balance_minor: number;
+  payment_status: FinancingPaymentStatus;
+  payment_date: string | null;
+  paid_amount_minor: number;
+  source_pages: number[];
+  created_at: string;
+};
+
+export type FinancingImportScheduleRow = Omit<
+  FinancingScheduleEntry,
+  "contract_id"
+> & {
+  job_id: string;
+};
+
+export type FinancingExtraAmortization = {
+  id: string;
+  contract_id: string;
+  user_id: string;
+  source_sequence: number;
+  event_date: string;
+  reduction_type: FinancingReductionType;
+  cash_amount_minor: number;
+  fgts_amount_minor: number;
+  installments_reduced: number | null;
+  source_pages: number[];
+  created_at: string;
+};
+
+export type FinancingImportExtraAmortization = Omit<
+  FinancingExtraAmortization,
+  "contract_id"
+> & {
+  job_id: string;
+};
+
+export type FinancingContract = {
+  id: string;
+  user_id: string;
+  net_worth_item_id: string;
+  institution: string;
+  product_type: FinancingProductType;
+  contract_reference: string;
+  currency: SupportedCurrency;
+  amortization_system: string | null;
+  indexer: string | null;
+  original_principal_minor: number;
+  original_term_months: number | null;
+  contract_date: string;
+  release_date: string | null;
+  current_balance_minor: number;
+  balance_date: string;
+  nominal_annual_rate: string | null;
+  effective_annual_rate: string | null;
+  cet_annual_rate: string | null;
+  cesh_annual_rate: string | null;
+  status: FinancingContractStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancingContractSummary = FinancingContract & {
+  name: string;
+  context: FinancialContext;
+  total_paid_minor: number;
+  principal_paid_minor: number;
+  interest_paid_minor: number;
+  charges_paid_minor: number;
+  extra_cash_minor: number;
+  extra_fgts_minor: number;
+  paid_installments: number;
+  scheduled_installments: number;
 };
 
 export type ImportJob = {
@@ -737,6 +909,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      credit_card_payments: {
+        Row: CreditCardPayment;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       monthly_budgets: {
         Row: MonthlyBudget;
         Insert: {
@@ -858,6 +1036,42 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      financing_import_jobs: {
+        Row: FinancingImportJob;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      financing_import_schedule_rows: {
+        Row: FinancingImportScheduleRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      financing_import_extra_amortizations: {
+        Row: FinancingImportExtraAmortization;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      financing_contracts: {
+        Row: FinancingContract;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      financing_schedule_entries: {
+        Row: FinancingScheduleEntry;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      financing_extra_amortizations: {
+        Row: FinancingExtraAmortization;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       import_jobs: {
         Row: ImportJob;
         Insert: never;
@@ -892,6 +1106,10 @@ export type Database = {
         Row: CreditCardSummary;
         Relationships: [];
       };
+      credit_card_cash_transfers: {
+        Row: CreditCardCashTransfer;
+        Relationships: [];
+      };
       monthly_consumption: {
         Row: MonthlyConsumption;
         Relationships: [];
@@ -908,6 +1126,14 @@ export type Database = {
         Row: FinancialDashboardExpenseCategory;
         Relationships: [];
       };
+      financial_dashboard_monthly_basis: {
+        Row: FinancialDashboardMonthlyBasisSummary;
+        Relationships: [];
+      };
+      financial_dashboard_expense_categories_basis: {
+        Row: FinancialDashboardExpenseCategoryBasis;
+        Relationships: [];
+      };
       financial_dashboard_upcoming_recurrences: {
         Row: FinancialDashboardUpcomingRecurrence;
         Relationships: [];
@@ -922,6 +1148,10 @@ export type Database = {
       };
       investment_position_summary: {
         Row: InvestmentPositionSummary;
+        Relationships: [];
+      };
+      financing_contract_summaries: {
+        Row: FinancingContractSummary;
         Relationships: [];
       };
     };
@@ -965,6 +1195,31 @@ export type Database = {
           target_transfer_id: string;
           source_account_id: string;
           destination_account_id: string;
+          amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: boolean;
+      };
+      create_credit_card_transfer: {
+        Args: {
+          source_account_id: string;
+          destination_credit_card_id: string;
+          amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: string;
+      };
+      update_credit_card_transfer: {
+        Args: {
+          target_transfer_id: string;
+          source_account_id: string;
+          destination_credit_card_id: string;
           amount_minor: number;
           transaction_date: string;
           transfer_status: TransactionStatus;
@@ -1030,6 +1285,31 @@ export type Database = {
       };
       reverse_credit_card_invoice_payment: {
         Args: { target_invoice_id: string };
+        Returns: boolean;
+      };
+      create_financing_import_job: {
+        Args: {
+          target_file_name: string;
+          target_file_sha256: string;
+          target_adapter_id: string;
+          target_adapter_version: string;
+          target_contract: Json;
+          target_schedule: Json;
+          target_extra_amortizations: Json;
+        };
+        Returns: string;
+      };
+      confirm_financing_import: {
+        Args: {
+          target_job_id: string;
+          target_name: string;
+          target_product_type: FinancingProductType;
+          target_context: FinancialContext;
+        };
+        Returns: string;
+      };
+      cancel_financing_import: {
+        Args: { target_job_id: string };
         Returns: boolean;
       };
       recurrence_next_date: {

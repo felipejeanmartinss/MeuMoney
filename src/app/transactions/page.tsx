@@ -20,6 +20,8 @@ export const metadata = { title: "Lançamentos" };
 
 const messages: Record<string, string> = {
   created: "Lançamento criado com sucesso.",
+  "card-paid":
+    "Transferência para o cartão registrada e fatura paga com sucesso.",
   updated: "Lançamento atualizado com sucesso.",
   "status-updated": "Status do lançamento atualizado com sucesso.",
   "status-error": "Não foi possível alterar o status do lançamento.",

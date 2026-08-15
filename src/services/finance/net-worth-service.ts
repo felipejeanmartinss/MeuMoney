@@ -19,7 +19,7 @@ export type NetWorthItemMutationInput = {
 
 export async function listCurrentUserNetWorth() {
   const { supabase, user } = await requireUser();
-  const [itemsResult, summaryResult, accountsResult, invoicesResult] =
+  const [itemsResult, summaryResult, accountsResult, cardBalancesResult] =
     await Promise.all([
     supabase
       .from("net_worth_items")
@@ -45,12 +45,10 @@ export async function listCurrentUserNetWorth() {
       .is("archived_at", null)
       .order("name"),
     supabase
-      .from("financial_dashboard_invoices")
-      .select(
-        "id, user_id, credit_card_id, credit_card_name, currency, reference_month, due_date, status, effective_status, total_amount_minor, outstanding_amount_minor",
-      )
+      .from("credit_card_summaries")
+      .select("id, user_id, currency, current_balance_minor")
       .eq("user_id", user.id)
-      .order("due_date"),
+      .eq("is_active", true),
     ]);
 
   return {
@@ -58,12 +56,12 @@ export async function listCurrentUserNetWorth() {
     items: itemsResult.data ?? [],
     summaries: summaryResult.data ?? [],
     accounts: accountsResult.data ?? [],
-    invoices: invoicesResult.data ?? [],
+    cardBalances: cardBalancesResult.data ?? [],
     hasError: Boolean(
       itemsResult.error ||
         summaryResult.error ||
         accountsResult.error ||
-        invoicesResult.error,
+        cardBalancesResult.error,
     ),
   };
 }

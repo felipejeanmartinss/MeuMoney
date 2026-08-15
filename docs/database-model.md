@@ -232,3 +232,37 @@ As duas estruturas possuem RLS por proprietário, privilégios explícitos por
 coluna e índices que começam pelas colunas usadas nas chaves estrangeiras ou
 filtros de proprietário. A migration é cumulativa e migra todas as categorias
 e posições existentes para valores compatíveis.
+
+## Caixa de cartões e contratos de financiamento
+
+`credit_card_payments` permanece como registro canônico do fluxo integral que
+liquida uma fatura e atualiza suas parcelas. Para pagamentos livres,
+`transfers.destination_credit_card_id` registra diretamente o cartão de destino,
+sem exigir uma fatura. A restrição `transfers_exactly_one_destination` garante
+que cada transferência aponte para exatamente uma conta ou um cartão. A mesma
+moeda, o proprietário e a atividade dos dois lados são validados pelas RPCs.
+
+Transferências para cartão criam somente o `transfer_entry` de saída. A view
+`credit_card_summaries` calcula `current_balance_minor` como parcelas ativas
+pendentes ou faturadas menos transferências realizadas. Um valor negativo
+representa crédito no cartão; `used_limit` permanece limitado a zero ou mais.
+
+As views `financial_dashboard_monthly_basis` e
+`financial_dashboard_expense_categories_basis` usam `security_invoker` e
+publicam linhas distintas para `competence` e `cash`. A primeira reutiliza o
+consumo mensal por competência; a segunda reconhece transações realizadas e o
+pagamento da fatura na data da saída.
+
+`financing_import_jobs`, `financing_import_schedule_rows` e
+`financing_import_extra_amortizations` formam o staging. Após confirmação,
+`financing_contracts`, `financing_schedule_entries` e
+`financing_extra_amortizations` recebem o contrato estruturado. O contrato usa
+chave composta com o proprietário e vínculo único a `net_worth_items`; a view
+`financing_contract_summaries` agrega os indicadores sem carregar o cronograma
+inteiro no navegador.
+
+As migrations cumulativas deste incremento são aplicadas, nesta ordem:
+`20260815135005_card_cash_financing_imports.sql` e
+`20260815160729_card_account_transfers.sql`, seguidas de
+`20260815161500_card_financing_fk_indexes.sql` para os índices das chaves
+estrangeiras.

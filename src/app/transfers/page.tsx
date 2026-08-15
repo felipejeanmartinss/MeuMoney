@@ -38,9 +38,12 @@ export default async function TransfersPage({
   const filters = parsedFilters.success
     ? parsedFilters.data
     : { activity: "active" as const };
-  const { transfers, accounts, hasError } =
+  const { transfers, accounts, creditCards, hasError } =
     await listCurrentUserTransfers(filters);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
+  const creditCardById = new Map(
+    creditCards.map((creditCard) => [creditCard.id, creditCard]),
+  );
   const messageCode =
     typeof rawParams.message === "string" ? rawParams.message : undefined;
   const feedback = messageCode ? messages[messageCode] : undefined;
@@ -57,8 +60,8 @@ export default async function TransfersPage({
             Transferências
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Mova valores entre contas da mesma moeda sem alterar receitas ou
-            despesas.
+            Mova valores entre contas ou pague cartões da mesma moeda sem
+            transformar a operação em receita ou despesa.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -181,7 +184,7 @@ export default async function TransfersPage({
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-slate-600">
             Crie uma transferência para movimentar dinheiro com segurança entre
-            duas contas.
+            contas ou para reduzir o saldo de um cartão.
           </p>
         </section>
       ) : null}
@@ -189,9 +192,11 @@ export default async function TransfersPage({
       <section className="grid gap-3">
         {transfers.map((transfer) => {
           const source = accountById.get(transfer.source_account_id);
-          const destination = accountById.get(
-            transfer.destination_account_id,
-          );
+          const destination = transfer.destination_account_id
+            ? accountById.get(transfer.destination_account_id)
+            : transfer.destination_credit_card_id
+              ? creditCardById.get(transfer.destination_credit_card_id)
+              : undefined;
           return (
             <article
               key={transfer.id}
@@ -214,10 +219,13 @@ export default async function TransfersPage({
                   <h2 className="mt-2 text-lg font-bold text-slate-950">
                     {source?.name ?? "Conta indisponível"}{" "}
                     <span aria-hidden="true">→</span>{" "}
-                    {destination?.name ?? "Conta indisponível"}
+                    {destination?.name ?? "Destino indisponível"}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    {transfer.description || "Transferência entre contas"} ·{" "}
+                    {transfer.description ||
+                      (transfer.destination_credit_card_id
+                        ? "Transferência para cartão"
+                        : "Transferência entre contas")} ·{" "}
                     {formatFinancialDate(transfer.transaction_date)}
                   </p>
                 </div>

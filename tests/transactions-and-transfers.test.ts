@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { transactionFormSchema } from "../src/domain/transactions";
 import {
+  accountTransferDestinationValue,
+  creditCardTransferDestinationValue,
+  creditCardTransferFormSchema,
+  parseTransferDestinationTarget,
   transferFiltersSchema,
   transferFormSchema,
 } from "../src/domain/transfers";
@@ -82,6 +86,35 @@ describe("Sprint 3 financial movement validation", () => {
         destinationAccountId: accountA,
       }).success,
     ).toBe(false);
+  });
+
+  it("distinguishes account transfers from transfers to credit cards", () => {
+    expect(
+      parseTransferDestinationTarget(
+        accountTransferDestinationValue(accountB),
+      ),
+    ).toEqual({ kind: "account", id: accountB });
+    expect(
+      parseTransferDestinationTarget(
+        creditCardTransferDestinationValue(category),
+      ),
+    ).toEqual({ kind: "credit_card", id: category });
+    expect(parseTransferDestinationTarget("card:invalid")).toBeNull();
+  });
+
+  it("validates a positive transfer to an active credit-card destination", () => {
+    const result = creditCardTransferFormSchema.safeParse({
+      sourceAccountId: accountA,
+      destinationCreditCardId: category,
+      amountMinor: "480,35",
+      transactionDate: "2026-08-15",
+      status: "completed",
+      description: "Pagamento do cartão",
+      notes: "",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.amountMinor).toBe(48_035);
   });
 
   it("sanitizes transfer filters and defaults to active records", () => {

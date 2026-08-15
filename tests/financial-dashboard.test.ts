@@ -140,6 +140,72 @@ describe("financial dashboard aggregations", () => {
     expect(result[0].categoryExpenses[0].amountMinor).toBe(12_500);
   });
 
+  it("separates card competence from the cash payment of its invoice", () => {
+    const cardInstallment: DashboardEntry = {
+      source: "card_installment",
+      userId: "user-a",
+      currency: "BRL",
+      amountMinor: 30_000,
+      categoryId: "travel",
+      categoryName: "Viagens",
+      context: "personal",
+      competenceDate: "2026-07-01",
+      purchaseActive: true,
+      installmentCancelled: false,
+    };
+    const invoicePayment: DashboardEntry = {
+      ...baseExpense,
+      categoryId: null,
+      categoryName: null,
+      context: null,
+      amountMinor: 30_000,
+      originType: "credit_card_invoice_payment",
+    };
+    const budgets = [
+      {
+        userId: "user-a",
+        currency: "BRL" as const,
+        referenceMonth: "2026-07-01",
+        plannedAmountMinor: 60_000,
+      },
+    ];
+
+    const competence = calculateFinancialDashboardMonth({
+      userId: "user-a",
+      referenceMonth: "2026-07",
+      basis: "competence",
+      budgets,
+      entries: [cardInstallment, invoicePayment],
+    });
+    const cash = calculateFinancialDashboardMonth({
+      userId: "user-a",
+      referenceMonth: "2026-07",
+      basis: "cash",
+      budgets,
+      entries: [cardInstallment, invoicePayment],
+    });
+
+    expect(competence[0]).toMatchObject({
+      expenseAmountMinor: 30_000,
+      plannedAmountMinor: 60_000,
+      budgetPercentageConsumed: 50,
+    });
+    expect(competence[0].categoryExpenses[0]).toMatchObject({
+      categoryName: "Viagens",
+      amountMinor: 30_000,
+    });
+    expect(cash[0]).toMatchObject({
+      expenseAmountMinor: 30_000,
+      plannedAmountMinor: 0,
+      budgetPercentageConsumed: null,
+    });
+    expect(cash[0].categoryExpenses[0]).toMatchObject({
+      categoryId: "cash-card-payments",
+      categoryName: "Pagamento de cartões",
+      amountMinor: 30_000,
+    });
+  });
+
   it("keeps currencies and users isolated", () => {
     const result = calculateFinancialDashboardMonth({
       userId: "user-a",
@@ -236,12 +302,12 @@ describe("financial dashboard aggregations", () => {
     });
   });
 
-  it("adds transactional balance and subtracts pending invoices from net worth", () => {
+  it("adds transactional balance and subtracts the current credit-card balance", () => {
     expect(
       calculateExecutiveDashboardNetWorth({
         accountBalanceMinor: 50_000,
         manualNetWorthMinor: 300_000,
-        outstandingInvoicesMinor: 20_000,
+        creditCardBalanceMinor: 20_000,
       }),
     ).toBe(330_000);
   });

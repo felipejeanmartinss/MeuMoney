@@ -57,15 +57,15 @@ export function InvoicePaymentForm({
       </Field>
       <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
         <input className="mt-1" type="checkbox" name="confirmation" value="yes" />
-        Confirmo a quitação integral. Ela criará uma saída técnica na conta,
-        sem duplicar a despesa de consumo.
+        Confirmo a transferência integral da conta para o cartão. Ela será uma
+        saída no regime de caixa, sem duplicar a despesa por competência.
       </label>
       {state.fieldErrors?.confirmation?.[0] ? (
         <p className="text-sm text-red-700">
           {state.fieldErrors.confirmation[0]}
         </p>
       ) : null}
-      <SubmitButton pending={pending}>Pagar fatura</SubmitButton>
+      <SubmitButton pending={pending}>Transferir e pagar fatura</SubmitButton>
     </form>
   );
 }

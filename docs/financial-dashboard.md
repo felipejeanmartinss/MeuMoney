@@ -1,19 +1,20 @@
 # Dashboard financeiro
 
-## Escopo mensal
+## Escopo mensal e regime
 
-O dashboard recebe `month=AAAA-MM` e mostra o mês selecionado. O saldo das contas, as próximas recorrências e as faturas pendentes são posições atuais; receitas, despesas, resultado, orçamento e categorias respeitam o mês informado.
+O dashboard recebe `month=AAAA-MM` e `basis=competence|cash`. Competência é o padrão. O saldo das contas, as próximas recorrências e as faturas pendentes são posições atuais; receitas, despesas, resultado, orçamento e categorias respeitam o mês e o regime informados.
 
 ## Definições
 
 - **Saldo atual:** saldo inicial mais lançamentos e transferências ativos e realizados, apresentado por conta.
 - **Receitas:** lançamentos de receita ativos e realizados.
-- **Despesas de consumo:** despesas manuais categorizadas, ativas e realizadas, somadas às parcelas de cartão pela competência.
+- **Despesas por competência:** despesas manuais categorizadas, ativas e realizadas, somadas às parcelas de cartão na competência da parcela. O pagamento da fatura é excluído.
+- **Saídas por caixa:** despesas ativas e realizadas na data de pagamento. Compras do cartão não são repetidas; entra somente a transferência efetiva da conta para a fatura.
 - **Resultado:** receitas menos despesas de consumo.
 - **Orçamento consumido:** despesas de consumo divididas pelo planejamento total da moeda no mês.
 - **Distribuição por categoria:** mesma base de despesas de consumo, agrupada por categoria.
 
-Transferências e pagamentos técnicos de fatura são excluídos dos indicadores de consumo. Faturas são compromissos de liquidação e não uma segunda ocorrência da compra.
+Transferências entre contas próprias são excluídas dos dois regimes. O pagamento técnico da fatura é excluído da competência e incluído no caixa como `Pagamento de cartões`. O orçamento continua sendo comparado apenas à competência.
 
 ## Segurança e desempenho
 
@@ -24,5 +25,7 @@ As views são `security_invoker`, portanto as políticas RLS das tabelas subjace
 Aplicar cumulativamente:
 
 `supabase/migrations/20260726050129_financial_dashboard.sql`
+
+`supabase/migrations/20260815135005_card_cash_financing_imports.sql`
 
 Depois da aplicação, faça um novo deploy do ambiente que usa o mesmo projeto Supabase.

@@ -3,10 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
-import { transferFormSchema, transferIdSchema } from "@/domain/transfers";
 import {
+  accountTransferDestinationValue,
+  creditCardTransferFormSchema,
+  parseTransferDestinationTarget,
+  transferFormSchema,
+  transferIdSchema,
+} from "@/domain/transfers";
+import {
+  createCurrentUserCreditCardTransfer,
   createCurrentUserTransfer,
   setCurrentUserTransferActive,
+  updateCurrentUserCreditCardTransfer,
   updateCurrentUserTransfer,
 } from "@/services/finance/transfers-service";
 
@@ -22,7 +30,9 @@ const transferInputFrom = (formData: FormData) => ({
 
 function revalidateFinancialPaths() {
   revalidatePath("/transfers");
+  revalidatePath("/transactions");
   revalidatePath("/accounts");
+  revalidatePath("/credit-cards");
   revalidatePath("/dashboard");
 }
 
@@ -30,7 +40,46 @@ export async function createTransfer(
   _previousState: FinancialFormState,
   formData: FormData,
 ): Promise<FinancialFormState> {
-  const parsed = transferFormSchema.safeParse(transferInputFrom(formData));
+  const fallbackAccountId = formData.get("destinationAccountId");
+  const destination = parseTransferDestinationTarget(
+    formData.get("destinationTarget") ??
+      (typeof fallbackAccountId === "string"
+        ? accountTransferDestinationValue(fallbackAccountId)
+        : null),
+  );
+  if (!destination) {
+    return {
+      status: "error",
+      fieldErrors: {
+        destinationTarget: ["Selecione uma conta ou cartão válido."],
+      },
+    };
+  }
+
+  if (destination.kind === "credit_card") {
+    const parsedCardTransfer = creditCardTransferFormSchema.safeParse({
+      ...transferInputFrom(formData),
+      destinationCreditCardId: destination.id,
+    });
+    if (!parsedCardTransfer.success) {
+      return {
+        status: "error",
+        fieldErrors: parsedCardTransfer.error.flatten().fieldErrors,
+      };
+    }
+
+    const result = await createCurrentUserCreditCardTransfer(
+      parsedCardTransfer.data,
+    );
+    if (!result.ok) return { status: "error", message: result.message };
+    revalidateFinancialPaths();
+    redirect("/transfers?message=created");
+  }
+
+  const parsed = transferFormSchema.safeParse({
+    ...transferInputFrom(formData),
+    destinationAccountId: destination.id,
+  });
   if (!parsed.success) {
     return {
       status: "error",
@@ -48,19 +97,54 @@ export async function updateTransfer(
   _previousState: FinancialFormState,
   formData: FormData,
 ): Promise<FinancialFormState> {
-  const parsed = transferFormSchema.safeParse(transferInputFrom(formData));
   const parsedId = transferIdSchema.safeParse(formData.get("id"));
-  if (!parsed.success || !parsedId.success) {
+  const fallbackAccountId = formData.get("destinationAccountId");
+  const destination = parseTransferDestinationTarget(
+    formData.get("destinationTarget") ??
+      (typeof fallbackAccountId === "string"
+        ? accountTransferDestinationValue(fallbackAccountId)
+        : null),
+  );
+  if (!parsedId.success || !destination) {
     return {
       status: "error",
       message: parsedId.success ? undefined : "Transferência inválida.",
-      fieldErrors: parsed.success
+      fieldErrors: destination
         ? undefined
-        : parsed.error.flatten().fieldErrors,
+        : { destinationTarget: ["Selecione uma conta ou cartão válido."] },
     };
   }
 
-  const result = await updateCurrentUserTransfer(parsedId.data, parsed.data);
+  const rawInput = transferInputFrom(formData);
+  let result;
+  if (destination.kind === "account") {
+    const parsed = transferFormSchema.safeParse({
+      ...rawInput,
+      destinationAccountId: destination.id,
+    });
+    if (!parsed.success) {
+      return {
+        status: "error",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      };
+    }
+    result = await updateCurrentUserTransfer(parsedId.data, parsed.data);
+  } else {
+    const parsed = creditCardTransferFormSchema.safeParse({
+      ...rawInput,
+      destinationCreditCardId: destination.id,
+    });
+    if (!parsed.success) {
+      return {
+        status: "error",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      };
+    }
+    result = await updateCurrentUserCreditCardTransfer(
+      parsedId.data,
+      parsed.data,
+    );
+  }
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
   redirect("/transfers?message=updated");

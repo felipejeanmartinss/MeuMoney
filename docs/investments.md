@@ -45,3 +45,19 @@ atualização do proprietário, sem exclusão física. Fotografias são somente
 leitura para o cliente e criadas por trigger. Fluxos históricos são
 acrescentados de forma imutável pela interface. Chaves estrangeiras compostas
 impedem ligar histórico a uma posição de outro usuário.
+
+## Financiamentos estruturados
+
+Financiamentos e empréstimos permanecem passivos patrimoniais. A importação de
+um extrato pesquisável cria um único `net_worth_item` e o vincula a um contrato
+estruturado, evitando que o mesmo saldo devedor seja contado duas vezes.
+
+O fluxo é leitura em memória, prévia, confirmação explícita e gravação atômica.
+Parcelas preservam principal, juros, seguros, tarifas, encargos, saldo devedor,
+situação e páginas de origem. Amortizações extraordinárias distinguem recursos
+próprios, FGTS e redução de prazo ou prestação. O PDF original não é salvo.
+
+O primeiro adaptador cobre exclusivamente o layout Bradesco versionado e
+testado com fixture anônima. Outros bancos entram por novos adaptadores somente
+depois de fixtures representativas; PDF digitalizado, protegido e OCR ficam
+fora deste incremento.
