@@ -7,6 +7,7 @@ import {
   type FinancingProductType,
 } from "@/domain/financing-imports";
 import { coerceMinorUnits } from "@/domain/money";
+import { reportServerError } from "@/lib/monitoring";
 import { PdfImportError } from "@/domain/pdf-imports";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
@@ -125,13 +126,28 @@ export async function createCurrentUserFinancingImport(file: File) {
     });
 
     if (error || !data) {
+      if (error) {
+        reportServerError(new Error("financing_import_staging_failed"), {
+          routePath: "/investments/financing-imports/new",
+          routeType: "server-action",
+          method: "POST",
+        });
+      }
       return {
         ok: false as const,
-        message: "O PDF foi lido, mas a prévia não pôde ser armazenada.",
+        message:
+          error?.code === "PGRST202" || error?.code === "42883"
+            ? "O PDF foi lido, mas a estrutura de importação ainda não foi aplicada ao Supabase deste ambiente."
+            : "O PDF foi lido, mas a prévia não pôde ser armazenada.",
       };
     }
     return { ok: true as const, id: data };
   } catch (error) {
+    reportServerError(error, {
+      routePath: "/investments/financing-imports/new",
+      routeType: "server-action",
+      method: "POST",
+    });
     return { ok: false as const, message: importErrorMessage(error) };
   }
 }

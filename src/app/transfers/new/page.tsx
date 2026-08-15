@@ -1,23 +1,18 @@
 import Link from "next/link";
 import { TransferForm } from "@/components/forms/transfer-form";
-import { listCurrentUserPayableCreditCardDestinations } from "@/services/finance/credit-cards-service";
 import { getTransferFormOptions } from "@/services/finance/transfers-service";
 
 export const metadata = { title: "Nova transferência" };
 
 export default async function NewTransferPage() {
-  const [formOptions, cardPaymentOptions] = await Promise.all([
-    getTransferFormOptions(),
-    listCurrentUserPayableCreditCardDestinations(),
-  ]);
-  const { accounts, hasError } = formOptions;
+  const { accounts, creditCards, hasError } = await getTransferFormOptions();
   const today = new Date().toISOString().slice(0, 10);
   const hasCompatiblePair = accounts.some(
     (source, index) =>
       accounts
         .slice(index + 1)
         .some((destination) => destination.currency === source.currency) ||
-      cardPaymentOptions.destinations.some(
+      creditCards.some(
         (destination) => destination.currency === source.currency,
       ),
   );
@@ -52,8 +47,7 @@ export default async function NewTransferPage() {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
           <h2 className="font-bold">Não há um destino compatível</h2>
           <p className="mt-2 text-sm leading-6">
-            Cadastre ou reative outra conta da mesma moeda, ou feche uma fatura
-            de cartão para disponibilizá-la como destino de pagamento.
+            Cadastre ou reative outra conta ou cartão da mesma moeda.
           </p>
           <Link
             href="/accounts/new"
@@ -68,7 +62,7 @@ export default async function NewTransferPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <TransferForm
             accounts={accounts}
-            creditCardPaymentDestinations={cardPaymentOptions.destinations}
+            creditCards={creditCards}
             values={{ transactionDate: today, status: "completed" }}
           />
         </section>

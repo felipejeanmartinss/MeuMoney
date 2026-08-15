@@ -28,17 +28,17 @@ O fechamento atualiza parcelas pendentes para faturadas e é idempotente. Uma co
 
 ## Pagamento, transferência e saldo
 
-Uma compra não movimenta o saldo bancário. O pagamento integral exige fatura fechada, conta ativa do mesmo usuário e moeda idêntica. A RPC cria uma saída técnica realizada na conta bancária e um registro canônico em `credit_card_payments`, que representa a transferência de caixa para o cartão. Na mesma transação, as parcelas e a fatura são marcadas como pagas.
+Uma compra não movimenta o saldo bancário. O usuário pode transferir um valor positivo de uma conta ativa para qualquer cartão ativo próprio da mesma moeda, sem selecionar uma fatura. A operação reduz o saldo da conta e o saldo devedor atual do cartão de forma atômica.
 
-O mesmo fluxo pode ser iniciado no detalhe da fatura, em Novo lançamento ou em Nova transferência. Nos formulários gerais, somente faturas fechadas ou vencidas, com valor positivo, aparecem no grupo “Cartões de crédito — faturas a pagar”. A seleção fixa o valor integral e o status Realizado; não cria uma transferência comum para um cartão sem fatura.
+O cartão aparece como destino em Novo lançamento e Nova transferência. O valor, a data e o estado seguem as mesmas regras das demais transferências; uma transferência prevista não afeta os saldos. O fluxo específico de pagamento integral continua no detalhe da fatura para marcar fatura e parcelas como pagas.
 
-A transação usa `origin_type = credit_card_invoice_payment`, categoria nula e vínculo obrigatório com a fatura. Ela aparece em Movimentações como item técnico, mas não pode ser editada ou inativada diretamente. O estorno deve ser feito pela fatura; ele inativa a transação técnica e restaura os estados anteriores na mesma transação.
+O pagamento integral usa `origin_type = credit_card_invoice_payment`, categoria nula e vínculo obrigatório com a fatura. Já o pagamento livre é uma transferência canônica com `destination_credit_card_id`, sem categoria nem vínculo de fatura, e pode ser editado ou inativado como as demais transferências.
 
-O consumo é exibido e categorizado na compra. No regime de competência, a saída técnica é excluída e as parcelas são reconhecidas em seus meses. No regime de caixa, as parcelas são excluídas e a transferência para o cartão é reconhecida na data do pagamento. Os dois regimes nunca são somados entre si.
+O consumo é exibido e categorizado na compra. No regime de competência, pagamentos são excluídos e as parcelas são reconhecidas em seus meses. No regime de caixa, as parcelas são excluídas e as transferências realizadas para o cartão são reconhecidas na data do pagamento. Os dois regimes nunca são somados entre si.
 
 ## Limite
 
-O limite utilizado é derivado de todas as parcelas de compras ativas nos estados `pending` e `invoiced`, inclusive competências futuras. O limite disponível é `limite total - utilizado`; ele pode ficar negativo, pois a Sprint 4 informa excesso de limite sem bloquear retroativamente o registro.
+O saldo atual é derivado de todas as parcelas de compras ativas nos estados `pending` e `invoiced`, menos as transferências realizadas para o cartão. O limite utilizado é a parte positiva desse saldo, e o disponível é o limite menos o saldo assinado. Um pagamento superior ao saldo produz crédito visível no cartão.
 
 ## Segurança e atomicidade
 

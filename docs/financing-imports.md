@@ -16,6 +16,10 @@ uma representação do contrato e serve aos indicadores de financiamento.
 
 - Bradesco — Extrato Financeiro de financiamento, layout v1, coberto por fixture anônima.
 
+O layout Bradesco de múltiplas páginas fornecido para validação foi reconhecido
+com 13 páginas, 327 parcelas e três amortizações extraordinárias. O documento
+real não integra o repositório; somente fixtures anonimizadas são versionadas.
+
 Outros bancos exigem amostras anonimizadas representativas e testes de
 regressão antes de serem adicionados ao registro de adaptadores. PDF protegido,
 digitalizado ou sem texto pesquisável recebe erro amigável. OCR está fora do
@@ -41,3 +45,11 @@ persistidos e conteúdo financeiro não deve aparecer em logs.
 Aplicar cumulativamente antes do deploy:
 
 `supabase/migrations/20260815135005_card_cash_financing_imports.sql`
+
+Depois das estruturas funcionais, aplicar também os índices cumulativos de
+chaves estrangeiras em
+`supabase/migrations/20260815161500_card_financing_fk_indexes.sql`.
+
+Sem essa migration, a leitura do PDF pode terminar com sucesso, mas a aplicação
+não possui as tabelas e a RPC necessárias para armazenar a prévia. Nesse caso, a
+interface informa explicitamente que a estrutura do ambiente está pendente.

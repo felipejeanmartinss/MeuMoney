@@ -13,6 +13,7 @@ import {
   TRANSACTION_TYPE_LABELS,
 } from "@/domain/transactions";
 import type { CategoryGroupItem } from "@/domain/categories";
+import type { CreditCardTransferDestination } from "@/domain/transfers";
 import { CategoryCombobox } from "./category-combobox";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import {
@@ -67,6 +68,7 @@ export function TransactionForm({
   values,
   fixedType,
   transferAccounts,
+  transferCreditCards,
   onTransferSelected,
 }: {
   accounts: AccountOption[];
@@ -75,7 +77,8 @@ export function TransactionForm({
   values: TransactionFormValues;
   fixedType?: TransactionType;
   transferAccounts?: AccountOption[];
-  onTransferSelected?: (destinationAccountId: string) => void;
+  transferCreditCards?: CreditCardTransferDestination[];
+  onTransferSelected?: (destinationTarget: string) => void;
 }) {
   const action = values.id ? updateTransaction : createTransaction;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -118,7 +121,14 @@ export function TransactionForm({
   function changeClassification(selection: string) {
     if (selection.startsWith("transfer:")) {
       setCategoryId("");
-      onTransferSelected?.(selection.slice("transfer:".length));
+      onTransferSelected?.(
+        `account:${selection.slice("transfer:".length)}`,
+      );
+      return;
+    }
+    if (selection.startsWith("credit-card:")) {
+      setCategoryId("");
+      onTransferSelected?.(selection);
       return;
     }
     setCategoryId(selection);
@@ -206,13 +216,16 @@ export function TransactionForm({
               value={categoryId}
               onValueChange={changeClassification}
               transferAccounts={values.id ? [] : (transferAccounts ?? [])}
+              transferCreditCards={
+                values.id ? [] : (transferCreditCards ?? [])
+              }
               sourceAccountId={accountId}
               invalid={Boolean(state.fieldErrors?.categoryId)}
             />
             {!values.id && accountId && onTransferSelected ? (
               <p className="text-xs text-slate-500">
-                Contas compatíveis aparecem junto às categorias. Ao escolher
-                uma delas, o formulário muda para Transferência.
+                Contas e cartões compatíveis aparecem junto às categorias. Ao
+                escolher um destino, o formulário muda para Transferência.
               </p>
             ) : null}
             <button

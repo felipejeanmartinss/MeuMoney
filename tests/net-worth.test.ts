@@ -197,11 +197,11 @@ describe("net worth rules", () => {
           liabilitiesMinor: 40_000,
         },
       ],
-      invoices: [
+      cardBalances: [
         {
           userId: "user-a",
           currency: "BRL",
-          outstandingMinor: 10_000,
+          currentBalanceMinor: 10_000,
         },
       ],
     });
@@ -213,7 +213,7 @@ describe("net worth rules", () => {
         transactionalLiabilitiesMinor: 5_000,
         manualAssetsMinor: 100_000,
         investmentsMinor: 30_000,
-        pendingInvoicesMinor: 10_000,
+        cardBalancesMinor: 10_000,
         otherLiabilitiesMinor: 40_000,
         assetsMinor: 150_000,
         liabilitiesMinor: 55_000,

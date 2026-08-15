@@ -66,7 +66,7 @@ quando uma alteração financeira torna a confirmação anterior obsoleta.
 
 Cartões são lidos e editados por Server Components, Server Actions e serviços exclusivos do servidor. Compras, parcelas, fechamento, pagamento e estorno não aceitam escrita direta do cliente: fachadas públicas sem elevação delegam a funções internas `security definer`, com `search_path` vazio e validação de `auth.uid()`, para executar cada operação crítica em uma única transação PostgreSQL.
 
-O consumo é reconhecido na compra e categorizado como despesa, mas não movimenta uma conta. O pagamento integral da fatura cria uma transação técnica realizada, vinculada à fatura por `origin_type` e chaves estrangeiras. Essa transação representa a liquidação financeira e é protegida contra edição manual. A view `credit_card_summaries`, com `security_invoker`, deriva o limite utilizado de todas as parcelas ativas ainda não pagas.
+O consumo é reconhecido na compra e categorizado como despesa, mas não movimenta uma conta. O fluxo de pagamento integral da fatura continua criando uma transação técnica protegida. Além dele, `transfers.destination_credit_card_id` permite registrar uma transferência comum da conta para o cartão, sem associação obrigatória a fatura. A transferência possui somente a saída da conta, enquanto a view `credit_card_summaries`, com `security_invoker`, deriva o saldo atual das parcelas ativas menos os pagamentos realizados.
 
 Valores de cartão também usam unidades menores inteiras. As colunas `numeric(16,0)` preservam exatidão no PostgreSQL e permanecem dentro do intervalo inteiro seguro adotado pelo TypeScript. Consulte `docs/credit-cards.md`.
 
@@ -127,6 +127,8 @@ O navegador recebe apenas o recorte necessário: resumo do mês e dos cinco ante
 
 As agregações de alto volume ocorrem no PostgreSQL. A interface renderiza gráficos acessíveis com HTML e CSS no servidor, sem biblioteca cliente nem carregamento do histórico bruto. `loading.tsx` oferece o estado de transição e `error.tsx` isola falhas inesperadas com tentativa segura de recarga.
 
+No regime de competência, o cartão permanece reconhecido pelas parcelas. No regime de caixa, transferências realizadas para cartões são agregadas pela data da saída da conta. As duas fontes ficam separadas no banco para impedir dupla contagem.
+
 ## Patrimônio líquido — Sprint 8
 
 A rota `/net-worth` é independente das contas transacionais. Ela usa Server Components para resumo, listagem e histórico, Server Actions para mutações e `src/services/finance/net-worth-service.ts` como única camada de acesso ao Supabase. O formulário cliente apenas coleta e valida a entrada; não cria cliente de banco nem executa consultas.
@@ -186,6 +188,10 @@ versão do layout e parser vivem no domínio; extração do PDF e persistência 
 em serviços exclusivos do servidor. O arquivo é lido em memória e convertido
 em staging estruturado. RPCs autenticadas fazem confirmação ou cancelamento de
 forma atômica, sob RLS e chaves compostas de proprietário.
+
+A disponibilidade da prévia depende da migration cumulativa do financiamento.
+O servidor diferencia falhas de leitura de ausência da RPC e registra somente
+metadados técnicos seguros, nunca texto, valores ou identificadores do PDF.
 
 O simulador patrimonial é o único novo Client Component com cálculo financeiro.
 A função pura `projectSavings` recebe dinheiro inteiro, taxa em pontos-base e

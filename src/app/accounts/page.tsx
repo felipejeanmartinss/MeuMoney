@@ -6,7 +6,6 @@ import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 import type {
   AccountBalance,
-  CreditCardInvoice,
   CreditCardSummary,
   SupportedCurrency,
 } from "@/types/database";
@@ -236,29 +235,15 @@ function AccountGroup({
 
 function CardsGroup({
   cards,
-  invoices,
 }: {
   cards: CreditCardSummary[];
-  invoices: CreditCardInvoice[];
 }) {
-  const invoiceByCard = new Map(
-    cards.map((card) => [
-      card.id,
-      invoices
-        .filter((invoice) => invoice.credit_card_id === card.id)
-        .reduce(
-          (total, invoice) =>
-            total + Math.max(0, invoice.total_amount - invoice.paid_amount),
-          0,
-        ),
-    ]),
-  );
   const totals = totalsByCurrency(
     cards
       .filter((card) => card.is_active)
       .map((card) => ({
         currency: card.currency,
-        value: invoiceByCard.get(card.id) ?? 0,
+        value: card.current_balance_minor,
       })),
   );
 
@@ -270,7 +255,7 @@ function CardsGroup({
             Cartões de crédito
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Faturas abertas ou vencidas, sem misturar limite e saldo bancário.
+            Compras ativas menos transferências já realizadas para cada cartão.
           </p>
         </div>
         <CurrencyTotals totals={totals} emptyLabel="Nenhum cartão" />
@@ -297,10 +282,10 @@ function CardsGroup({
               </div>
               <div className="sm:text-right">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Fatura pendente
+                  Saldo do cartão
                 </p>
                 <p className="mt-1 font-extrabold text-rose-700">
-                  {formatMoney(invoiceByCard.get(card.id) ?? 0, card.currency)}
+                  {formatMoney(card.current_balance_minor, card.currency)}
                 </p>
               </div>
               <span className="text-xs font-bold text-slate-500">
@@ -440,10 +425,7 @@ export default async function AccountsPage({
           description="Caixa físico e demais saldos transacionais."
           accounts={cashAndOther}
         />
-        <CardsGroup
-          cards={visibleCards}
-          invoices={cardResult.invoices}
-        />
+        <CardsGroup cards={visibleCards} />
       </div>
     </main>
   );

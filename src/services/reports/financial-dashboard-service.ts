@@ -38,6 +38,8 @@ const budgetProgressColumns =
   "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed";
 const netWorthColumns =
   "user_id, currency, assets_minor, manual_assets_minor, investments_minor, liabilities_minor, net_worth_minor";
+const creditCardBalanceColumns =
+  "id, user_id, currency, current_balance_minor";
 
 function normalizeMonthlySummary(
   row: FinancialDashboardMonthlyBasisSummary,
@@ -160,6 +162,7 @@ export async function getFinancialDashboard(
     categoriesResult,
     budgetsResult,
     netWorthResult,
+    cardBalancesResult,
     recurrenceResults,
     invoiceResults,
   ] = await Promise.all([
@@ -199,6 +202,11 @@ export async function getFinancialDashboard(
       .from("net_worth_summary")
       .select(netWorthColumns)
       .eq("user_id", user.id),
+    supabase
+      .from("credit_card_summaries")
+      .select(creditCardBalanceColumns)
+      .eq("user_id", user.id)
+      .eq("is_active", true),
     Promise.all(
       SUPPORTED_CURRENCIES.map((currency) =>
         supabase
@@ -231,6 +239,10 @@ export async function getFinancialDashboard(
   const categories = (categoriesResult.data ?? []).map(normalizeCategory);
   const budgets = (budgetsResult.data ?? []).map(normalizeBudgetProgress);
   const netWorth = (netWorthResult.data ?? []).map(normalizeNetWorth);
+  const cardBalances = (cardBalancesResult.data ?? []).map((card) => ({
+    ...card,
+    current_balance_minor: coerceMinorUnits(card.current_balance_minor),
+  }));
   const recurrences = recurrenceResults.flatMap((result) =>
     (result.data ?? []).map(normalizeRecurrence),
   );
@@ -246,6 +258,7 @@ export async function getFinancialDashboard(
     ...categories.map((row) => row.currency),
     ...budgets.map((row) => row.currency),
     ...netWorth.map((row) => row.currency),
+    ...cardBalances.map((row) => row.currency),
     ...recurrences.map((row) => row.currency),
     ...invoices.map((row) => row.currency),
   ]);
@@ -275,9 +288,11 @@ export async function getFinancialDashboard(
     );
     const manualNetWorthMinor =
       netWorth.find((row) => row.currency === currency)?.net_worth_minor ?? 0;
-    const outstandingInvoicesMinor = currencyInvoices.reduce(
-      (total, invoice) =>
-        coerceMinorUnits(total + invoice.outstanding_amount_minor),
+    const creditCardBalanceMinor = cardBalances
+      .filter((card) => card.currency === currency)
+      .reduce(
+      (total, card) =>
+        coerceMinorUnits(total + Math.max(0, card.current_balance_minor)),
       0,
     );
     const accountBalanceMinor = currencyAccounts.reduce(
@@ -329,7 +344,7 @@ export async function getFinancialDashboard(
       netWorthMinor: calculateExecutiveDashboardNetWorth({
         accountBalanceMinor,
         manualNetWorthMinor,
-        outstandingInvoicesMinor,
+        creditCardBalanceMinor,
       }),
     };
   });
@@ -345,6 +360,7 @@ export async function getFinancialDashboard(
         categoriesResult.error ||
         budgetsResult.error ||
         netWorthResult.error ||
+        cardBalancesResult.error ||
         recurrenceResults.some((result) => result.error) ||
         invoiceResults.some((result) => result.error),
     ),

@@ -101,6 +101,7 @@ export async function getCurrentUserAccountHub(id: string) {
     transferEntriesResult,
     transfersResult,
     accountsResult,
+    creditCardsResult,
     recurrencesResult,
     importsResult,
     categoriesResult,
@@ -119,12 +120,16 @@ export async function getCurrentUserAccountHub(id: string) {
     supabase
       .from("transfers")
       .select(
-        "id, user_id, source_account_id, destination_account_id, amount_minor, currency, transaction_date, status, description, notes, is_active, created_at, updated_at",
+        "id, user_id, source_account_id, destination_account_id, destination_credit_card_id, amount_minor, currency, transaction_date, status, description, notes, is_active, created_at, updated_at",
       )
       .eq("user_id", user.id)
       .or(`source_account_id.eq.${id},destination_account_id.eq.${id}`),
     supabase
       .from("accounts")
+      .select("id, name")
+      .eq("user_id", user.id),
+    supabase
+      .from("credit_cards")
       .select("id, name")
       .eq("user_id", user.id),
     supabase
@@ -171,6 +176,9 @@ export async function getCurrentUserAccountHub(id: string) {
       transfer,
     ]),
   );
+  const creditCardById = new Map(
+    (creditCardsResult.data ?? []).map((card) => [card.id, card.name]),
+  );
   const registerSource: AccountRegisterSourceEntry[] = [
     ...transactionsResult.data.map((transaction) => {
       const category = transaction.category_id
@@ -209,10 +217,12 @@ export async function getCurrentUserAccountHub(id: string) {
           : transfer?.source_account_id;
       const counterpartName = counterpartId
         ? accountById.get(counterpartId)
-        : undefined;
+        : transfer?.destination_credit_card_id
+          ? creditCardById.get(transfer.destination_credit_card_id)
+          : undefined;
       const movement =
         entry.direction === "outflow"
-          ? `Transferência para ${counterpartName ?? "outra conta"}`
+          ? `Transferência para ${counterpartName ?? "outro destino"}`
           : `Transferência de ${counterpartName ?? "outra conta"}`;
       return {
         id: entry.id,
@@ -248,6 +258,7 @@ export async function getCurrentUserAccountHub(id: string) {
         transferEntriesResult.error ||
         transfersResult.error ||
         accountsResult.error ||
+        creditCardsResult.error ||
         recurrencesResult.error ||
       importsResult.error ||
       categoriesResult.error ||

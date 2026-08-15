@@ -6,23 +6,21 @@ import type { SupportedCurrency } from "../types/database";
 
 export type TransferDestinationTarget =
   | { kind: "account"; id: string }
-  | { kind: "credit_card_invoice"; id: string };
+  | { kind: "credit_card"; id: string };
 
-export type CreditCardPaymentDestination = {
-  invoiceId: string;
+export type CreditCardTransferDestination = {
+  id: string;
   cardName: string;
   currency: SupportedCurrency;
-  amountMinor: number;
-  referenceMonth: string;
-  dueDate: string;
+  currentBalanceMinor: number;
 };
 
 export function accountTransferDestinationValue(accountId: string) {
   return `account:${accountId}`;
 }
 
-export function cardInvoiceTransferDestinationValue(invoiceId: string) {
-  return `card-invoice:${invoiceId}`;
+export function creditCardTransferDestinationValue(creditCardId: string) {
+  return `credit-card:${creditCardId}`;
 }
 
 export function parseTransferDestinationTarget(
@@ -37,8 +35,8 @@ export function parseTransferDestinationTarget(
   if (!z.uuid().safeParse(id).success) return null;
 
   if (kind === "account") return { kind: "account", id };
-  if (kind === "card-invoice") {
-    return { kind: "credit_card_invoice", id };
+  if (kind === "credit-card") {
+    return { kind: "credit_card", id };
   }
   return null;
 }
@@ -93,6 +91,28 @@ export const transferFormSchema = z
       path: ["destinationAccountId"],
     },
   );
+
+export const creditCardTransferFormSchema = z.object({
+  sourceAccountId: z.uuid("Selecione a conta de origem."),
+  destinationCreditCardId: z.uuid("Selecione o cartão de destino."),
+  amountMinor: positiveMoneyInput,
+  transactionDate: z
+    .string()
+    .refine(isValidIsoDate, "Informe uma data válida."),
+  status: z.enum(TRANSACTION_STATUSES, {
+    error: "Selecione o status.",
+  }),
+  description: z
+    .string()
+    .trim()
+    .max(180, "Use até 180 caracteres.")
+    .transform((value) => value || null),
+  notes: z
+    .string()
+    .trim()
+    .max(1000, "Use até 1.000 caracteres.")
+    .transform((value) => value || null),
+});
 
 export const transferIdSchema = z.uuid("Transferência inválida.");
 

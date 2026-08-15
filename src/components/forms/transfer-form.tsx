@@ -13,11 +13,11 @@ import {
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import {
   accountTransferDestinationValue,
-  cardInvoiceTransferDestinationValue,
+  creditCardTransferDestinationValue,
   parseTransferDestinationTarget,
-  type CreditCardPaymentDestination,
+  type CreditCardTransferDestination,
 } from "@/domain/transfers";
-import { formatMoney, minorUnitsToInput } from "@/domain/money";
+import { formatMoney } from "@/domain/money";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import type {
   FinancialContext,
@@ -36,6 +36,8 @@ type TransferFormValues = {
   id?: string;
   sourceAccountId?: string;
   destinationAccountId?: string;
+  destinationCreditCardId?: string;
+  destinationTarget?: string;
   amountMinor?: string;
   transactionDate?: string;
   status?: TransactionStatus;
@@ -47,30 +49,33 @@ const initialState: FinancialFormState = { status: "idle" };
 
 export function TransferForm({
   accounts,
-  creditCardPaymentDestinations = [],
+  creditCards = [],
   values,
 }: {
   accounts: AccountOption[];
-  creditCardPaymentDestinations?: CreditCardPaymentDestination[];
+  creditCards?: CreditCardTransferDestination[];
   values: TransferFormValues;
 }) {
   const action = values.id ? updateTransfer : createTransfer;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [sourceId, setSourceId] = useState(values.sourceAccountId ?? "");
   const [destinationTarget, setDestinationTarget] = useState(
-    values.destinationAccountId
+    values.destinationTarget ??
+      (values.destinationAccountId
       ? accountTransferDestinationValue(values.destinationAccountId)
-      : "",
+      : values.destinationCreditCardId
+        ? creditCardTransferDestinationValue(values.destinationCreditCardId)
+        : ""),
   );
   const [amountInput, setAmountInput] = useState(values.amountMinor ?? "0,00");
   const source = accounts.find((account) => account.id === sourceId);
   const parsedDestination = parseTransferDestinationTarget(destinationTarget);
   const destinationAccountId =
     parsedDestination?.kind === "account" ? parsedDestination.id : "";
-  const selectedCardPayment =
-    parsedDestination?.kind === "credit_card_invoice"
-      ? creditCardPaymentDestinations.find(
-          (destination) => destination.invoiceId === parsedDestination.id,
+  const selectedCreditCard =
+    parsedDestination?.kind === "credit_card"
+      ? creditCards.find(
+          (destination) => destination.id === parsedDestination.id,
         )
       : undefined;
   const destinationOptions = accounts.filter(
@@ -78,7 +83,7 @@ export function TransferForm({
       account.id !== sourceId &&
       (!source || account.currency === source.currency),
   );
-  const cardPaymentOptions = creditCardPaymentDestinations.filter(
+  const creditCardOptions = creditCards.filter(
     (destination) => !source || destination.currency === source.currency,
   );
 
@@ -87,9 +92,9 @@ export function TransferForm({
     if (parsed?.kind === "account") {
       return accounts.find((account) => account.id === parsed.id)?.currency;
     }
-    if (parsed?.kind === "credit_card_invoice") {
-      return creditCardPaymentDestinations.find(
-        (destination) => destination.invoiceId === parsed.id,
+    if (parsed?.kind === "credit_card") {
+      return creditCards.find(
+        (destination) => destination.id === parsed.id,
       )?.currency;
     }
     return undefined;
@@ -97,18 +102,6 @@ export function TransferForm({
 
   function changeDestination(target: string) {
     setDestinationTarget(target);
-    const parsed = parseTransferDestinationTarget(target);
-    const cardPayment =
-      parsed?.kind === "credit_card_invoice"
-        ? creditCardPaymentDestinations.find(
-            (destination) => destination.invoiceId === parsed.id,
-          )
-        : undefined;
-    setAmountInput(
-      cardPayment
-        ? minorUnitsToInput(cardPayment.amountMinor)
-        : values.amountMinor ?? "0,00",
-    );
   }
 
   function changeSource(id: string) {
@@ -120,7 +113,6 @@ export function TransferForm({
       destinationCurrency(destinationTarget) !== nextSource?.currency
     ) {
       setDestinationTarget("");
-      if (selectedCardPayment) setAmountInput(values.amountMinor ?? "0,00");
     }
   }
 
@@ -162,13 +154,6 @@ export function TransferForm({
             state.fieldErrors?.destinationAccountId?.[0]
           }
         >
-          {values.id ? (
-            <input
-              type="hidden"
-              name="destinationAccountId"
-              value={destinationAccountId}
-            />
-          ) : null}
           <select
             className={inputClass(
               Boolean(
@@ -176,14 +161,14 @@ export function TransferForm({
                   state.fieldErrors?.destinationAccountId,
               ),
             )}
-            name={values.id ? undefined : "destinationTarget"}
+            name="destinationTarget"
             value={destinationTarget}
             onChange={(event) => changeDestination(event.target.value)}
             required
           >
             <option value="" disabled>
               {sourceId
-                ? "Selecione uma conta da mesma moeda"
+                ? "Selecione uma conta ou cartão da mesma moeda"
                 : "Escolha primeiro a origem"}
             </option>
             {destinationOptions.length > 0 ? (
@@ -199,20 +184,18 @@ export function TransferForm({
                 ))}
               </optgroup>
             ) : null}
-            {!values.id && cardPaymentOptions.length > 0 ? (
-              <optgroup label="Cartões de crédito — faturas a pagar">
-                {cardPaymentOptions.map((destination) => (
+            {creditCardOptions.length > 0 ? (
+              <optgroup label="Cartões de crédito">
+                {creditCardOptions.map((destination) => (
                   <option
-                    key={destination.invoiceId}
-                    value={cardInvoiceTransferDestinationValue(
-                      destination.invoiceId,
+                    key={destination.id}
+                    value={creditCardTransferDestinationValue(
+                      destination.id,
                     )}
                   >
-                    {destination.cardName} · fatura{" "}
-                    {destination.referenceMonth.slice(5, 7)}/
-                    {destination.referenceMonth.slice(0, 4)} ·{" "}
+                    {destination.cardName} · saldo{" "}
                     {formatMoney(
-                      destination.amountMinor,
+                      destination.currentBalanceMinor,
                       destination.currency,
                     )}
                   </option>
@@ -230,8 +213,6 @@ export function TransferForm({
             name="amountMinor"
             value={amountInput}
             onChange={(event) => setAmountInput(event.target.value)}
-            readOnly={Boolean(selectedCardPayment)}
-            aria-readonly={selectedCardPayment ? "true" : undefined}
             inputMode="decimal"
             placeholder="0,00"
             required
@@ -251,82 +232,57 @@ export function TransferForm({
         </Field>
 
         <Field label="Status" error={state.fieldErrors?.status?.[0]}>
-          {selectedCardPayment ? (
-            <>
-              <input type="hidden" name="status" value="completed" />
-              <div className={`${inputClass()} flex items-center bg-slate-50`}>
-                Realizado
-              </div>
-            </>
-          ) : (
-            <select
-              className={inputClass(Boolean(state.fieldErrors?.status))}
-              name="status"
-              defaultValue={values.status ?? "completed"}
-              required
-            >
-              {TRANSACTION_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {TRANSACTION_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            className={inputClass(Boolean(state.fieldErrors?.status))}
+            name="status"
+            defaultValue={values.status ?? "completed"}
+            required
+          >
+            {TRANSACTION_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {TRANSACTION_STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 
-      {selectedCardPayment ? (
-        <>
-          <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <input
-              className="mt-1"
-              type="checkbox"
-              name="confirmation"
-              value="yes"
-              required
-            />
-            Confirmo a transferência integral para pagar a fatura de{" "}
-            {selectedCardPayment.cardName}. Ela será uma saída no regime de
-            caixa, sem duplicar as compras reconhecidas por competência.
-          </label>
-          {state.fieldErrors?.confirmation?.[0] ? (
-            <p className="text-sm text-red-700">
-              {state.fieldErrors.confirmation[0]}
-            </p>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <Field
-            label="Descrição opcional"
-            error={state.fieldErrors?.description?.[0]}
-          >
-            <input
-              className={inputClass(Boolean(state.fieldErrors?.description))}
-              name="description"
-              defaultValue={values.description}
-              maxLength={180}
-              placeholder="Ex.: Reserva para emergência"
-            />
-          </Field>
+      {selectedCreditCard ? (
+        <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+          A transferência reduz o caixa da conta de origem e o saldo devedor
+          de {selectedCreditCard.cardName}. Ela entra apenas no regime de
+          caixa; as compras continuam no mês de competência.
+        </p>
+      ) : null}
 
-          <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>
-            <textarea
-              className={`${inputClass(Boolean(state.fieldErrors?.notes))} min-h-28 py-3`}
-              name="notes"
-              defaultValue={values.notes}
-              maxLength={1000}
-              placeholder="Opcional"
-            />
-          </Field>
-        </>
-      )}
+      <Field
+        label="Descrição opcional"
+        error={state.fieldErrors?.description?.[0]}
+      >
+        <input
+          className={inputClass(Boolean(state.fieldErrors?.description))}
+          name="description"
+          defaultValue={values.description}
+          maxLength={180}
+          placeholder="Ex.: Reserva para emergência"
+        />
+      </Field>
+
+      <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>
+        <textarea
+          className={`${inputClass(Boolean(state.fieldErrors?.notes))} min-h-28 py-3`}
+          name="notes"
+          defaultValue={values.notes}
+          maxLength={1000}
+          placeholder="Opcional"
+        />
+      </Field>
 
       <SubmitButton pending={pending}>
         {values.id
           ? "Salvar alterações"
-          : selectedCardPayment
-            ? "Transferir e pagar fatura"
+          : selectedCreditCard
+            ? "Transferir para o cartão"
             : "Criar transferência"}
       </SubmitButton>
     </form>

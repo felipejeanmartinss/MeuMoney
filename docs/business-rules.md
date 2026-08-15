@@ -52,9 +52,9 @@
 - Somente lançamentos ativos e realizados participam do saldo atual. Lançamentos previstos e inativos permanecem no histórico sem efeito financeiro.
 - Editar conta, tipo, valor, status ou atividade não exige ajustar um saldo persistido: o saldo é recalculado a partir dos registros vigentes.
 - Transferência não é receita nem despesa e não recebe categoria.
-- Origem e destino devem ser contas ativas distintas do mesmo usuário e, nesta sprint, da mesma moeda.
-- Cada transferência possui um registro canônico e exatamente duas movimentações vinculadas: saída na origem e entrada no destino.
-- Criar, editar, inativar ou reativar uma transferência altera os dois lados na mesma transação SQL. Uma falha reverte toda a operação.
+- A origem deve ser uma conta ativa. O destino pode ser outra conta ativa ou um cartão de crédito ativo do mesmo usuário e da mesma moeda.
+- Uma transferência entre contas possui duas movimentações vinculadas: saída na origem e entrada no destino. Uma transferência para cartão possui somente a saída vinculada à conta; o destino é registrado no próprio cartão.
+- Criar, editar, inativar ou reativar uma transferência altera seus registros vinculados na mesma transação SQL. Uma falha reverte toda a operação.
 - Transferências previstas ou inativas não afetam o saldo realizado.
 - Lançamentos e transferências não são excluídos fisicamente pela interface.
 - O saldo atual é o saldo inicial, mais receitas realizadas ativas, menos despesas realizadas ativas, mais transferências recebidas realizadas ativas e menos transferências enviadas realizadas ativas.
@@ -66,12 +66,12 @@
 ## Cartões de crédito — Sprint 4
 
 - Compra de cartão é despesa de consumo e exige categoria de Despesa ativa do mesmo usuário.
-- Compra não altera saldo de conta. A conta só recebe uma saída técnica quando a fatura integral é paga.
+- Compra não altera saldo de conta. Uma transferência realizada para o cartão reduz o saldo da conta de origem e o saldo devedor atual do cartão, sem exigir vínculo com uma fatura.
 - Valores são positivos e exatos em unidades menores; parcelas nunca possuem valor zero. Eventual resto da divisão fica na última parcela.
 - Compra realizada até o dia de fechamento pertence à competência atual; após esse dia, pertence à seguinte. Dias inexistentes em um mês são limitados ao último dia real.
-- O limite utilizado soma todas as parcelas ativas pendentes ou faturadas, inclusive futuras. O limite disponível é o limite total menos esse valor e pode ficar negativo.
+- O saldo devedor atual soma parcelas ativas pendentes ou faturadas e deduz transferências realizadas para o cartão. O limite utilizado não fica negativo; eventual pagamento excedente permanece visível como crédito no saldo atual.
 - Fechamento é idempotente. Uma fatura fechada ou paga impede mudanças estruturais nas compras que a compõem.
-- Pagamento exige conta ativa, do mesmo usuário e na mesma moeda do cartão. A transação técnica é realizada, não possui categoria e não pode ser editada pela interface de movimentações.
+- A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
 - Cartões e compras não são excluídos fisicamente pela interface.
 
@@ -106,7 +106,7 @@
 - Todo indicador consolidado é calculado por mês e moeda. Valores em BRL, USD e EUR nunca são somados entre si e não há conversão cambial implícita.
 - Receita mensal considera apenas receitas ativas e realizadas na data do lançamento.
 - Em competência, despesa mensal considera consumo ativo e realizado: despesas categorizadas em conta e parcelas de cartão reconhecidas na competência. O pagamento da fatura não é novo consumo.
-- Em caixa, despesa mensal considera as saídas ativas e realizadas na data em que o dinheiro deixa a conta. A compra do cartão não entra novamente; entra a transferência técnica que paga a fatura.
+- Em caixa, despesa mensal considera as saídas ativas e realizadas na data em que o dinheiro deixa a conta. A compra do cartão não entra novamente; entra qualquer transferência realizada para o cartão, com ou sem associação a uma fatura.
 - Transferências entre contas próprias não compõem receita ou despesa em nenhum regime. A transferência para cartão é a exceção explícita do regime de caixa porque liquida uma obrigação externa já reconhecida em competência.
 - Resultado mensal é `receitas realizadas - despesas de consumo`.
 - Orçamento consumido compara todas as despesas por competência do mês com todo o valor planejado na mesma moeda. No regime de caixa ele não é calculado.

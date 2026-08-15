@@ -275,13 +275,15 @@ export type CreditCardCashTransfer = Omit<CreditCardPayment, "updated_at"> & {
 export type CreditCardSummary = CreditCard & {
   used_limit: number;
   available_limit: number;
+  current_balance_minor: number;
 };
 
 export type Transfer = {
   id: string;
   user_id: string;
   source_account_id: string;
-  destination_account_id: string;
+  destination_account_id: string | null;
+  destination_credit_card_id: string | null;
   amount_minor: number;
   currency: SupportedCurrency;
   transaction_date: string;
@@ -1193,6 +1195,31 @@ export type Database = {
           target_transfer_id: string;
           source_account_id: string;
           destination_account_id: string;
+          amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: boolean;
+      };
+      create_credit_card_transfer: {
+        Args: {
+          source_account_id: string;
+          destination_credit_card_id: string;
+          amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: string;
+      };
+      update_credit_card_transfer: {
+        Args: {
+          target_transfer_id: string;
+          source_account_id: string;
+          destination_credit_card_id: string;
           amount_minor: number;
           transaction_date: string;
           transfer_status: TransactionStatus;

@@ -342,11 +342,11 @@ export function limitExpenseCategories(
 export function calculateExecutiveDashboardNetWorth(input: {
   accountBalanceMinor: number;
   manualNetWorthMinor: number;
-  outstandingInvoicesMinor: number;
+  creditCardBalanceMinor: number;
 }) {
   return assertMinorUnits(
     assertMinorUnits(input.accountBalanceMinor) +
       assertMinorUnits(input.manualNetWorthMinor) -
-      assertMinorUnits(input.outstandingInvoicesMinor),
+      Math.max(0, assertMinorUnits(input.creditCardBalanceMinor)),
   );
 }

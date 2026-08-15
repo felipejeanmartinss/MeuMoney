@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   calculateFinancingIndicators,
@@ -133,5 +135,36 @@ describe("financing PDF imports", () => {
     expect(() => parseSupportedFinancingPdf(unsupported)).toThrowError(
       FinancingImportError,
     );
+  });
+
+  it("ships the staging tables and authenticated RPC required by the preview", () => {
+    const migration = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260815135005_card_cash_financing_imports.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("create table public.financing_import_jobs");
+    expect(migration).toContain(
+      "create table public.financing_import_schedule_rows",
+    );
+    expect(migration).toContain(
+      "create or replace function public.create_financing_import_job",
+    );
+    expect(migration).toContain("grant execute on function public.create_financing_import_job");
+
+    const indexes = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260815161500_card_financing_fk_indexes.sql",
+      ),
+      "utf8",
+    );
+    expect(indexes).toContain("financing_contracts_net_worth_owner_fk_idx");
+    expect(indexes).toContain("financing_schedule_contract_owner_fk_idx");
   });
 });

@@ -8,6 +8,9 @@
 - indicadores de valor pago, principal, juros, encargos e amortizações extraordinárias;
 - arquitetura de adaptadores para novos bancos condicionada a fixtures anônimas representativas;
 - revisão minimalista do dashboard para melhor leitura em desktop.
+- transferência livre de conta para cartão, sem associação obrigatória a fatura;
+- saldo do cartão deduzido pelos pagamentos realizados, com competência das compras preservada;
+- diagnóstico da prévia de financiamento quando a migration ainda não está disponível no ambiente.
 
 ## Incremento — administração flexível de categorias e contas
 

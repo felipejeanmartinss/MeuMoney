@@ -99,9 +99,9 @@ export default async function CreditCardsPage({
                 <dd className="font-bold">{formatMoney(card.credit_limit, card.currency)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-500">Utilizado</dt>
+                <dt className="text-xs text-slate-500">Saldo devedor</dt>
                 <dd className="font-bold text-rose-700">
-                  {formatMoney(card.used_limit, card.currency)}
+                  {formatMoney(card.current_balance_minor, card.currency)}
                 </dd>
               </div>
               <div>

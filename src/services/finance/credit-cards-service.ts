@@ -1,10 +1,11 @@
 import "server-only";
+import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   CreditCardBrand,
   SupportedCurrency,
 } from "@/types/database";
-import type { CreditCardPaymentDestination } from "@/domain/transfers";
+import type { CreditCardTransferDestination } from "@/domain/transfers";
 
 export type CreditCardMutationInput = {
   name: string;
@@ -29,7 +30,7 @@ export type CreditCardPurchaseMutationInput = {
 
 const cardColumns =
   "id, user_id, name, issuer, brand, last_four_digits, credit_limit, closing_day, due_day, currency, linked_account_id, is_active, created_at, updated_at";
-const cardSummaryColumns = `${cardColumns}, used_limit, available_limit`;
+const cardSummaryColumns = `${cardColumns}, used_limit, available_limit, current_balance_minor`;
 const purchaseColumns =
   "id, user_id, credit_card_id, category_id, description, total_amount, purchase_date, installment_count, status, notes, created_at, updated_at";
 const invoiceColumns =
@@ -66,49 +67,26 @@ function mutationErrorMessage(error: { message?: string } | null) {
   return "Não foi possível concluir a operação.";
 }
 
-export async function listCurrentUserPayableCreditCardDestinations() {
+export async function listCurrentUserTransferCreditCardDestinations() {
   const { supabase, user } = await requireUser();
-  const [cardsResult, invoicesResult] = await Promise.all([
-    supabase
-      .from("credit_cards")
-      .select("id, name, currency")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("name"),
-    supabase
-      .from("credit_card_invoices")
-      .select(
-        "id, credit_card_id, reference_month, due_date, status, total_amount",
-      )
-      .eq("user_id", user.id)
-      .in("status", ["closed", "overdue"])
-      .gt("total_amount", 0)
-      .order("due_date"),
-  ]);
-
-  const cardById = new Map(
-    (cardsResult.data ?? []).map((card) => [card.id, card]),
+  const { data, error } = await supabase
+    .from("credit_card_summaries")
+    .select("id, name, currency, current_balance_minor")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("name");
+  const destinations: CreditCardTransferDestination[] = (data ?? []).map(
+    (card) => ({
+      id: card.id,
+      cardName: card.name,
+      currency: card.currency,
+      currentBalanceMinor: coerceMinorUnits(card.current_balance_minor),
+    }),
   );
-  const destinations: CreditCardPaymentDestination[] = (
-    invoicesResult.data ?? []
-  ).flatMap((invoice) => {
-    const card = cardById.get(invoice.credit_card_id);
-    if (!card) return [];
-    return [
-      {
-        invoiceId: invoice.id,
-        cardName: card.name,
-        currency: card.currency,
-        amountMinor: invoice.total_amount,
-        referenceMonth: invoice.reference_month,
-        dueDate: invoice.due_date,
-      },
-    ];
-  });
 
   return {
     destinations,
-    hasError: Boolean(cardsResult.error || invoicesResult.error),
+    hasError: Boolean(error),
   };
 }
 

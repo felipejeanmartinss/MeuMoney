@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { CategoryGroupItem } from "@/domain/categories";
-import type { CreditCardPaymentDestination } from "@/domain/transfers";
+import type { CreditCardTransferDestination } from "@/domain/transfers";
 import type {
   AccountType,
   FinancialContext,
@@ -43,7 +43,7 @@ export function AccountEntryForm({
   accounts,
   categories,
   groups,
-  creditCardPaymentDestinations,
+  creditCards,
   accountId,
   transactionDate,
   initialMode,
@@ -51,13 +51,13 @@ export function AccountEntryForm({
   accounts: AccountOption[];
   categories: CategoryOption[];
   groups: CategoryGroupItem[];
-  creditCardPaymentDestinations: CreditCardPaymentDestination[];
+  creditCards: CreditCardTransferDestination[];
   accountId?: string;
   transactionDate: string;
   initialMode: EntryMode;
 }) {
   const [mode, setMode] = useState<EntryMode>(initialMode);
-  const [transferDestinationAccountId, setTransferDestinationAccountId] =
+  const [transferDestinationTarget, setTransferDestinationTarget] =
     useState("");
 
   return (
@@ -89,10 +89,10 @@ export function AccountEntryForm({
         <TransferForm
           key="transfer"
           accounts={accounts}
-          creditCardPaymentDestinations={creditCardPaymentDestinations}
+          creditCards={creditCards}
           values={{
             sourceAccountId: accountId,
-            destinationAccountId: transferDestinationAccountId,
+            destinationTarget: transferDestinationTarget,
             transactionDate,
             status: "completed",
             amountMinor: "0,00",
@@ -106,8 +106,9 @@ export function AccountEntryForm({
           groups={groups}
           fixedType={mode}
           transferAccounts={accounts}
-          onTransferSelected={(destinationAccountId) => {
-            setTransferDestinationAccountId(destinationAccountId);
+          transferCreditCards={creditCards}
+          onTransferSelected={(destinationTarget) => {
+            setTransferDestinationTarget(destinationTarget);
             setMode("transfer");
           }}
           values={{

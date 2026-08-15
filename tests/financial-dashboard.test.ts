@@ -302,12 +302,12 @@ describe("financial dashboard aggregations", () => {
     });
   });
 
-  it("adds transactional balance and subtracts pending invoices from net worth", () => {
+  it("adds transactional balance and subtracts the current credit-card balance", () => {
     expect(
       calculateExecutiveDashboardNetWorth({
         accountBalanceMinor: 50_000,
         manualNetWorthMinor: 300_000,
-        outstandingInvoicesMinor: 20_000,
+        creditCardBalanceMinor: 20_000,
       }),
     ).toBe(330_000);
   });
