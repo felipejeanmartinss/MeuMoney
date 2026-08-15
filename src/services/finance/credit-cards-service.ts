@@ -4,6 +4,7 @@ import type {
   CreditCardBrand,
   SupportedCurrency,
 } from "@/types/database";
+import type { CreditCardPaymentDestination } from "@/domain/transfers";
 
 export type CreditCardMutationInput = {
   name: string;
@@ -63,6 +64,52 @@ function mutationErrorMessage(error: { message?: string } | null) {
     return "Esta fatura não está mais aberta.";
   }
   return "Não foi possível concluir a operação.";
+}
+
+export async function listCurrentUserPayableCreditCardDestinations() {
+  const { supabase, user } = await requireUser();
+  const [cardsResult, invoicesResult] = await Promise.all([
+    supabase
+      .from("credit_cards")
+      .select("id, name, currency")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("credit_card_invoices")
+      .select(
+        "id, credit_card_id, reference_month, due_date, status, total_amount",
+      )
+      .eq("user_id", user.id)
+      .in("status", ["closed", "overdue"])
+      .gt("total_amount", 0)
+      .order("due_date"),
+  ]);
+
+  const cardById = new Map(
+    (cardsResult.data ?? []).map((card) => [card.id, card]),
+  );
+  const destinations: CreditCardPaymentDestination[] = (
+    invoicesResult.data ?? []
+  ).flatMap((invoice) => {
+    const card = cardById.get(invoice.credit_card_id);
+    if (!card) return [];
+    return [
+      {
+        invoiceId: invoice.id,
+        cardName: card.name,
+        currency: card.currency,
+        amountMinor: invoice.total_amount,
+        referenceMonth: invoice.reference_month,
+        dueDate: invoice.due_date,
+      },
+    ];
+  });
+
+  return {
+    destinations,
+    hasError: Boolean(cardsResult.error || invoicesResult.error),
+  };
 }
 
 export async function listCurrentUserCreditCards() {

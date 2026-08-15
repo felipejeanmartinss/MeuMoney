@@ -30,6 +30,8 @@ O fechamento atualiza parcelas pendentes para faturadas e é idempotente. Uma co
 
 Uma compra não movimenta o saldo bancário. O pagamento integral exige fatura fechada, conta ativa do mesmo usuário e moeda idêntica. A RPC cria uma saída técnica realizada na conta bancária e um registro canônico em `credit_card_payments`, que representa a transferência de caixa para o cartão. Na mesma transação, as parcelas e a fatura são marcadas como pagas.
 
+O mesmo fluxo pode ser iniciado no detalhe da fatura, em Novo lançamento ou em Nova transferência. Nos formulários gerais, somente faturas fechadas ou vencidas, com valor positivo, aparecem no grupo “Cartões de crédito — faturas a pagar”. A seleção fixa o valor integral e o status Realizado; não cria uma transferência comum para um cartão sem fatura.
+
 A transação usa `origin_type = credit_card_invoice_payment`, categoria nula e vínculo obrigatório com a fatura. Ela aparece em Movimentações como item técnico, mas não pode ser editada ou inativada diretamente. O estorno deve ser feito pela fatura; ele inativa a transação técnica e restaura os estados anteriores na mesma transação.
 
 O consumo é exibido e categorizado na compra. No regime de competência, a saída técnica é excluída e as parcelas são reconhecidas em seus meses. No regime de caixa, as parcelas são excluídas e a transferência para o cartão é reconhecida na data do pagamento. Os dois regimes nunca são somados entre si.

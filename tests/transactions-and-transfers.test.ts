@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { transactionFormSchema } from "../src/domain/transactions";
 import {
+  accountTransferDestinationValue,
+  cardInvoiceTransferDestinationValue,
+  parseTransferDestinationTarget,
   transferFiltersSchema,
   transferFormSchema,
 } from "../src/domain/transfers";
@@ -82,6 +85,20 @@ describe("Sprint 3 financial movement validation", () => {
         destinationAccountId: accountA,
       }).success,
     ).toBe(false);
+  });
+
+  it("distinguishes account transfers from credit card invoice payments", () => {
+    expect(
+      parseTransferDestinationTarget(
+        accountTransferDestinationValue(accountB),
+      ),
+    ).toEqual({ kind: "account", id: accountB });
+    expect(
+      parseTransferDestinationTarget(
+        cardInvoiceTransferDestinationValue(category),
+      ),
+    ).toEqual({ kind: "credit_card_invoice", id: category });
+    expect(parseTransferDestinationTarget("card:invalid")).toBeNull();
   });
 
   it("sanitizes transfer filters and defaults to active records", () => {

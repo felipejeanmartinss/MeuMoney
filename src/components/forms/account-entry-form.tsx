@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CategoryGroupItem } from "@/domain/categories";
+import type { CreditCardPaymentDestination } from "@/domain/transfers";
 import type {
   AccountType,
   FinancialContext,
@@ -42,6 +43,7 @@ export function AccountEntryForm({
   accounts,
   categories,
   groups,
+  creditCardPaymentDestinations,
   accountId,
   transactionDate,
   initialMode,
@@ -49,6 +51,7 @@ export function AccountEntryForm({
   accounts: AccountOption[];
   categories: CategoryOption[];
   groups: CategoryGroupItem[];
+  creditCardPaymentDestinations: CreditCardPaymentDestination[];
   accountId?: string;
   transactionDate: string;
   initialMode: EntryMode;
@@ -86,6 +89,7 @@ export function AccountEntryForm({
         <TransferForm
           key="transfer"
           accounts={accounts}
+          creditCardPaymentDestinations={creditCardPaymentDestinations}
           values={{
             sourceAccountId: accountId,
             destinationAccountId: transferDestinationAccountId,

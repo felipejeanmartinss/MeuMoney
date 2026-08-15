@@ -174,7 +174,8 @@
 - A busca de categorias ignora diferenças entre maiúsculas, minúsculas e acentos e procura tanto no nome principal quanto na subcategoria.
 - No lançamento por conta e na revisão de importação, contas ativas e de mesma moeda podem aparecer no seletor como destinos de transferência. A escolha cria ou reclassifica uma transferência canônica e nunca grava uma categoria fictícia.
 - Uma linha em staging pode ser corrigida de lançamento para transferência ou de transferência para lançamento. A troca limpa a referência incompatível, revalida proprietário, moeda e natureza e atualiza o job na mesma transação SQL.
-- Cartões de crédito não são destinos genéricos de transferência. O pagamento continua associado à fatura e à sua movimentação técnica para impedir a duplicação das despesas de consumo.
+- Cartões de crédito não são destinos genéricos de transferência. Faturas fechadas ou vencidas aparecem no formulário de transferência como destinos explícitos de pagamento, identificados pelo cartão, competência e valor integral. A escolha continua associada à fatura e usa a movimentação técnica para impedir a duplicação das despesas de consumo.
+- O pagamento iniciado por Novo lançamento ou por Nova transferência exige uma conta ativa da mesma moeda, confirmação explícita e sempre registra o valor integral da fatura como realizado. Faturas abertas, pagas ou sem valor não aparecem como destinos.
 
 ## Importação assistida por PDF — Sprint 11
 

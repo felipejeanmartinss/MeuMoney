@@ -2,6 +2,46 @@ import { z } from "zod";
 import { isValidIsoDate } from "./dates";
 import { parseMoneyInputToMinor } from "./money";
 import { TRANSACTION_STATUSES } from "./transactions";
+import type { SupportedCurrency } from "../types/database";
+
+export type TransferDestinationTarget =
+  | { kind: "account"; id: string }
+  | { kind: "credit_card_invoice"; id: string };
+
+export type CreditCardPaymentDestination = {
+  invoiceId: string;
+  cardName: string;
+  currency: SupportedCurrency;
+  amountMinor: number;
+  referenceMonth: string;
+  dueDate: string;
+};
+
+export function accountTransferDestinationValue(accountId: string) {
+  return `account:${accountId}`;
+}
+
+export function cardInvoiceTransferDestinationValue(invoiceId: string) {
+  return `card-invoice:${invoiceId}`;
+}
+
+export function parseTransferDestinationTarget(
+  value: unknown,
+): TransferDestinationTarget | null {
+  if (typeof value !== "string") return null;
+  const separatorIndex = value.indexOf(":");
+  if (separatorIndex < 1) return null;
+
+  const kind = value.slice(0, separatorIndex);
+  const id = value.slice(separatorIndex + 1);
+  if (!z.uuid().safeParse(id).success) return null;
+
+  if (kind === "account") return { kind: "account", id };
+  if (kind === "card-invoice") {
+    return { kind: "credit_card_invoice", id };
+  }
+  return null;
+}
 
 const positiveMoneyInput = z.string().trim().transform((value, context) => {
   try {

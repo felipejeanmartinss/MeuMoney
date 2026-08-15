@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
-import { transferFormSchema, transferIdSchema } from "@/domain/transfers";
+import { invoicePaymentFormSchema } from "@/domain/credit-cards";
+import {
+  accountTransferDestinationValue,
+  parseTransferDestinationTarget,
+  transferFormSchema,
+  transferIdSchema,
+} from "@/domain/transfers";
+import { payCurrentUserCreditCardInvoice } from "@/services/finance/credit-cards-service";
 import {
   createCurrentUserTransfer,
   setCurrentUserTransferActive,
@@ -22,7 +29,9 @@ const transferInputFrom = (formData: FormData) => ({
 
 function revalidateFinancialPaths() {
   revalidatePath("/transfers");
+  revalidatePath("/transactions");
   revalidatePath("/accounts");
+  revalidatePath("/credit-cards");
   revalidatePath("/dashboard");
 }
 
@@ -30,7 +39,49 @@ export async function createTransfer(
   _previousState: FinancialFormState,
   formData: FormData,
 ): Promise<FinancialFormState> {
-  const parsed = transferFormSchema.safeParse(transferInputFrom(formData));
+  const fallbackAccountId = formData.get("destinationAccountId");
+  const destination = parseTransferDestinationTarget(
+    formData.get("destinationTarget") ??
+      (typeof fallbackAccountId === "string"
+        ? accountTransferDestinationValue(fallbackAccountId)
+        : null),
+  );
+  if (!destination) {
+    return {
+      status: "error",
+      fieldErrors: {
+        destinationTarget: ["Selecione uma conta ou fatura válida."],
+      },
+    };
+  }
+
+  if (destination.kind === "credit_card_invoice") {
+    const parsedPayment = invoicePaymentFormSchema.safeParse({
+      accountId: formData.get("sourceAccountId"),
+      paymentDate: formData.get("transactionDate"),
+      confirmation: formData.get("confirmation"),
+    });
+    if (!parsedPayment.success) {
+      return {
+        status: "error",
+        fieldErrors: parsedPayment.error.flatten().fieldErrors,
+      };
+    }
+
+    const result = await payCurrentUserCreditCardInvoice(
+      destination.id,
+      parsedPayment.data.accountId,
+      parsedPayment.data.paymentDate,
+    );
+    if (!result.ok) return { status: "error", message: result.message };
+    revalidateFinancialPaths();
+    redirect("/transactions?message=card-paid");
+  }
+
+  const parsed = transferFormSchema.safeParse({
+    ...transferInputFrom(formData),
+    destinationAccountId: destination.id,
+  });
   if (!parsed.success) {
     return {
       status: "error",
