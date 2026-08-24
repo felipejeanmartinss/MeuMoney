@@ -665,6 +665,7 @@ export type ImportStagingRow = {
   source_category_name: string | null;
   transfer_account_name: string | null;
   transfer_account_id: string | null;
+  transfer_credit_card_id: string | null;
   transaction_date: string | null;
   description: string | null;
   normalized_description: string | null;
@@ -1373,6 +1374,16 @@ export type Database = {
           target_description: string;
           target_signed_amount_minor: number;
           target_transfer_account_id: string;
+        };
+        Returns: boolean;
+      };
+      update_import_credit_card_transfer_row: {
+        Args: {
+          target_row_id: string;
+          target_transaction_date: string;
+          target_description: string;
+          target_signed_amount_minor: number;
+          target_credit_card_id: string;
         };
         Returns: boolean;
       };

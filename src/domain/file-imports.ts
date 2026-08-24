@@ -177,11 +177,14 @@ const importClassificationSelectionSchema = z
   .string()
   .trim()
   .regex(
-    /^(category|transfer):[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    "Selecione uma categoria ou conta válida.",
+    /^(category|transfer|credit-card):[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "Selecione uma categoria, conta ou cartão válido.",
   )
   .transform((value) => {
-    const [kind, id] = value.split(":") as ["category" | "transfer", string];
+    const [kind, id] = value.split(":") as [
+      "category" | "transfer" | "credit-card",
+      string,
+    ];
     return { kind, id };
   });
 

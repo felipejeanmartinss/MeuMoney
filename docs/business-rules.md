@@ -172,10 +172,11 @@
 
 - Categorias e subcategorias são apresentadas em ordem alfabética pelo nome mais específico, com o caminho completo e o contexto Pessoal ou Profissional visíveis.
 - A busca de categorias ignora diferenças entre maiúsculas, minúsculas e acentos e procura tanto no nome principal quanto na subcategoria.
-- No lançamento por conta e na revisão de importação, contas ativas e de mesma moeda podem aparecer no seletor como destinos de transferência. A escolha cria ou reclassifica uma transferência canônica e nunca grava uma categoria fictícia.
+- No lançamento por conta e na revisão de importação, contas ativas e cartões de crédito ativos da mesma moeda podem aparecer no seletor como destinos de transferência. A escolha cria ou reclassifica uma transferência canônica e nunca grava uma categoria fictícia.
 - Uma linha em staging pode ser corrigida de lançamento para transferência ou de transferência para lançamento. A troca limpa a referência incompatível, revalida proprietário, moeda e natureza e atualiza o job na mesma transação SQL.
-- Cartões de crédito não são destinos genéricos de transferência. Faturas fechadas ou vencidas aparecem no formulário de transferência como destinos explícitos de pagamento, identificados pelo cartão, competência e valor integral. A escolha continua associada à fatura e usa a movimentação técnica para impedir a duplicação das despesas de consumo.
-- O pagamento iniciado por Novo lançamento ou por Nova transferência exige uma conta ativa da mesma moeda, confirmação explícita e sempre registra o valor integral da fatura como realizado. Faturas abertas, pagas ou sem valor não aparecem como destinos.
+- A transferência livre para cartão representa pagamento, não exige associação a uma fatura e aceita valor parcial ou integral. Ela usa somente a conta bancária como origem e o cartão como destino técnico.
+- Na importação, somente uma linha negativa pode ser classificada como pagamento de cartão. A confirmação cria a transferência e sua assinatura na mesma transação SQL; falha em qualquer linha desfaz o job inteiro.
+- O pagamento integral associado a uma fatura continua disponível no detalhe da fatura. Em ambos os fluxos, o pagamento entra no regime de caixa e não cria uma segunda despesa de consumo na competência.
 
 ## Importação assistida por PDF — Sprint 11
 

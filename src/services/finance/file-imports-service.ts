@@ -41,6 +41,13 @@ export type ImportTransferRowMutationInput = Omit<
   transferAccountId: string;
 };
 
+export type ImportCreditCardTransferRowMutationInput = Omit<
+  ImportRowMutationInput,
+  "categoryId"
+> & {
+  creditCardId: string;
+};
+
 function safeFileName(value: string) {
   const baseName = value.split(/[\\/]/).pop() ?? "importacao";
   const sanitized = baseName.replace(/[\u0000-\u001f\u007f]/g, "").trim();
@@ -247,6 +254,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       job: null,
       rows: [],
       accounts: [],
+      creditCards: [],
       categories: [],
       groups: [],
       pagination: { page: 1, totalRows: 0, totalPages: 1 },
@@ -257,11 +265,17 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
   const safePage = Math.max(1, Math.trunc(page) || 1);
   const start = (safePage - 1) * IMPORT_REVIEW_PAGE_SIZE;
   const end = start + IMPORT_REVIEW_PAGE_SIZE - 1;
-  const [rowsResult, accountsResult, categoriesResult, groupsResult] = await Promise.all([
+  const [
+    rowsResult,
+    accountsResult,
+    creditCardsResult,
+    categoriesResult,
+    groupsResult,
+  ] = await Promise.all([
     supabase
       .from("import_staging_rows")
       .select(
-        "id, job_id, user_id, source_row_number, source_external_id, source_date_text, source_amount_text, source_description_original, source_pages, confidence, record_kind, source_category_name, transfer_account_name, transfer_account_id, transaction_date, description, normalized_description, signed_amount_minor, transaction_type, amount_minor, account_id, category_id, signature, status, validation_code, duplicate_transaction_id, duplicate_transfer_id, is_selected, created_at, updated_at",
+        "id, job_id, user_id, source_row_number, source_external_id, source_date_text, source_amount_text, source_description_original, source_pages, confidence, record_kind, source_category_name, transfer_account_name, transfer_account_id, transfer_credit_card_id, transaction_date, description, normalized_description, signed_amount_minor, transaction_type, amount_minor, account_id, category_id, signature, status, validation_code, duplicate_transaction_id, duplicate_transfer_id, is_selected, created_at, updated_at",
         { count: "exact" },
       )
       .eq("user_id", user.id)
@@ -273,6 +287,12 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       .select("id, name, type, currency, context")
       .eq("user_id", user.id)
       .is("archived_at", null)
+      .order("name"),
+    supabase
+      .from("credit_cards")
+      .select("id, name, currency")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
       .order("name"),
     supabase
       .from("categories")
@@ -294,6 +314,11 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
     job: jobResult.data,
     rows: rowsResult.data ?? [],
     accounts: accountsResult.data ?? [],
+    creditCards: (creditCardsResult.data ?? []).map((card) => ({
+      id: card.id,
+      cardName: card.name,
+      currency: card.currency,
+    })),
     categories: categoriesResult.data ?? [],
     groups: groupsResult.data ?? [],
     pagination: {
@@ -308,6 +333,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
       jobResult.error ||
         rowsResult.error ||
         accountsResult.error ||
+        creditCardsResult.error ||
         categoriesResult.error ||
         groupsResult.error,
     ),
@@ -332,6 +358,32 @@ export async function updateCurrentUserImportTransferRow(
         message: mutationErrorMessage(
           error,
           "Não foi possível corrigir esta transferência.",
+        ),
+      }
+    : { ok: true as const };
+}
+
+export async function updateCurrentUserImportCreditCardTransferRow(
+  rowId: string,
+  input: ImportCreditCardTransferRowMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "update_import_credit_card_transfer_row",
+    {
+      target_row_id: rowId,
+      target_transaction_date: input.transactionDate,
+      target_description: input.description,
+      target_signed_amount_minor: input.signedAmountMinor,
+      target_credit_card_id: input.creditCardId,
+    },
+  );
+  return error || !data
+    ? {
+        ok: false as const,
+        message: mutationErrorMessage(
+          error,
+          "Não foi possível registrar este pagamento de cartão.",
         ),
       }
     : { ok: true as const };

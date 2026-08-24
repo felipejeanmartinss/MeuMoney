@@ -6,6 +6,7 @@ import {
   toggleFinancialImportRow,
 } from "@/app/actions/file-imports";
 import type { CategoryGroupItem } from "@/domain/categories";
+import type { CategorySelectionCreditCard } from "@/domain/category-selection";
 import { minorUnitsToInput } from "@/domain/money";
 import type {
   Category,
@@ -57,6 +58,7 @@ export function ImportStagingRowForm({
   categories,
   groups,
   accounts,
+  creditCards,
   page,
 }: {
   jobId: string;
@@ -74,6 +76,7 @@ export function ImportStagingRowForm({
   >[];
   groups: CategoryGroupItem[];
   accounts: Pick<Account, "id" | "name" | "type" | "currency">[];
+  creditCards: CategorySelectionCreditCard[];
   page: number;
 }) {
   const initialAmount =
@@ -96,7 +99,9 @@ export function ImportStagingRowForm({
   const editable = !["imported"].includes(row.status);
   const isTransfer = row.record_kind === "transfer";
   const [classification, setClassification] = useState(
-    isTransfer && row.transfer_account_id
+    isTransfer && row.transfer_credit_card_id
+      ? `credit-card:${row.transfer_credit_card_id}`
+      : isTransfer && row.transfer_account_id
       ? `transfer:${row.transfer_account_id}`
       : row.category_id
         ? `category:${row.category_id}`
@@ -115,6 +120,13 @@ export function ImportStagingRowForm({
   );
   function changeAmount(nextAmount: string) {
     setAmount(nextAmount);
+    if (
+      classification.startsWith("credit-card:") &&
+      expectedType(nextAmount) === "income"
+    ) {
+      setClassification("");
+      return;
+    }
     if (!classification.startsWith("category:")) return;
     const categoryId = classification.slice("category:".length);
     const selected = categoryOptions.find(
@@ -245,6 +257,9 @@ export function ImportStagingRowForm({
               value={classification}
               onValueChange={setClassification}
               transferAccounts={accounts}
+              transferCreditCards={
+                transactionType === "expense" ? creditCards : []
+              }
               sourceAccountId={row.account_id}
               prefixCategoryValue
             />
@@ -262,9 +277,9 @@ export function ImportStagingRowForm({
             </button>
           </div>
           <p className="text-xs text-slate-500 lg:col-span-12">
-            Transferências entre contas correntes, poupança, caixa e
-            investimentos ficam fora das receitas e despesas. Pagamentos de
-            cartão continuam no fluxo da fatura para evitar gasto duplicado.
+            Transferências entre contas e pagamentos para cartões ficam fora
+            das receitas e despesas. No cartão, o valor reduz o saldo da conta
+            de origem e abate o saldo do cartão sem duplicar o consumo.
           </p>
         </form>
       ) : (
