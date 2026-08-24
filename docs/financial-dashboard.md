@@ -13,6 +13,8 @@ O dashboard recebe `month=AAAA-MM` e `basis=competence|cash`. Competência é o 
 - **Resultado:** receitas menos despesas de consumo.
 - **Orçamento consumido:** despesas de consumo divididas pelo planejamento total da moeda no mês.
 - **Distribuição por categoria:** mesma base de despesas de consumo, agrupada por categoria.
+- **Capacidade de poupança:** resultado dividido pelas receitas realizadas do mês; sem receita, o indicador não é calculado.
+- **Leitura rápida:** resume consumo do orçamento e quantidade de recorrências e faturas próximas, sem somar moedas nem antecipar valores futuros.
 
 Transferências entre contas próprias são excluídas dos dois regimes. O pagamento técnico da fatura é excluído da competência e incluído no caixa como `Pagamento de cartões`. O orçamento continua sendo comparado apenas à competência.
 
