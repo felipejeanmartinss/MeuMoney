@@ -150,7 +150,8 @@ export default async function RecurringTransactionsPage({
   const accountFilter = asString(rawParams.accountId);
   const typeFilter = asString(rawParams.type) as TransactionType | undefined;
   const stateFilter = asString(rawParams.state) as
-    | RecurringTransactionState
+    | "active"
+    | "suspended"
     | undefined;
   const today = toIsoDate(new Date());
   const timelineMonth =
@@ -330,13 +331,16 @@ export default async function RecurringTransactionsPage({
               <option value="">Todas</option>
               <option value="active">Ativa</option>
               <option value="suspended">Suspensa</option>
-              <option value="ended">Encerrada</option>
             </select>
           </label>
           <button className="min-h-11 self-end rounded-xl bg-slate-950 px-4 font-bold text-white hover:bg-slate-800">
             Aplicar filtros
           </button>
         </form>
+        <p className="text-xs text-slate-500">
+          Recorrências encerradas saem da agenda, mas permanecem preservadas no
+          histórico para auditoria.
+        </p>
       </section>
 
       <section className="grid gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:grid-cols-[1fr_auto] sm:items-end">

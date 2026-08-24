@@ -1,9 +1,20 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   collectDueRecurrenceDates,
   nextRecurrenceDate,
   recurringTransactionFormSchema,
 } from "../src/domain/recurring-transactions";
+
+const recurringService = readFileSync(
+  resolve("src", "services", "finance", "recurring-transactions-service.ts"),
+  "utf8",
+);
+const accountsService = readFileSync(
+  resolve("src", "services", "finance", "accounts-service.ts"),
+  "utf8",
+);
 
 describe("recurring transaction calendar", () => {
   it("advances weekly, monthly and yearly frequencies", () => {
@@ -131,5 +142,12 @@ describe("recurring transaction generation", () => {
         nextOccurrence: "2026-07-25",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("recurring transaction operational lists", () => {
+  it("keeps ended schedules out of global and account agendas", () => {
+    expect(recurringService).toContain('.is("ended_at", null)');
+    expect(accountsService).toContain('.is("ended_at", null)');
   });
 });

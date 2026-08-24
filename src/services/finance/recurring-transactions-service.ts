@@ -50,7 +50,7 @@ export async function listCurrentUserRecurringTransactions() {
         .from("recurring_transactions")
         .select(recurringTransactionColumns)
         .eq("user_id", user.id)
-        .order("ended_at", { ascending: true, nullsFirst: true })
+        .is("ended_at", null)
         .order("is_active", { ascending: false })
         .order("next_occurrence"),
       supabase

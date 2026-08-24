@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateFinancialDashboardMonth,
   calculateExecutiveDashboardNetWorth,
+  calculateSavingsRatePercentage,
   fillMonthlyEvolution,
   limitExpenseCategories,
   referenceMonthsEndingAt,
@@ -310,5 +311,20 @@ describe("financial dashboard aggregations", () => {
         creditCardBalanceMinor: 20_000,
       }),
     ).toBe(330_000);
+  });
+
+  it("calculates a savings rate only when the month has realized income", () => {
+    expect(
+      calculateSavingsRatePercentage({
+        incomeAmountMinor: 100_000,
+        resultAmountMinor: 27_500,
+      }),
+    ).toBe(27.5);
+    expect(
+      calculateSavingsRatePercentage({
+        incomeAmountMinor: 0,
+        resultAmountMinor: -10_000,
+      }),
+    ).toBeNull();
   });
 });
