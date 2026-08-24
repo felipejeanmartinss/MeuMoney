@@ -22,6 +22,7 @@ import {
   mapCurrentUserQifCategory,
   mapCurrentUserQifTransferAccount,
   setCurrentUserImportRowIgnored,
+  updateCurrentUserImportCreditCardTransferRow,
   updateCurrentUserImportRow,
   updateCurrentUserImportTransferRow,
 } from "@/services/finance/file-imports-service";
@@ -208,16 +209,26 @@ export async function correctFinancialImportClassification(formData: FormData) {
     description: parsed.data.description,
     signedAmountMinor: parsed.data.signedAmountMinor,
   };
-  const result =
-    parsed.data.classification.kind === "transfer"
-      ? await updateCurrentUserImportTransferRow(parsed.data.rowId, {
-          ...commonInput,
-          transferAccountId: parsed.data.classification.id,
-        })
-      : await updateCurrentUserImportRow(parsed.data.rowId, {
-          ...commonInput,
-          categoryId: parsed.data.classification.id,
-        });
+  let result;
+  if (parsed.data.classification.kind === "transfer") {
+    result = await updateCurrentUserImportTransferRow(parsed.data.rowId, {
+      ...commonInput,
+      transferAccountId: parsed.data.classification.id,
+    });
+  } else if (parsed.data.classification.kind === "credit-card") {
+    result = await updateCurrentUserImportCreditCardTransferRow(
+      parsed.data.rowId,
+      {
+        ...commonInput,
+        creditCardId: parsed.data.classification.id,
+      },
+    );
+  } else {
+    result = await updateCurrentUserImportRow(parsed.data.rowId, {
+      ...commonInput,
+      categoryId: parsed.data.classification.id,
+    });
+  }
   revalidatePath(`/imports/${jobId.data}`);
   redirect(
     `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}&page=${page}`,

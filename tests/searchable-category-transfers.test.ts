@@ -116,7 +116,7 @@ describe("searchable financial classification", () => {
     });
   });
 
-  it("parses category and transfer corrections into explicit classifications", () => {
+  it("parses category, account transfer and card payment corrections", () => {
     const common = {
       rowId: "88888888-8888-4888-8888-888888888888",
       transactionDate: "2026-08-14",
@@ -136,6 +136,12 @@ describe("searchable financial classification", () => {
         classification: `transfer:${investmentAccountId}`,
       }).classification,
     ).toEqual({ kind: "transfer", id: investmentAccountId });
+    expect(
+      importClassificationCorrectionSchema.parse({
+        ...common,
+        classification: `credit-card:${creditCardId}`,
+      }).classification,
+    ).toEqual({ kind: "credit-card", id: creditCardId });
   });
 
   it("allows an imported transaction row to be reclassified as a transfer", () => {
