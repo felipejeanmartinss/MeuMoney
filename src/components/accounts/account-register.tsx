@@ -21,9 +21,11 @@ const messages: Record<string, { text: string; error?: boolean }> = {
 function ReconciliationControl({
   accountId,
   entry,
+  page,
 }: {
   accountId: string;
   entry: AccountRegisterEntry;
+  page: number;
 }) {
   const canReconcile = entry.isActive && entry.status === "completed";
   if (!canReconcile) {
@@ -40,6 +42,7 @@ function ReconciliationControl({
       <input type="hidden" name="accountId" value={accountId} />
       <input type="hidden" name="entryType" value={entry.entryType} />
       <input type="hidden" name="entryId" value={entry.id} />
+      <input type="hidden" name="page" value={page} />
       <input
         type="hidden"
         name="reconciled"
@@ -49,7 +52,7 @@ function ReconciliationControl({
         type="submit"
         aria-label={`${reconciled ? "Desmarcar" : "Marcar"} ${entry.description} como reconciliado`}
         aria-pressed={reconciled}
-        className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border text-xs font-black transition ${
+        className={`inline-flex size-7 items-center justify-center rounded border text-[0.7rem] font-black transition ${
           reconciled
             ? "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800"
             : "border-slate-300 bg-white text-slate-600 hover:border-emerald-600 hover:text-emerald-700"
@@ -80,7 +83,7 @@ function Pagination({
     >
       {page > 1 ? (
         <Link
-          href={`/accounts/${accountId}?tab=statement&page=${page - 1}`}
+          href={`/accounts/${accountId}?tab=statement&page=${page - 1}#account-register`}
           className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
         >
           ← Anterior
@@ -93,7 +96,7 @@ function Pagination({
       </span>
       {page < pageCount ? (
         <Link
-          href={`/accounts/${accountId}?tab=statement&page=${page + 1}`}
+          href={`/accounts/${accountId}?tab=statement&page=${page + 1}#account-register`}
           className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
         >
           Próxima →
@@ -134,10 +137,10 @@ export function AccountRegister({
   const feedback = message ? messages[message] : undefined;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+    <section id="account-register" className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-950">
+          <h2 className="font-extrabold text-slate-950">
             Extrato da conta
           </h2>
           <p className="mt-1 text-sm text-slate-600">
@@ -149,13 +152,13 @@ export function AccountRegister({
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/transactions/new?accountId=${accountId}`}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
           >
             Nova movimentação
           </Link>
           <Link
             href={`/transactions/new?accountId=${accountId}&type=transfer`}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800 hover:bg-slate-50"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
           >
             Transferir
           </Link>
@@ -187,79 +190,88 @@ export function AccountRegister({
       ) : (
         <>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[980px] border-collapse text-sm">
+            <table className="w-full min-w-[940px] border-collapse text-sm">
               <caption className="sr-only">
                 Movimentações da conta em ordem cronológica
               </caption>
-              <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+              <thead className="border-b border-slate-300 bg-slate-100 text-left text-[0.68rem] uppercase tracking-wide text-slate-600">
                 <tr>
-                  <th scope="col" className="px-4 py-3">
+                  <th scope="col" className="px-3 py-2">
                     Data
                   </th>
-                  <th scope="col" className="px-4 py-3">
+                  <th scope="col" className="px-3 py-2">
                     Descrição
                   </th>
-                  <th scope="col" className="px-4 py-3">
+                  <th scope="col" className="px-3 py-2">
                     Categoria / origem
                   </th>
-                  <th scope="col" className="px-3 py-3 text-center">
+                  <th scope="col" className="px-2 py-2 text-center">
                     C
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right">
+                  <th scope="col" className="px-3 py-2 text-right">
                     Saída
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right">
+                  <th scope="col" className="px-3 py-2 text-right">
                     Entrada
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right">
+                  <th scope="col" className="px-3 py-2 text-right">
                     Saldo
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right">
+                  <th scope="col" className="px-3 py-2 text-right">
                     Ações
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {pageEntries.map((entry) => {
                   const isIncome = entry.signedAmountMinor > 0;
                   return (
                     <tr
                       key={`${entry.entryType}-${entry.id}`}
-                      className={`${entry.isActive ? "" : "opacity-55"} hover:bg-emerald-50/30`}
+                      className={`${entry.isActive ? "" : "opacity-55"} hover:bg-emerald-50/40`}
                     >
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                      <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">
                         {formatFinancialDate(entry.transactionDate)}
                       </td>
-                      <td className="max-w-64 px-4 py-3">
-                        <p className="truncate font-bold text-slate-950">
-                          {entry.description}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {TRANSACTION_STATUS_LABELS[entry.status]}
-                          {!entry.isActive ? " · Inativo" : ""}
-                        </p>
+                      <td className="max-w-64 px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate font-semibold text-slate-950">
+                            {entry.description}
+                          </p>
+                          {entry.status !== "completed" ? (
+                            <span className="shrink-0 text-[0.65rem] font-bold uppercase text-amber-700">
+                              {TRANSACTION_STATUS_LABELS[entry.status]}
+                            </span>
+                          ) : null}
+                          {!entry.isActive ? (
+                            <span className="shrink-0 text-[0.65rem] font-bold uppercase text-slate-500">
+                              Inativo
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
-                      <td className="max-w-56 px-4 py-3 text-slate-600">
+                      <td className="max-w-56 px-3 py-2 text-slate-600">
                         <p className="truncate">{entry.detail}</p>
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-2 py-2 text-center">
                         <ReconciliationControl
                           accountId={accountId}
                           entry={entry}
+                          page={page}
                         />
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-rose-700">
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-rose-700">
                         {!isIncome
                           ? formatMoney(entry.amountMinor, currency)
                           : "—"}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-emerald-700">
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-emerald-700">
                         {isIncome
                           ? formatMoney(entry.amountMinor, currency)
                           : "—"}
                       </td>
                       <td
-                        className={`whitespace-nowrap px-4 py-3 text-right font-extrabold ${
+                        className={`whitespace-nowrap px-3 py-2 text-right font-extrabold ${
                           entry.runningBalanceMinor < 0
                             ? "text-rose-700"
                             : "text-slate-950"
@@ -267,7 +279,7 @@ export function AccountRegister({
                       >
                         {formatMoney(entry.runningBalanceMinor, currency)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-2 text-right">
                         {entry.editHref ? (
                           <Link
                             href={entry.editHref}
@@ -325,12 +337,15 @@ export function AccountRegister({
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-500">
-                        {TRANSACTION_STATUS_LABELS[entry.status]}
-                      </span>
+                      {entry.status !== "completed" ? (
+                        <span className="text-xs font-bold text-amber-700">
+                          {TRANSACTION_STATUS_LABELS[entry.status]}
+                        </span>
+                      ) : null}
                       <ReconciliationControl
                         accountId={accountId}
                         entry={entry}
+                        page={page}
                       />
                       {entry.editHref ? (
                         <Link

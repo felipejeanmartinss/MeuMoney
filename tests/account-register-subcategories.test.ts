@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  accountRegisterReconciliationSchema,
   buildAccountRegister,
   type AccountRegisterSourceEntry,
 } from "../src/domain/account-register";
@@ -168,5 +169,17 @@ describe("account register and subcategories", () => {
     expect(migration).toContain(
       "transactions_clear_reconciliation_on_financial_change",
     );
+  });
+
+  it("keeps the current statement page in reconciliation submissions", () => {
+    const parsed = accountRegisterReconciliationSchema.parse({
+      accountId: "11111111-1111-4111-8111-111111111111",
+      entryType: "transaction",
+      entryId: "22222222-2222-4222-8222-222222222222",
+      reconciled: "true",
+      page: "4",
+    });
+
+    expect(parsed.page).toBe(4);
   });
 });

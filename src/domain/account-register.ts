@@ -41,6 +41,7 @@ export const accountRegisterReconciliationSchema = z.object({
   entryType: z.enum(ACCOUNT_REGISTER_ENTRY_TYPES),
   entryId: z.uuid("Movimentação inválida."),
   reconciled: z.enum(["true", "false"]).transform((value) => value === "true"),
+  page: z.coerce.number().int().min(1).max(100_000),
 });
 
 export function accountRegisterSignedAmount(

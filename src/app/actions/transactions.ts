@@ -98,6 +98,7 @@ export async function toggleAccountEntryReconciliation(formData: FormData) {
     entryType: formData.get("entryType"),
     entryId: formData.get("entryId"),
     reconciled: formData.get("reconciled"),
+    page: formData.get("page"),
   });
   if (!parsed.success) {
     redirect("/accounts?message=reconciliation-error");
@@ -111,8 +112,10 @@ export async function toggleAccountEntryReconciliation(formData: FormData) {
   revalidateFinancialPaths();
   revalidatePath(`/accounts/${parsed.data.accountId}`);
   redirect(
-    `/accounts/${parsed.data.accountId}?tab=statement&message=${
+    `/accounts/${parsed.data.accountId}?tab=statement&page=${
+      parsed.data.page
+    }&message=${
       result.ok ? "reconciliation-updated" : "reconciliation-error"
-    }`,
+    }#account-register`,
   );
 }

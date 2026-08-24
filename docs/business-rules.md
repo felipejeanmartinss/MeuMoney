@@ -84,6 +84,7 @@
 - A geração é idempotente. A combinação entre recorrência e data da ocorrência é única, e chamadas repetidas ou concorrentes não criam duplicidades.
 - A próxima ocorrência indica a primeira data ainda não processada pelo gerador.
 - Suspender impede novas gerações e permite reativação. Encerrar é definitivo e não permite reativação.
+- Recorrências encerradas permanecem preservadas para auditoria, mas são removidas da agenda operacional e das listas por conta.
 - Editar uma recorrência altera somente gerações futuras. Lançamentos previstos já gerados permanecem como registro histórico.
 - Conta e categoria devem estar ativas e pertencer ao usuário autenticado; a natureza da categoria deve coincidir com a natureza da recorrência.
 - Recorrências e ocorrências não são excluídas fisicamente pela interface.

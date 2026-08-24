@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExpenseDistribution } from "@/components/dashboard/expense-distribution";
+import { FinancialPulse } from "@/components/dashboard/financial-pulse";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { MonthlyEvolution } from "@/components/dashboard/monthly-evolution";
 import { SpendingTracker } from "@/components/dashboard/spending-tracker";
@@ -98,13 +99,6 @@ export default async function DashboardPage({
         </form>
       </header>
 
-      <section className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
-        <strong>{basisLabels[basis]}:</strong>{" "}
-        {basis === "competence"
-          ? "compras de cartão aparecem no mês de cada parcela; o pagamento da fatura não duplica a despesa."
-          : "saídas aparecem quando o dinheiro deixa a conta, inclusive transferências para pagar cartões."}
-      </section>
-
       {data.hasError ? (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
           Parte dos indicadores não pôde ser carregada. Confirme a migration desta feature e tente novamente.
@@ -141,6 +135,19 @@ export default async function DashboardPage({
               <MetricCard label="Resultado" value={formatMoney(month.result_amount_minor, section.currency, locale)} helper={`${basisLabels[basis]} do mês`} tone={month.result_amount_minor < 0 ? "negative" : "positive"} />
             </div>
 
+            <FinancialPulse
+              basis={basis}
+              currency={section.currency}
+              locale={locale}
+              incomeAmountMinor={month.income_amount_minor}
+              expenseAmountMinor={month.expense_amount_minor}
+              resultAmountMinor={month.result_amount_minor}
+              plannedAmountMinor={month.planned_amount_minor}
+              budgetPercentageConsumed={month.budget_percentage_consumed}
+              recurrenceCount={section.recurrences.length}
+              invoices={section.invoices}
+            />
+
             <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
               <MonthlyEvolution rows={section.evolution} currency={section.currency} locale={locale} basis={basis} />
               <ExpenseDistribution rows={section.categories} currency={section.currency} locale={locale} basis={basis} />
@@ -154,7 +161,7 @@ export default async function DashboardPage({
                 </div>
                 {section.accounts.length ? (
                   <div className="divide-y divide-slate-100">
-                    {section.accounts.slice(0, 6).map((account) => (
+                    {section.accounts.slice(0, 5).map((account) => (
                       <Link key={account.id} href={`/accounts/${account.id}`} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-emerald-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
                         <div className="min-w-0"><p className="truncate font-bold text-slate-900">{account.name}</p><p className="text-xs text-slate-500">{CONTEXT_LABELS[account.context]}</p></div>
                         <p className={`shrink-0 font-extrabold ${account.current_balance_minor < 0 ? "text-rose-700" : "text-slate-950"}`}>{formatMoney(account.current_balance_minor, section.currency, locale)}</p>

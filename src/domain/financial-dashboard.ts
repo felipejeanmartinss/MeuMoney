@@ -350,3 +350,14 @@ export function calculateExecutiveDashboardNetWorth(input: {
       Math.max(0, assertMinorUnits(input.creditCardBalanceMinor)),
   );
 }
+
+export function calculateSavingsRatePercentage(input: {
+  incomeAmountMinor: number;
+  resultAmountMinor: number;
+}) {
+  const incomeAmountMinor = assertMinorUnits(input.incomeAmountMinor);
+  const resultAmountMinor = assertMinorUnits(input.resultAmountMinor);
+  if (incomeAmountMinor <= 0) return null;
+
+  return Math.round((resultAmountMinor / incomeAmountMinor) * 1_000) / 10;
+}

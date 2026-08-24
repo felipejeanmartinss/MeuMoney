@@ -139,6 +139,7 @@ export async function getCurrentUserAccountHub(id: string) {
       )
       .eq("user_id", user.id)
       .eq("account_id", id)
+      .is("ended_at", null)
       .order("next_occurrence")
       .limit(50),
     supabase
