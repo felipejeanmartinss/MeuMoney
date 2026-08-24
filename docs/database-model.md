@@ -160,6 +160,14 @@ Para QIF, `record_kind` distingue lançamento e transferência;
 da conta entre colchetes. `duplicate_transfer_id` aponta uma transferência já
 existente quando aplicável.
 
+`transfer_credit_card_id` permite que uma saída bancária seja revisada como
+pagamento livre de cartão. A linha pode ter no máximo um destino técnico:
+`transfer_account_id` ou `transfer_credit_card_id`. O cartão precisa estar
+ativo, pertencer ao usuário e usar a moeda da conta associada ao arquivo. Uma
+assinatura específica combina usuário, conta de origem, cartão, data e valor;
+a confirmação chama `private.create_credit_card_transfer` dentro da mesma
+transação que confirma as demais linhas.
+
 `public.imported_transaction_signatures` vincula uma assinatura estável ao
 lançamento ou transferência criada. A chave única `(user_id, signature)`
 impede que dois jobs confirmados gravem a mesma movimentação. Lançamentos usam
@@ -265,4 +273,5 @@ As migrations cumulativas deste incremento são aplicadas, nesta ordem:
 `20260815135005_card_cash_financing_imports.sql` e
 `20260815160729_card_account_transfers.sql`, seguidas de
 `20260815161500_card_financing_fk_indexes.sql` para os índices das chaves
-estrangeiras.
+estrangeiras. A classificação de linhas importadas como pagamentos livres é
+adicionada por `20260823090000_import_credit_card_payments.sql`.
