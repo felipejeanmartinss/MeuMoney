@@ -30,8 +30,8 @@ describe("imported credit-card payments", () => {
   it("uses a stable card payment signature and checks prior transfers", () => {
     expect(migration).toContain("private.import_credit_card_transfer_signature");
     expect(migration).toContain("'credit_card_payment'");
-    expect(migration).toContain(
-      "transfers.destination_credit_card_id\n          = computed.transfer_credit_card_id",
+    expect(migration).toMatch(
+      /transfers\.destination_credit_card_id\s*=\s*computed\.transfer_credit_card_id/,
     );
     expect(migration).toContain("duplicate_inside_job");
   });
