@@ -12,7 +12,8 @@ export type NavigationIcon =
   | "cards"
   | "imports"
   | "security"
-  | "financing";
+  | "financing"
+  | "reports";
 
 export type NavigationItem = {
   href: string;
@@ -26,6 +27,7 @@ export type NavigationSection =
   | "accounts"
   | "investments"
   | "net-worth"
+  | "reports"
   | "profile";
 
 export const MAIN_NAVIGATION: ReadonlyArray<
@@ -68,6 +70,13 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     match: ["/net-worth"],
   },
   {
+    section: "reports",
+    href: "/reports",
+    label: "Relatórios",
+    icon: "reports",
+    match: ["/reports"],
+  },
+  {
     section: "profile",
     href: "/settings",
     label: "Perfil",
@@ -77,7 +86,7 @@ export const MAIN_NAVIGATION: ReadonlyArray<
 ];
 
 export const SECONDARY_NAVIGATION: Record<
-  Exclude<NavigationSection, "home" | "net-worth">,
+  Exclude<NavigationSection, "home" | "net-worth" | "reports">,
   readonly NavigationItem[]
 > = {
   accounts: [
@@ -89,7 +98,7 @@ export const SECONDARY_NAVIGATION: Record<
     },
     {
       href: "/recurring-transactions",
-      label: "Recorrências",
+      label: "Contas a Pagar",
       icon: "recurring",
       match: ["/recurring-transactions"],
     },
@@ -181,6 +190,12 @@ export function isNavigationItemActive(
 
 export function secondaryNavigationFor(pathname: string) {
   const section = resolveNavigationSection(pathname);
-  if (section === "home" || section === "net-worth") return [];
+  if (
+    section === "home" ||
+    section === "net-worth" ||
+    section === "reports"
+  ) {
+    return [];
+  }
   return SECONDARY_NAVIGATION[section];
 }

@@ -5,6 +5,7 @@ import {
   formatInvestmentQuantity,
   INVESTMENT_CASH_FLOW_LABELS,
   INVESTMENT_CLASS_LABELS,
+  INVESTMENT_INCOME_TYPE_LABELS,
   investmentPositionIdSchema,
 } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
@@ -113,7 +114,9 @@ export default async function InvestmentHistoryPage({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-bold text-blue-700">
-                      {INVESTMENT_CASH_FLOW_LABELS[cashFlow.cash_flow_type]}
+                      {cashFlow.cash_flow_type === "income" && cashFlow.income_type
+                        ? INVESTMENT_INCOME_TYPE_LABELS[cashFlow.income_type]
+                        : INVESTMENT_CASH_FLOW_LABELS[cashFlow.cash_flow_type]}
                     </p>
                     <time
                       dateTime={cashFlow.cash_flow_date}
@@ -133,6 +136,11 @@ export default async function InvestmentHistoryPage({
                     {cashFlow.quantity ? (
                       <p className="mt-1 text-sm text-slate-500">
                         {formatInvestmentQuantity(cashFlow.quantity)} unidades
+                      </p>
+                    ) : null}
+                    {cashFlow.transaction_id ? (
+                      <p className="mt-1 text-xs font-semibold text-emerald-700">
+                        Vinculado ao extrato da conta
                       </p>
                     ) : null}
                   </div>

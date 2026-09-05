@@ -13,7 +13,7 @@ export type MonthlyBudgetMutationInput = {
 };
 
 const progressColumns =
-  "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed";
+  "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed, category_kind";
 
 function normalizeProgress(row: MonthlyBudgetProgress): MonthlyBudgetProgress {
   return {
@@ -37,9 +37,8 @@ export async function getCurrentUserMonthlyBudget(input: {
   const [categoriesResult, progressResult] = await Promise.all([
     supabase
       .from("categories")
-      .select("id, parent_id, name, context")
+      .select("id, group_id, parent_id, name, kind, context, archived_at")
       .eq("user_id", user.id)
-      .eq("kind", "expense")
       .eq("context", input.context)
       .is("archived_at", null)
       .order("name"),
@@ -58,6 +57,63 @@ export async function getCurrentUserMonthlyBudget(input: {
     progress: (progressResult.data ?? []).map(normalizeProgress),
     hasError: Boolean(categoriesResult.error || progressResult.error),
   };
+}
+
+export async function getCurrentUserAnnualBudget(input: {
+  year: number;
+  context: FinancialContext;
+  currency: SupportedCurrency;
+}) {
+  const { supabase, user } = await requireUser();
+  const [categoriesResult, progressResult] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, group_id, parent_id, name, kind, context, archived_at")
+      .eq("user_id", user.id)
+      .eq("context", input.context)
+      .is("archived_at", null)
+      .order("kind")
+      .order("name"),
+    supabase
+      .from("monthly_budget_progress")
+      .select(progressColumns)
+      .eq("user_id", user.id)
+      .eq("context", input.context)
+      .eq("currency", input.currency)
+      .gte("reference_month", `${input.year}-01-01`)
+      .lte("reference_month", `${input.year}-12-01`)
+      .order("reference_month")
+      .order("category_name"),
+  ]);
+
+  return {
+    categories: categoriesResult.data ?? [],
+    progress: (progressResult.data ?? []).map(normalizeProgress),
+    hasError: Boolean(categoriesResult.error || progressResult.error),
+  };
+}
+
+export async function upsertCurrentUserAnnualBudgets(
+  currency: SupportedCurrency,
+  rows: Array<MonthlyBudgetMutationInput & { referenceMonth: string }>,
+) {
+  const { supabase, user } = await requireUser();
+  if (rows.length === 0) return { ok: true as const };
+
+  const { error } = await supabase.from("monthly_budgets").upsert(
+    rows.map((row) => ({
+      user_id: user.id,
+      category_id: row.categoryId,
+      reference_month: row.referenceMonth,
+      currency,
+      planned_amount_minor: row.plannedAmountMinor,
+    })),
+    { onConflict: "user_id,reference_month,currency,category_id" },
+  );
+
+  return error
+    ? { ok: false as const, message: "Não foi possível salvar o orçamento anual." }
+    : { ok: true as const };
 }
 
 export async function upsertCurrentUserMonthlyBudgets(

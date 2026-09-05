@@ -272,7 +272,7 @@ export default async function TransactionsPage({
                     {account?.name ?? "Conta indisponível"} ·{" "}
                     {isTechnical
                       ? isRecurring
-                        ? "Gerado por recorrência"
+                        ? "Gerado por conta a pagar"
                         : "Liquidação de fatura"
                       : category
                         ? getCategoryQualifiedName(
@@ -302,7 +302,7 @@ export default async function TransactionsPage({
                 {isTechnical ? (
                   <span className="text-sm font-semibold text-slate-500">
                     {isRecurring
-                      ? "Gerenciado pela recorrência"
+                      ? "Gerenciado pela conta a pagar"
                       : "Gerenciado pela fatura"}
                   </span>
                 ) : (

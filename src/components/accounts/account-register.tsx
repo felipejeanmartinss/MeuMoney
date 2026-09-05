@@ -6,7 +6,7 @@ import { TRANSACTION_STATUS_LABELS } from "@/domain/transactions";
 import type { SupportedCurrency } from "@/types/database";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
-const PAGE_SIZE = 75;
+const PAGE_SIZE = 100;
 
 const messages: Record<string, { text: string; error?: boolean }> = {
   "reconciliation-updated": {
@@ -15,6 +15,9 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   "reconciliation-error": {
     text: "Não foi possível atualizar a conciliação.",
     error: true,
+  },
+  "investment-recorded": {
+    text: "Movimento de investimento registrado e vinculado à posição.",
   },
 };
 
@@ -79,7 +82,7 @@ function Pagination({
   return (
     <nav
       aria-label="Páginas do extrato"
-      className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4"
+      className="flex items-center justify-between gap-3 border-t border-slate-200 px-3 py-3"
     >
       {page > 1 ? (
         <Link
@@ -138,7 +141,7 @@ export function AccountRegister({
 
   return (
     <section id="account-register" className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="font-extrabold text-slate-950">
             Extrato da conta
@@ -190,34 +193,34 @@ export function AccountRegister({
       ) : (
         <>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[940px] border-collapse text-sm">
+            <table className="w-full min-w-[1080px] table-fixed border-collapse text-[0.82rem]">
               <caption className="sr-only">
-                Movimentações da conta em ordem cronológica
+                Movimentações da conta, das mais recentes para as mais antigas
               </caption>
               <thead className="border-b border-slate-300 bg-slate-100 text-left text-[0.68rem] uppercase tracking-wide text-slate-600">
                 <tr>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="w-24 px-2 py-1.5">
                     Data
                   </th>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="w-[27%] px-2 py-1.5">
                     Descrição
                   </th>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="w-[27%] px-2 py-1.5">
                     Categoria / origem
                   </th>
-                  <th scope="col" className="px-2 py-2 text-center">
+                  <th scope="col" className="w-12 px-1 py-1.5 text-center">
                     C
                   </th>
-                  <th scope="col" className="px-3 py-2 text-right">
+                  <th scope="col" className="w-28 px-2 py-1.5 text-right">
                     Saída
                   </th>
-                  <th scope="col" className="px-3 py-2 text-right">
+                  <th scope="col" className="w-28 px-2 py-1.5 text-right">
                     Entrada
                   </th>
-                  <th scope="col" className="px-3 py-2 text-right">
+                  <th scope="col" className="w-28 px-2 py-1.5 text-right">
                     Saldo
                   </th>
-                  <th scope="col" className="px-3 py-2 text-right">
+                  <th scope="col" className="w-20 px-2 py-1.5 text-right">
                     Ações
                   </th>
                 </tr>
@@ -230,10 +233,10 @@ export function AccountRegister({
                       key={`${entry.entryType}-${entry.id}`}
                       className={`${entry.isActive ? "" : "opacity-55"} hover:bg-emerald-50/40`}
                     >
-                      <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700">
+                      <td className="whitespace-nowrap px-2 py-1.5 font-medium text-slate-700">
                         {formatFinancialDate(entry.transactionDate)}
                       </td>
-                      <td className="max-w-64 px-3 py-2">
+                      <td className="px-2 py-1.5">
                         <div className="flex min-w-0 items-center gap-2">
                           <p className="truncate font-semibold text-slate-950">
                             {entry.description}
@@ -250,28 +253,28 @@ export function AccountRegister({
                           ) : null}
                         </div>
                       </td>
-                      <td className="max-w-56 px-3 py-2 text-slate-600">
+                      <td className="px-2 py-1.5 text-slate-600">
                         <p className="truncate">{entry.detail}</p>
                       </td>
-                      <td className="px-2 py-2 text-center">
+                      <td className="px-1 py-1.5 text-center">
                         <ReconciliationControl
                           accountId={accountId}
                           entry={entry}
                           page={page}
                         />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-rose-700">
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-bold text-rose-700">
                         {!isIncome
                           ? formatMoney(entry.amountMinor, currency)
                           : "—"}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold text-emerald-700">
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-bold text-emerald-700">
                         {isIncome
                           ? formatMoney(entry.amountMinor, currency)
                           : "—"}
                       </td>
                       <td
-                        className={`whitespace-nowrap px-3 py-2 text-right font-extrabold ${
+                        className={`whitespace-nowrap px-2 py-1.5 text-right font-extrabold ${
                           entry.runningBalanceMinor < 0
                             ? "text-rose-700"
                             : "text-slate-950"
@@ -279,7 +282,7 @@ export function AccountRegister({
                       >
                         {formatMoney(entry.runningBalanceMinor, currency)}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-2 py-1.5 text-right">
                         {entry.editHref ? (
                           <Link
                             href={entry.editHref}

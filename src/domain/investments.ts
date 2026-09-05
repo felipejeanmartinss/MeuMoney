@@ -5,7 +5,9 @@ import { isValidIsoDate } from "./dates";
 import { assertMinorUnits, parseMoneyInputToMinor } from "./money";
 import type {
   InvestmentCashFlowType,
+  InvestmentAccountEventType,
   InvestmentClass,
+  InvestmentIncomeType,
   InvestmentType,
   SupportedCurrency,
 } from "../types/database";
@@ -112,6 +114,43 @@ export const INVESTMENT_CASH_FLOW_LABELS: Record<
   redemption: "Resgate",
   income: "Renda",
 };
+
+export const INVESTMENT_ACCOUNT_EVENT_TYPES = [
+  "contribution",
+  "redemption",
+  "interest_on_capital",
+  "dividend",
+  "bonus",
+  "other",
+] as const;
+
+export const INVESTMENT_ACCOUNT_EVENT_LABELS: Record<
+  InvestmentAccountEventType,
+  string
+> = {
+  contribution: "Aplicação ou aporte",
+  redemption: "Liquidação ou resgate",
+  interest_on_capital: "Juros sobre capital",
+  dividend: "Dividendos",
+  bonus: "Bonificação em dinheiro",
+  other: "Outro rendimento",
+};
+
+export const INVESTMENT_INCOME_TYPE_LABELS: Record<
+  InvestmentIncomeType,
+  string
+> = {
+  interest_on_capital: "Juros sobre capital",
+  dividend: "Dividendos",
+  bonus: "Bonificação em dinheiro",
+  other: "Outro rendimento",
+};
+
+export function investmentEventTransactionType(
+  eventType: InvestmentAccountEventType,
+) {
+  return eventType === "contribution" ? "expense" as const : "income" as const;
+}
 
 const MAX_QUANTITY_INTEGER_DIGITS = 18;
 
@@ -290,6 +329,75 @@ export const investmentCashFlowFormSchema = z.object({
     .max(1000, "Use até 1.000 caracteres.")
     .transform((value) => value || null),
 });
+
+export const investmentAccountEntryFormSchema = z
+  .object({
+    accountId: z.uuid("Selecione uma conta de investimento válida."),
+    positionId: z.union([
+      z.uuid("Selecione uma posição de investimento válida."),
+      z.literal("new"),
+    ]),
+    eventType: z.enum(INVESTMENT_ACCOUNT_EVENT_TYPES, {
+      error: "Selecione o tipo do movimento.",
+    }),
+    description: z
+      .string()
+      .trim()
+      .min(1, "Informe a descrição.")
+      .max(180, "Use até 180 caracteres."),
+    amountMinor: positiveMoneyInput,
+    quantity: optionalQuantityInput,
+    transactionDate: pastOrTodayDate,
+    notes: z
+      .string()
+      .trim()
+      .max(1000, "Use até 1.000 caracteres.")
+      .transform((value) => value || null),
+    newInstitution: z.string().trim().max(120).optional().default(""),
+    newInvestmentClass: z.enum(INVESTMENT_CLASSES).optional(),
+    newInvestmentType: z.enum(INVESTMENT_TYPES).optional(),
+    newAssetName: z.string().trim().max(160).optional().default(""),
+  })
+  .superRefine((value, context) => {
+    if (value.positionId !== "new") return;
+    if (value.eventType !== "contribution") {
+      context.addIssue({
+        code: "custom",
+        path: ["positionId"],
+        message: "Uma nova posição deve começar por uma aplicação ou aporte.",
+      });
+    }
+    if (!value.newInstitution) {
+      context.addIssue({
+        code: "custom",
+        path: ["newInstitution"],
+        message: "Informe a instituição.",
+      });
+    }
+    if (!value.newAssetName) {
+      context.addIssue({
+        code: "custom",
+        path: ["newAssetName"],
+        message: "Informe o ativo.",
+      });
+    }
+    if (!value.newInvestmentClass || !value.newInvestmentType) {
+      context.addIssue({
+        code: "custom",
+        path: ["newInvestmentType"],
+        message: "Selecione a classe e o produto.",
+      });
+      return;
+    }
+    const validTypes = INVESTMENT_TYPES_BY_CLASS[value.newInvestmentClass];
+    if (!(validTypes as readonly string[]).includes(value.newInvestmentType)) {
+      context.addIssue({
+        code: "custom",
+        path: ["newInvestmentType"],
+        message: "O produto não pertence à classe selecionada.",
+      });
+    }
+  });
 
 export const investmentPositionIdSchema = z.uuid(
   "Posição de investimento inválida.",

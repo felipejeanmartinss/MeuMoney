@@ -2,9 +2,9 @@
 
 ## Escopo
 
-A Sprint 6 planeja despesas por mês, categoria, contexto e moeda. A tela
-`/budgets` apresenta valores planejado, realizado, disponível e percentual
-consumido, além do comparativo por categoria.
+A tela `/budgets` planeja receitas e despesas por mês, categoria, contexto e
+moeda. A visão mensal apresenta planejado, realizado, diferença e percentual;
+a visão anual abre os doze meses em uma grade compacta sobre os mesmos registros.
 
 ## Competência do realizado
 
@@ -14,6 +14,10 @@ consumido, além do comparativo por categoria.
 - cada parcela de cartão entra em seu próprio `competence_date`;
 - compras ou parcelas canceladas não entram;
 - receitas e previsões pendentes não entram.
+
+Receitas realizadas entram somente quando são categorizadas, ativas e
+concluídas. A diferença de receita é `realizado - planejado`; a diferença de
+despesa é `planejado - realizado`.
 
 Essa separação evita contar primeiro a compra e novamente o pagamento da fatura.
 
@@ -32,5 +36,6 @@ preservadas por `ON CONFLICT DO NOTHING`, então repetir a ação é seguro.
 ## Segurança
 
 `monthly_budgets` possui RLS por `user_id` e não concede exclusão ao cliente. As
-views de consumo e progresso usam `security_invoker`, mantendo as políticas das
+views `monthly_consumption`, `monthly_budget_actuals` e
+`monthly_budget_progress` usam `security_invoker`, mantendo as políticas das
 tabelas de origem. A RPC valida `auth.uid()` antes de copiar dados.
