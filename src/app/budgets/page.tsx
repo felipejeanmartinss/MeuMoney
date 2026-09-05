@@ -138,19 +138,21 @@ export default async function BudgetsPage({
     }))
     .sort(
       (left, right) =>
-        left.kind.localeCompare(right.kind) ||
+        (left.kind === right.kind ? 0 : left.kind === "income" ? -1 : 1) ||
         left.displayName.localeCompare(right.displayName, "pt-BR"),
     );
   const monthlyCategories = orderedCategories.map((category) => ({
     id: category.id,
-    name: category.displayName,
+    name: category.name,
+    parentId: category.parent_id,
     kind: category.kind,
     plannedAmountMinor:
       progressByCategory.get(category.id)?.planned_amount_minor ?? 0,
   }));
   const annualCategories = orderedCategories.map((category) => ({
     id: category.id,
-    name: category.displayName,
+    name: category.name,
+    parentId: category.parent_id,
     kind: category.kind,
     plannedByMonth: Array.from({ length: 12 }, (_, monthIndex) => {
       const referenceMonth = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;

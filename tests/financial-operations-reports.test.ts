@@ -27,6 +27,14 @@ const matrixMigration = readFileSync(
   ),
   "utf8",
 );
+const fixedExpenseMigration = readFileSync(
+  resolve(
+    "supabase",
+    "migrations",
+    "20260905153310_fixed_expense_subcategories.sql",
+  ),
+  "utf8",
+);
 
 describe("financial operations and reports", () => {
   it("fills missing months and sums only integer minor units", () => {
@@ -62,6 +70,10 @@ describe("financial operations and reports", () => {
         section: "income",
         groupLabel: "Receitas pessoais",
         label: "Salário",
+        categoryKey: "work",
+        categoryLabel: "Trabalho",
+        subcategoryKey: "salary",
+        subcategoryLabel: "Salário",
         referenceMonth: "2026-01-01",
         amountMinor: 10_000_00,
       },
@@ -70,6 +82,10 @@ describe("financial operations and reports", () => {
         section: "income",
         groupLabel: "Receitas pessoais",
         label: "Salário",
+        categoryKey: "work",
+        categoryLabel: "Trabalho",
+        subcategoryKey: "salary",
+        subcategoryLabel: "Salário",
         referenceMonth: "2026-02-01",
         amountMinor: 11_000_00,
       },
@@ -82,6 +98,12 @@ describe("financial operations and reports", () => {
       0,
     ]);
     expect(matrix[0].totalAmountMinor).toBe(21_000_00);
+    expect(matrix[0]).toMatchObject({
+      categoryKey: "work",
+      categoryLabel: "Trabalho",
+      subcategoryKey: "salary",
+      subcategoryLabel: "Salário",
+    });
   });
 
   it("projects recurring fixed expenses without treating them as paid", () => {
@@ -205,6 +227,18 @@ describe("financial operations and reports", () => {
     );
     expect(matrixMigration).toContain(
       "grant select on table public.financial_report_category_monthly to authenticated",
+    );
+  });
+
+  it("classifies fixed expenses only on expense subcategories", () => {
+    expect(fixedExpenseMigration).toContain(
+      "add column is_fixed_expense boolean not null default false",
+    );
+    expect(fixedExpenseMigration).toContain(
+      "kind = 'expense'::public.transaction_kind and parent_id is not null",
+    );
+    expect(fixedExpenseMigration).toContain(
+      "grant update (is_fixed_expense)",
     );
   });
 });

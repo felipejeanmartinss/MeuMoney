@@ -58,6 +58,7 @@ export default async function EditCategoryPage({
             context: category.context,
             groupId: category.group_id,
             parentId: category.parent_id,
+            isFixedExpense: category.is_fixed_expense,
           }}
         />
       </section>

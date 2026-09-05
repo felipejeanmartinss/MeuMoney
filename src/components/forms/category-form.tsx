@@ -27,6 +27,7 @@ type CategoryFormValues = {
   context?: FinancialContext;
   groupId?: string;
   parentId?: string | null;
+  isFixedExpense?: boolean;
 };
 
 const initialState: FinancialFormState = { status: "idle" };
@@ -209,6 +210,29 @@ export function CategoryForm({
           hierarquia possui um nível para manter relatórios e filtros claros.
         </p>
       </Field>
+
+      {kind === "expense" && parentId ? (
+        <Field
+          label="Comportamento no relatório"
+          error={state.fieldErrors?.isFixedExpense?.[0]}
+        >
+          <label className="flex min-h-12 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              name="isFixedExpense"
+              defaultChecked={values.isFixedExpense}
+              className="mt-0.5 size-4 accent-emerald-700"
+            />
+            <span>
+              <strong className="block text-slate-950">
+                Considerar como despesa fixa
+              </strong>
+              Lançamentos desta subcategoria aparecem no relatório de despesas
+              fixas conforme o regime selecionado.
+            </span>
+          </label>
+        </Field>
+      ) : null}
 
       <SubmitButton pending={pending}>
         {values.id ? "Salvar alterações" : "Criar categoria"}

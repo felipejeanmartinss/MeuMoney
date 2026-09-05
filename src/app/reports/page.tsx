@@ -271,7 +271,6 @@ export default async function ReportsPage({
             <FixedExpensesReport
               filters={filters}
               context={context}
-              state={state}
             />
           ) : report === "period-comparison" ? (
             <ComparisonReport
@@ -363,7 +362,6 @@ async function IncomeExpenseReport({
 async function FixedExpensesReport({
   filters,
   context,
-  state,
 }: {
   filters: {
     year: number;
@@ -371,45 +369,38 @@ async function FixedExpensesReport({
     basis: FinancialReportBasis;
   };
   context: FinancialContext | "all";
-  state: "active" | "all";
 }) {
   const result = await getCurrentUserFixedExpenseReport({
     year: filters.year,
     currency: filters.currency,
+    basis: filters.basis,
     context,
-    state,
   });
   return (
     <>
       <ReportHeading
         title="Despesas fixas"
-        description="Projeção das despesas recorrentes cadastradas em Contas a Pagar; não representa confirmação de pagamento."
+        description="Lançamentos reais classificados em subcategorias marcadas como despesa fixa."
       />
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[120px_220px_170px_180px_auto]"
+        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[120px_220px_170px_160px_auto]"
       >
         <input type="hidden" name="report" value="fixed-expenses" />
-        <CommonReportFields
-          {...filters}
-          context={context}
-          includeBasis={false}
-        />
-        <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-          Regras
-          <select name="state" defaultValue={state} className={inputClass}>
-            <option value="active">Somente ativas</option>
-            <option value="all">Todas no período</option>
-          </select>
-        </label>
+        <CommonReportFields {...filters} context={context} />
         <ApplyFiltersButton />
       </form>
+      <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
+        Marque uma subcategoria de despesa como fixa ao criar ou editar sua
+        classificação. O relatório respeita o regime de competência ou caixa
+        selecionado.
+      </p>
       {result.hasError ? <ReportError /> : null}
       <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
-        caption={"Despesas fixas projetadas para " + String(filters.year)}
-        emptyMessage="Nenhuma despesa recorrente encontrada neste recorte."
+        caption={"Despesas fixas realizadas em " + String(filters.year)}
+        emptyMessage="Nenhum lançamento foi encontrado em subcategorias marcadas como fixas."
         showSections={false}
       />
     </>

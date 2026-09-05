@@ -138,6 +138,7 @@ export type Category = {
   kind: CategoryKind;
   context: FinancialContext;
   is_system: boolean;
+  is_fixed_expense: boolean;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -797,6 +798,7 @@ export type Database = {
           kind: CategoryKind;
           context: FinancialContext;
           is_system?: boolean;
+          is_fixed_expense?: boolean;
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;

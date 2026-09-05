@@ -65,4 +65,23 @@ describe("financial foundation validation", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("allows fixed-expense classification only for expense subcategories", () => {
+    const base = {
+      name: "Energia elétrica",
+      kind: "expense",
+      context: "personal",
+      groupId: "9f560c10-ebca-4b65-952d-e7b27c3ed1ac",
+      isFixedExpense: "on",
+    };
+    expect(
+      categoryFormSchema.safeParse({
+        ...base,
+        parentId: "d4d27d69-49c0-4d3d-a192-3f3e5124975e",
+      }).success,
+    ).toBe(true);
+    expect(
+      categoryFormSchema.safeParse({ ...base, parentId: "" }).success,
+    ).toBe(false);
+  });
 });

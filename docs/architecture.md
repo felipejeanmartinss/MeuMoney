@@ -223,18 +223,22 @@ continuam sendo fotografias manuais e auditáveis.
 `/reports` é um módulo principal e uma central de matrizes financeiras. Cada
 relatório consulta somente suas fontes no servidor:
 `financial_report_category_monthly` consolida competência e caixa por grupo,
-categoria e subcategoria; regras de Contas a Pagar são projetadas por função
-pura; e `investment_position_summary` fornece a fotografia agregada dos
+categoria e subcategoria; a preferência `categories.is_fixed_expense` define
+quais subcategorias reais entram em Despesas fixas; e
+`investment_position_summary` fornece a fotografia agregada dos
 ativos. O navegador recebe apenas linhas já agregadas para o recorte
 solicitado, sem carregar transações ou parcelas brutas.
 
 Receitas x despesas, Despesas fixas, Comparativo entre períodos e Performance
-de ativos compartilham filtros em URL e tabelas acessíveis com rolagem
-horizontal. As views financeiras continuam `security_invoker`, e os serviços
-repetem o filtro por `user_id`, moeda, contexto e período. Nenhuma nova tabela é
-necessária para a central.
+de ativos compartilham filtros em URL, o `AppShell` global e tabelas acessíveis
+com rolagem horizontal. Categorias principais são linhas consolidadas e abrem
+suas subcategorias por controle de divulgação. As views financeiras continuam
+`security_invoker`, e os serviços repetem o filtro por `user_id`, moeda,
+contexto e período. Nenhuma nova tabela é necessária para a central.
 
 `/budgets` mantém a edição mensal e adiciona uma grade anual que executa
-`UPSERT` sobre as mesmas linhas mensais. `monthly_budget_actuals` e
+`UPSERT` sobre as mesmas linhas mensais. As duas grades começam por receitas e
+consolidam cada categoria principal, com abertura das subcategorias.
+`monthly_budget_actuals` e
 `monthly_budget_progress` são views `security_invoker` e agregam receitas e
 despesas por proprietário, categoria, contexto, moeda e mês.
