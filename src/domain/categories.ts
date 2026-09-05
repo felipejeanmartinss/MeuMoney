@@ -18,14 +18,39 @@ const optionalParentId = z.preprocess(
   z.uuid("Selecione uma categoria principal válida.").nullable(),
 );
 
-export const categoryFormSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().trim().min(1, "Informe o nome da categoria.").max(80, "Use até 80 caracteres."),
-  kind: z.enum(CATEGORY_KINDS, { error: "Selecione receita ou despesa." }),
-  context: z.enum(FINANCIAL_CONTEXTS, { error: "Selecione o contexto." }),
-  groupId: z.uuid("Selecione um grupo válido."),
-  parentId: optionalParentId,
-});
+export const categoryFormSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z
+      .string()
+      .trim()
+      .min(1, "Informe o nome da categoria.")
+      .max(80, "Use até 80 caracteres."),
+    kind: z.enum(CATEGORY_KINDS, {
+      error: "Selecione receita ou despesa.",
+    }),
+    context: z.enum(FINANCIAL_CONTEXTS, {
+      error: "Selecione o contexto.",
+    }),
+    groupId: z.uuid("Selecione um grupo válido."),
+    parentId: optionalParentId,
+    isFixedExpense: z.preprocess(
+      (value) => value === "on" || value === "true" || value === true,
+      z.boolean(),
+    ),
+  })
+  .superRefine((value, refinement) => {
+    if (
+      value.isFixedExpense &&
+      (value.kind !== "expense" || value.parentId === null)
+    ) {
+      refinement.addIssue({
+        code: "custom",
+        path: ["isFixedExpense"],
+        message: "Somente uma subcategoria de despesa pode ser marcada como fixa.",
+      });
+    }
+  });
 
 export const categoryGroupFormSchema = z.object({
   id: z.string().optional(),
@@ -61,7 +86,13 @@ export const categoryGroupDeletionSchema = z.object({
 
 export type CategoryHierarchyItem = Pick<
   Category,
-  "id" | "group_id" | "parent_id" | "name" | "kind" | "context" | "archived_at"
+  | "id"
+  | "group_id"
+  | "parent_id"
+  | "name"
+  | "kind"
+  | "context"
+  | "archived_at"
 >;
 
 export type CategoryGroupItem = Pick<

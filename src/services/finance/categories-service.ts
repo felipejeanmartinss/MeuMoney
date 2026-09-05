@@ -8,6 +8,7 @@ export type CategoryMutationInput = {
   context: FinancialContext;
   groupId: string;
   parentId: string | null;
+  isFixedExpense: boolean;
 };
 
 export type CategoryGroupMutationInput = {
@@ -21,7 +22,7 @@ export async function listCurrentUserCategories() {
   const [categoriesResult, groupsResult] = await Promise.all([
     supabase
       .from("categories")
-      .select("id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at")
+      .select("id, user_id, group_id, parent_id, name, kind, context, is_system, is_fixed_expense, archived_at, created_at, updated_at")
       .eq("user_id", user.id)
       .order("is_system", { ascending: false })
       .order("name", { ascending: true }),
@@ -45,7 +46,7 @@ export async function getCurrentUserCategory(id: string) {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("categories")
-    .select("id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at")
+    .select("id, user_id, group_id, parent_id, name, kind, context, is_system, is_fixed_expense, archived_at, created_at, updated_at")
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle();
@@ -64,9 +65,10 @@ export async function createCurrentUserCategory(input: CategoryMutationInput) {
       name: input.name,
       kind: input.kind,
       context: input.context,
+      is_fixed_expense: input.isFixedExpense,
     })
     .select(
-      "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+      "id, user_id, group_id, parent_id, name, kind, context, is_system, is_fixed_expense, archived_at, created_at, updated_at",
     )
     .single();
 
@@ -101,7 +103,7 @@ export async function getCurrentUserCategoryDeletionImpact(id: string) {
   const { data: category, error: categoryError } = await supabase
     .from("categories")
     .select(
-      "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+      "id, user_id, group_id, parent_id, name, kind, context, is_system, is_fixed_expense, archived_at, created_at, updated_at",
     )
     .eq("user_id", user.id)
     .eq("id", id)
@@ -135,7 +137,7 @@ export async function getCurrentUserCategoryDeletionImpact(id: string) {
     supabase
       .from("categories")
       .select(
-        "id, user_id, group_id, parent_id, name, kind, context, is_system, archived_at, created_at, updated_at",
+        "id, user_id, group_id, parent_id, name, kind, context, is_system, is_fixed_expense, archived_at, created_at, updated_at",
       )
       .eq("user_id", user.id)
       .eq("kind", category.kind)
@@ -236,6 +238,7 @@ export async function updateCurrentUserCategory(id: string, input: CategoryMutat
       name: input.name,
       kind: input.kind,
       context: input.context,
+      is_fixed_expense: input.isFixedExpense,
     })
     .eq("user_id", user.id)
     .eq("id", id)

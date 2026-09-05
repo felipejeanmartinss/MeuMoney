@@ -32,6 +32,7 @@ export type QuickCategoryFormState = FinancialFormState & {
     | "kind"
     | "context"
     | "is_system"
+    | "is_fixed_expense"
     | "archived_at"
   >;
 };
@@ -43,6 +44,7 @@ const categoryInputFrom = (formData: FormData) => ({
   context: formData.get("context"),
   groupId: formData.get("groupId"),
   parentId: formData.get("parentId"),
+  isFixedExpense: formData.get("isFixedExpense"),
 });
 
 const categoryGroupInputFrom = (formData: FormData) => ({

@@ -125,6 +125,11 @@ export type CategoryMonthlyReportEntry = {
   section: "income" | "expense";
   groupLabel: string;
   label: string;
+  categoryKey?: string;
+  categoryLabel?: string;
+  subcategoryKey?: string | null;
+  subcategoryLabel?: string | null;
+  isFixedExpense?: boolean;
   referenceMonth: string;
   amountMinor: number;
 };
@@ -134,9 +139,30 @@ export type MonthlyReportMatrixRow = {
   section: "income" | "expense";
   groupLabel: string;
   label: string;
+  categoryKey: string;
+  categoryLabel: string;
+  subcategoryKey: string | null;
+  subcategoryLabel: string | null;
   monthAmountsMinor: number[];
   totalAmountMinor: number;
 };
+
+function reportHierarchy(entry: CategoryMonthlyReportEntry) {
+  const [fallbackCategory, ...fallbackSubcategory] = entry.label.split(" › ");
+  return {
+    categoryKey: entry.categoryKey ?? entry.rowId,
+    categoryLabel: entry.categoryLabel ?? fallbackCategory,
+    subcategoryKey: entry.subcategoryKey ?? null,
+    subcategoryLabel:
+      entry.subcategoryLabel ??
+      (fallbackSubcategory.length ? fallbackSubcategory.join(" › ") : null),
+  };
+}
+
+function compareMinorAscending(left: number, right: number) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
 
 export function buildMonthlyCategoryMatrix(
   year: number,
@@ -152,11 +178,13 @@ export function buildMonthlyCategoryMatrix(
     if (monthIndex < 0 || monthIndex > 11) continue;
 
     const key = `${entry.section}:${entry.rowId}`;
+    const hierarchy = reportHierarchy(entry);
     const row = rows.get(key) ?? {
       rowId: key,
       section: entry.section,
       groupLabel: entry.groupLabel,
       label: entry.label,
+      ...hierarchy,
       monthAmountsMinor: Array.from({ length: 12 }, () => 0),
       totalAmountMinor: 0,
     };
@@ -172,6 +200,7 @@ export function buildMonthlyCategoryMatrix(
       return left.section === "income" ? -1 : 1;
     }
     return (
+      compareMinorAscending(left.totalAmountMinor, right.totalAmountMinor) ||
       left.groupLabel.localeCompare(right.groupLabel, "pt-BR") ||
       left.label.localeCompare(right.label, "pt-BR")
     );
@@ -218,6 +247,10 @@ export function projectFixedExpenseMatrix(
         section: "expense",
         groupLabel: rule.groupLabel,
         label: rule.label,
+        categoryKey: rule.rowId,
+        categoryLabel: rule.label,
+        subcategoryKey: null,
+        subcategoryLabel: null,
         referenceMonth: occurrence,
         amountMinor: assertMinorUnits(rule.amountMinor),
       });
@@ -239,6 +272,10 @@ export type PeriodComparisonRow = {
   section: "income" | "expense";
   groupLabel: string;
   label: string;
+  categoryKey: string;
+  categoryLabel: string;
+  subcategoryKey: string | null;
+  subcategoryLabel: string | null;
   firstAmountMinor: number;
   secondAmountMinor: number;
   differenceMinor: number;
@@ -283,11 +320,13 @@ export function buildPeriodComparison(
     if (!inFirst && !inSecond) continue;
 
     const key = `${entry.section}:${entry.rowId}`;
+    const hierarchy = reportHierarchy(entry);
     const row = rows.get(key) ?? {
       rowId: key,
       section: entry.section,
       groupLabel: entry.groupLabel,
       label: entry.label,
+      ...hierarchy,
       firstAmountMinor: 0,
       secondAmountMinor: 0,
       differenceMinor: 0,
@@ -322,6 +361,7 @@ export function buildPeriodComparison(
         return left.section === "income" ? -1 : 1;
       }
       return (
+        compareMinorAscending(left.secondAmountMinor, right.secondAmountMinor) ||
         left.groupLabel.localeCompare(right.groupLabel, "pt-BR") ||
         left.label.localeCompare(right.label, "pt-BR")
       );
