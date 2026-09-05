@@ -231,14 +231,17 @@ solicitado, sem carregar transações ou parcelas brutas.
 
 Receitas x despesas, Despesas fixas, Comparativo entre períodos e Performance
 de ativos compartilham filtros em URL, o `AppShell` global e tabelas acessíveis
-com rolagem horizontal. Categorias principais são linhas consolidadas e abrem
-suas subcategorias por controle de divulgação. As views financeiras continuam
+com rolagem horizontal. O seletor de relatórios fica em uma faixa horizontal
+agrupada abaixo do cabeçalho. Categorias principais são linhas consolidadas e
+usam o mesmo controle de divulgação mesmo sem subcategorias; nesse caso, a
+abertura identifica o valor direto como `Sem subcategoria`. As views financeiras continuam
 `security_invoker`, e os serviços repetem o filtro por `user_id`, moeda,
 contexto e período. Nenhuma nova tabela é necessária para a central.
 
 `/budgets` mantém a edição mensal e adiciona uma grade anual que executa
 `UPSERT` sobre as mesmas linhas mensais. As duas grades começam por receitas e
-consolidam cada categoria principal, com abertura das subcategorias.
+consolidam cada categoria principal com um controle uniforme de abertura; uma
+categoria sem filhas expõe sua edição direta na linha `Sem subcategoria`.
 `monthly_budget_actuals` e
 `monthly_budget_progress` são views `security_invoker` e agregam receitas e
 despesas por proprietário, categoria, contexto, moeda e mês.

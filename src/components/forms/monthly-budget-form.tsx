@@ -96,7 +96,6 @@ export function MonthlyBudgetForm({ referenceMonth, context, currency, categorie
           const previous = hierarchy[index - 1];
           const showSection = !previous || previous.category.kind !== node.category.kind;
           const expanded = expandedCategories.has(node.key);
-          const hasChildren = node.children.length > 0;
           return (
             <div key={node.key}>
               {showSection ? (
@@ -104,20 +103,14 @@ export function MonthlyBudgetForm({ referenceMonth, context, currency, categorie
                   {node.category.kind === "income" ? "Receitas" : "Despesas"}
                 </p>
               ) : null}
-              {hasChildren ? (
-                <button type="button" aria-expanded={expanded} onClick={() => toggleCategory(node.key)} className="flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-100 bg-emerald-50/50 px-3 text-left font-semibold text-slate-900 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-600">
-                  <span><span aria-hidden="true" className="mr-2">{expanded ? "▾" : "▸"}</span>{node.category.name}</span>
-                  <span className="tabular-nums text-slate-600">{minorUnitsToInput(node.totalAmountMinor)}</span>
-                </button>
-              ) : (
-                <BudgetInput category={node.category} />
-              )}
-              {hasChildren ? (
-                <div className={expanded ? "block" : "hidden"}>
-                  <BudgetInput category={node.category} label="Sem subcategoria" nested />
-                  {node.children.map((category) => <BudgetInput key={category.id} category={category} nested />)}
-                </div>
-              ) : null}
+              <button type="button" aria-expanded={expanded} onClick={() => toggleCategory(node.key)} className="flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-100 bg-emerald-50/50 px-3 text-left font-semibold text-slate-900 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-600">
+                <span><span aria-hidden="true" className="mr-2">{expanded ? "▾" : "▸"}</span>{node.category.name}</span>
+                <span className="tabular-nums text-slate-600">{minorUnitsToInput(node.totalAmountMinor)}</span>
+              </button>
+              <div className={expanded ? "block" : "hidden"}>
+                <BudgetInput category={node.category} label="Sem subcategoria" nested />
+                {node.children.map((category) => <BudgetInput key={category.id} category={category} nested />)}
+              </div>
             </div>
           );
         })}

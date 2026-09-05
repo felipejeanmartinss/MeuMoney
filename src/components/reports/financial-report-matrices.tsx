@@ -125,9 +125,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
                 ),
                 monthAmountsMinor,
                 totalAmountMinor: sumMoney(monthAmountsMinor),
-                expandable: childRows.some(
-                  (row) => row.subcategoryLabel !== null,
-                ),
+                expandable: true,
               };
             })
             .sort(
@@ -509,9 +507,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
             differenceMinor: assertMinorUnits(
               secondAmountMinor - firstAmountMinor,
             ),
-            expandable: childRows.some(
-              (row) => row.subcategoryLabel !== null,
-            ),
+            expandable: true,
           };
         })
         .sort(
