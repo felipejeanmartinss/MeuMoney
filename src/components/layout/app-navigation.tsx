@@ -284,7 +284,7 @@ export function MobileBottomNavigation() {
   return (
     <nav
       aria-label="Navegação principal no celular"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-0.4rem_1.5rem_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-0.4rem_1.5rem_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
     >
       {MAIN_NAVIGATION.map((item) => {
         const active = item.section === activeSection;
@@ -293,7 +293,7 @@ export function MobileBottomNavigation() {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`grid min-h-14 place-items-center content-center gap-1 rounded-xl px-1 text-[0.64rem] font-bold ${
+            className={`grid min-h-14 place-items-center content-center gap-1 rounded-xl px-0.5 text-[0.58rem] font-bold sm:text-[0.64rem] ${
               active ? "text-emerald-800" : "text-slate-500"
             }`}
           >

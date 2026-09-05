@@ -157,3 +157,6 @@ autorizados. Não altera as regras financeiras existentes nem exige migration.
 - orçamento mensal de receitas e despesas e grade anual com doze meses;
 - módulo Recorrências apresentado ao usuário como Contas a Pagar;
 - autodetecção de CSV Bradesco com metadados antes do cabeçalho e colunas separadas de crédito e débito.
+- Relatórios promovidos a módulo principal, fora da navegação contextual de Contas.
+- Central configurável com matrizes de Receitas x despesas, Despesas fixas, Comparativo entre períodos e Performance de ativos.
+- Hierarquia de grupos, categorias e subcategorias preservada nas linhas e consolidação sempre separada por moeda.

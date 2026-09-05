@@ -398,6 +398,20 @@ export type FinancialDashboardExpenseCategoryBasis = Omit<
   category_id: string | null;
 };
 
+export type FinancialReportCategoryMonthly = {
+  basis: FinancialReportBasis;
+  user_id: string;
+  reference_month: string;
+  currency: SupportedCurrency;
+  section: CategoryKind;
+  row_id: string;
+  category_id: string | null;
+  group_name: string;
+  row_name: string;
+  context: FinancialContext;
+  amount_minor: number;
+};
+
 export type FinancialDashboardUpcomingRecurrence = {
   id: string;
   user_id: string;
@@ -1161,6 +1175,10 @@ export type Database = {
       };
       financial_dashboard_expense_categories_basis: {
         Row: FinancialDashboardExpenseCategoryBasis;
+        Relationships: [];
+      };
+      financial_report_category_monthly: {
+        Row: FinancialReportCategoryMonthly;
         Relationships: [];
       };
       financial_dashboard_upcoming_recurrences: {

@@ -297,4 +297,13 @@ mantém uma linha por usuário, mês, moeda e categoria. As views de dashboard p
 regime foram recompostas para excluir aportes e resgates do resultado e incluir
 pagamentos para cartão somente no caixa.
 
-Migration cumulativa: `20260905090000_investment_transactions_reports.sql`.
+`financial_report_category_monthly` é a fonte das matrizes de relatórios. A
+view usa `security_invoker`, preserva usuário, regime, mês, moeda, natureza,
+grupo, categoria ou subcategoria e contexto financeiro. Rendimentos de
+investimentos entram somente quando ligados a um fluxo do tipo `income`;
+aportes e resgates continuam fora de receitas e despesas. O acesso é revogado
+de `anon` e concedido explicitamente a `authenticated`.
+
+Migrations cumulativas, nesta ordem:
+`20260905090000_investment_transactions_reports.sql` e
+`20260905143000_financial_report_matrices.sql`.

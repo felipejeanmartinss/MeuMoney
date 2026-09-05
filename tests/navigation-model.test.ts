@@ -14,18 +14,20 @@ describe("navigation model", () => {
     ["/credit-cards/abc", "accounts"],
     ["/investments/abc/history", "investments"],
     ["/net-worth", "net-worth"],
+    ["/reports", "reports"],
     ["/imports/new", "profile"],
     ["/settings/security", "profile"],
   ] as const)("maps %s to %s", (pathname, section) => {
     expect(resolveNavigationSection(pathname)).toBe(section);
   });
 
-  it("keeps only five primary destinations", () => {
+  it("keeps reports as an independent primary destination", () => {
     expect(MAIN_NAVIGATION.map((item) => item.label)).toEqual([
       "Início",
       "Contas",
       "Investimentos",
       "Patrimônio",
+      "Relatórios",
       "Perfil",
     ]);
   });
@@ -37,9 +39,7 @@ describe("navigation model", () => {
     expect(
       secondaryNavigationFor("/credit-cards").map((item) => item.label),
     ).toContain("Cartões");
-    expect(
-      secondaryNavigationFor("/reports").map((item) => item.label),
-    ).toContain("Relatórios");
+    expect(secondaryNavigationFor("/reports")).toEqual([]);
     expect(
       secondaryNavigationFor("/recurring-transactions").map(
         (item) => item.label,

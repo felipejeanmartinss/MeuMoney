@@ -238,3 +238,8 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - O relatório de caixa reconhece despesas realizadas na data da saída e pagamentos livres para cartões, mas exclui transferências entre contas e movimentos patrimoniais de investimentos.
 - Orçamentos aceitam categorias ativas de receita e despesa. O realizado de receitas considera entradas categorizadas ativas e concluídas; o realizado de despesas mantém a regra de consumo por competência.
 - A grade anual apenas edita os doze orçamentos mensais em conjunto. Não cria uma nova unidade de consolidação e nunca soma moedas ou contextos diferentes.
+- A central de relatórios apresenta matrizes antes de gráficos e permite ajustar ano ou períodos, moeda, contexto, regime e situação quando aplicável.
+- Receitas x despesas detalha grupos, categorias e subcategorias por mês; categorias removidas continuam identificadas como históricas, sem reclassificação implícita.
+- Despesas fixas são projeções das regras de despesa cadastradas em Contas a Pagar. Uma projeção não confirma que a obrigação foi paga.
+- Comparativos exibem o segundo período menos o primeiro; a variação percentual fica vazia quando o primeiro período é zero.
+- Performance de ativos usa somente aportes, resgates, rendimentos, custo e valor registrados. Resultado e retorno ficam vazios quando o histórico da posição não é completo, e nenhuma taxa anualizada é inventada.
