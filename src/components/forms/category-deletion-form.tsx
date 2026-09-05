@@ -73,7 +73,7 @@ export function CategoryDeletionForm({
               ))}
             </select>
             <span className="text-xs font-normal text-slate-500">
-              Lançamentos, recorrências, compras, orçamentos e revisões de
+              Lançamentos, contas a pagar, compras, orçamentos e revisões de
               importação serão realocados na mesma operação.
             </span>
           </Field>

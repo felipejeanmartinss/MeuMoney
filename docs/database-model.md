@@ -275,3 +275,26 @@ As migrations cumulativas deste incremento são aplicadas, nesta ordem:
 `20260815161500_card_financing_fk_indexes.sql` para os índices das chaves
 estrangeiras. A classificação de linhas importadas como pagamentos livres é
 adicionada por `20260823090000_import_credit_card_payments.sql`.
+
+## Movimentos de investimento e relatórios
+
+`transactions.origin_type` recebe o valor `investment`. Nessas linhas,
+`origin_id` referencia semanticamente a posição e a categoria permanece nula.
+`investment_cash_flows.transaction_id` cria o vínculo único e reversível com o
+extrato; `income_type` detalha JCP, dividendos, bonificações ou outros
+rendimentos e permanece nulo em aportes e resgates.
+
+`create_investment_account_entry` valida proprietário, atividade, tipo da
+conta, posição, moeda, contexto, valor inteiro e data. A transação e o fluxo são
+inseridos na mesma transação PostgreSQL. O trigger também valida o vínculo,
+impedindo associação cruzada entre usuários ou valores divergentes.
+Quando solicitado no primeiro aporte, a mesma RPC cria antes a posição e sua
+fotografia automática, usando aporte como custo e valor inicial.
+
+`monthly_budget_actuals` une o consumo de despesas existente às receitas
+categorizadas realizadas. `monthly_budget_progress` expõe `category_kind` e
+mantém uma linha por usuário, mês, moeda e categoria. As views de dashboard por
+regime foram recompostas para excluir aportes e resgates do resultado e incluir
+pagamentos para cartão somente no caixa.
+
+Migration cumulativa: `20260905090000_investment_transactions_reports.sql`.

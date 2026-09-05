@@ -37,6 +37,14 @@ describe("navigation model", () => {
     expect(
       secondaryNavigationFor("/credit-cards").map((item) => item.label),
     ).toContain("Cartões");
+    expect(
+      secondaryNavigationFor("/reports").map((item) => item.label),
+    ).toContain("Relatórios");
+    expect(
+      secondaryNavigationFor("/recurring-transactions").map(
+        (item) => item.label,
+      ),
+    ).toContain("Contas a Pagar");
   });
 
   it("distinguishes investment tabs by query string", () => {

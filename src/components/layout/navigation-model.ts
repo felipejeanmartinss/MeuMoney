@@ -12,7 +12,8 @@ export type NavigationIcon =
   | "cards"
   | "imports"
   | "security"
-  | "financing";
+  | "financing"
+  | "reports";
 
 export type NavigationItem = {
   href: string;
@@ -51,6 +52,7 @@ export const MAIN_NAVIGATION: ReadonlyArray<
       "/transfers",
       "/categories",
       "/credit-cards",
+      "/reports",
     ],
   },
   {
@@ -89,7 +91,7 @@ export const SECONDARY_NAVIGATION: Record<
     },
     {
       href: "/recurring-transactions",
-      label: "Recorrências",
+      label: "Contas a Pagar",
       icon: "recurring",
       match: ["/recurring-transactions"],
     },
@@ -98,6 +100,12 @@ export const SECONDARY_NAVIGATION: Record<
       label: "Orçamentos",
       icon: "budgets",
       match: ["/budgets"],
+    },
+    {
+      href: "/reports",
+      label: "Relatórios",
+      icon: "reports",
+      match: ["/reports"],
     },
     {
       href: "/categories",

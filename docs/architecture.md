@@ -201,7 +201,7 @@ acessa o Supabase e não persiste simulações.
 ## Experiência centrada na conta
 
 O dashboard e a central de Contas encaminham para `/accounts/[id]`, que reúne
-Extrato, Recorrências e Importar. O formulário `/transactions/new` aceita a
+Extrato, Contas a Pagar e Importar. O formulário `/transactions/new` aceita a
 conta de origem e alterna entre Receita, Despesa e Transferência; cada modo
 continua chamando suas Server Actions e serviços financeiros existentes.
 
@@ -210,3 +210,23 @@ como opções mínimas aos formulários cliente. Nenhum Client Component acessa 
 Supabase diretamente. A central de Investimentos apenas organiza posições por
 família e reutiliza passivos patrimoniais para financiamentos e empréstimos,
 sem mover registros entre domínios.
+
+## Operações financeiras e relatórios executivos
+
+O formulário unificado de lançamentos oferece um modo de investimento somente
+para contas desse tipo. A Server Action valida a entrada e chama
+`create_investment_account_entry`, uma fachada `security invoker` para a
+operação privada e atômica que grava a transação da conta e o fluxo da posição.
+A posição atual não é recalculada a partir do evento: quantidade, custo e valor
+continuam sendo fotografias manuais e auditáveis.
+
+`/reports` consulta exclusivamente `financial_dashboard_monthly_basis`, com
+ano, moeda e regime filtrados no servidor. O navegador recebe no máximo doze
+linhas agregadas, sem carregar o histórico financeiro. A mesma view separa
+competência e caixa e distingue renda de investimento de simples devolução de
+capital.
+
+`/budgets` mantém a edição mensal e adiciona uma grade anual que executa
+`UPSERT` sobre as mesmas linhas mensais. `monthly_budget_actuals` e
+`monthly_budget_progress` são views `security_invoker` e agregam receitas e
+despesas por proprietário, categoria, contexto, moeda e mês.

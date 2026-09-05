@@ -103,7 +103,7 @@ export function FinancialPulse({
         >
           {overdueInvoices
             ? `${overdueInvoices} fatura(s) vencida(s) exigem atenção.`
-            : `${recurrenceCount} recorrência(s) e ${invoices.length} fatura(s) próxima(s).`}
+            : `${recurrenceCount} conta(s) a pagar e ${invoices.length} fatura(s) próxima(s).`}
         </p>
       </article>
     </section>

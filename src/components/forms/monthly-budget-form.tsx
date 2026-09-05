@@ -9,6 +9,7 @@ import { minorUnitsToInput } from "@/domain/money";
 import type {
   FinancialContext,
   SupportedCurrency,
+  CategoryKind,
 } from "@/types/database";
 import { FormMessage, SubmitButton, inputClass } from "./form-controls";
 
@@ -16,6 +17,7 @@ type BudgetCategory = {
   id: string;
   name: string;
   plannedAmountMinor: number;
+  kind: CategoryKind;
 };
 
 const initialState: BudgetFormState = { status: "idle" };
@@ -46,15 +48,19 @@ export function MonthlyBudgetForm({
         <FormMessage>{state.message}</FormMessage>
       ) : null}
 
-      <div className="grid gap-3">
+      <div className="overflow-hidden rounded-xl border border-slate-200">
         {categories.map((category) => (
           <label
             key={category.id}
-            className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[1fr_12rem] sm:items-center"
+            className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50 sm:grid-cols-[1fr_11rem] sm:items-center"
           >
-            <span className="font-semibold text-slate-900">{category.name}</span>
+            <span className="min-w-0 truncate font-semibold text-slate-900">
+              <span className={`mr-2 text-[0.62rem] font-black uppercase ${category.kind === "income" ? "text-emerald-700" : "text-rose-700"}`}>
+                {category.kind === "income" ? "Receita" : "Despesa"}
+              </span>
+              {category.name}
+            </span>
             <span className="grid gap-1 text-sm text-slate-600">
-              Planejado ({currency})
               <input type="hidden" name="categoryId" value={category.id} />
               <input
                 name="plannedAmountMinor"

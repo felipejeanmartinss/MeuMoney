@@ -16,11 +16,13 @@ A leitura automática é a opção padrão. Ela reconhece:
 
 | Emissor | Layout testado | Preset |
 | --- | --- | --- |
-| Bradesco | `Data; Histórico; Docto.; Crédito; Débito; Saldo; Valor` | `bradesco-account-statement-v1` |
+| Bradesco | metadados opcionais, seguidos por `Data; Histórico; Docto.; Crédito; Débito; Saldo` | `bradesco-account-statement-v1` |
 | Nubank | `Data, Valor, Identificador, Descrição` | `nubank-account-statement-v1` |
 
-O detector genérico também aceita cabeçalhos inequívocos de data, descrição e
-valor. Delimitador, formato da data e separador decimal são inferidos e a
+O detector examina as primeiras 20 linhas para localizar o cabeçalho real e
+aceita tanto uma coluna única de valor quanto colunas separadas de crédito e
+débito. O detector genérico também aceita cabeçalhos inequívocos de data,
+descrição e valor. Delimitador, formato da data e separador decimal são inferidos e a
 amostra precisa atingir pelo menos 60% de linhas válidas. Linhas automáticas
 com valor zero são descartadas porque não representam movimentação.
 

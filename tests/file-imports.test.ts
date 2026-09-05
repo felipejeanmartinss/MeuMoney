@@ -77,6 +77,46 @@ describe("file imports", () => {
     expect(parseDetectedCsv(content).rows).toHaveLength(2);
   });
 
+  it("finds the Bradesco header after account metadata and combines credit and debit columns", () => {
+    const content = fixture(
+      "anonymous-bradesco-credit-debit-preamble-v1.csv",
+    );
+    const detection = detectCsvImportConfig(content);
+    const rows = parseConfiguredCsv(content, detection.config);
+
+    expect(detection).toMatchObject({
+      presetId: "bradesco-account-statement-v1",
+      bankName: "Bradesco",
+      confidence: 1,
+      config: {
+        delimiter: ";",
+        skipRows: 1,
+        dateColumn: 1,
+        descriptionColumn: 2,
+        amountColumn: null,
+        creditColumn: 4,
+        debitColumn: 5,
+        externalIdColumn: 3,
+        decimalSeparator: ",",
+      },
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({
+      sourceExternalId: "100001",
+      transactionDate: "2026-08-01",
+      signedAmountMinor: 125075,
+      validationCode: null,
+    });
+    expect(rows[1].signedAmountMinor).toBe(-24590);
+    expect(rows[2].validationCode).toBe("invalid_amount");
+    expect(parseDetectedCsv(content).rows).toHaveLength(3);
+    expect(
+      parseDetectedCsv(
+        `${content}\nSALDOS INVEST;SEM MOVIMENTO;;;;\nTOTAL;RODAPÉ;;;;`,
+      ).rows,
+    ).toHaveLength(2);
+  });
+
   it("detects and parses the tested Nubank CSV layout", () => {
     const content = fixture("anonymous-nubank-account-statement-v1.csv");
     const detection = detectCsvImportConfig(content);

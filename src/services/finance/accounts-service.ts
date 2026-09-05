@@ -196,6 +196,8 @@ export async function getCurrentUserAccountHub(id: string) {
           ? getCategoryQualifiedName(category, categories, categoryGroups)
           : transaction.origin_type === "credit_card_invoice_payment"
             ? "Pagamento técnico de fatura"
+            : transaction.origin_type === "investment"
+              ? "Movimento de investimento"
             : transaction.transaction_type === "income"
               ? "Receita"
               : "Despesa",

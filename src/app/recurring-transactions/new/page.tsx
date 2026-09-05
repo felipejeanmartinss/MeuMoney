@@ -3,7 +3,7 @@ import { RecurringTransactionForm } from "@/components/forms/recurring-transacti
 import { getRecurringTransactionFormOptions } from "@/services/finance/recurring-transactions-service";
 import { toIsoDate } from "@/utils/dates";
 
-export const metadata = { title: "Nova recorrência" };
+export const metadata = { title: "Nova conta a pagar" };
 
 export default async function NewRecurringTransactionPage({
   searchParams,
@@ -29,10 +29,10 @@ export default async function NewRecurringTransactionPage({
           href="/recurring-transactions"
           className="text-sm font-semibold text-blue-700 hover:underline"
         >
-          ← Voltar para recorrências
+          ← Voltar para Contas a Pagar
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950">
-          Nova recorrência
+          Nova conta a pagar
         </h1>
         <p className="mt-2 text-slate-600">
           Configure o calendário; os lançamentos serão gerados como previstos.
@@ -41,7 +41,7 @@ export default async function NewRecurringTransactionPage({
       {hasError || accounts.length === 0 || categories.length === 0 ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
           Cadastre ao menos uma conta e uma categoria ativa antes de criar uma
-          recorrência.
+          conta a pagar.
         </section>
       ) : (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">

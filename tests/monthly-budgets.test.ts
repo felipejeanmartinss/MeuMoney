@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  annualBudgetBatchSchema,
   calculateMonthlyBudgetProgress,
   currentReferenceMonth,
   previousReferenceMonth,
@@ -203,5 +204,32 @@ describe("monthly budget aggregation", () => {
         "America/Sao_Paulo",
       ),
     ).toBe("2026-07");
+  });
+
+  it("validates an annual grid with income and expense category cells", () => {
+    const parsed = annualBudgetBatchSchema.safeParse({
+      year: "2026",
+      context: "personal",
+      currency: "BRL",
+      rows: [
+        {
+          categoryId: "5bca08ad-3663-4bf3-bec1-edceb86146d8",
+          referenceMonth: "2026-01-01",
+          plannedAmountMinor: "10.000,00",
+        },
+        {
+          categoryId: "67528771-faa2-4ec0-b0f1-bbb90795c514",
+          referenceMonth: "2026-12-01",
+          plannedAmountMinor: "2.500,00",
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.rows.map((row) => row.plannedAmountMinor)).toEqual([
+        1_000_000, 250_000,
+      ]);
+    }
   });
 });

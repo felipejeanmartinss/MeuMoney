@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   calculateInvestmentBreakdown,
   formatInvestmentQuantity,
+  investmentAccountEntryFormSchema,
   investmentCashFlowFormSchema,
+  investmentEventTransactionType,
   investmentPositionFormSchema,
   normalizeInvestmentQuantity,
   summarizeInvestmentsByCurrency,
@@ -83,6 +85,58 @@ describe("investment rules", () => {
 
     expect(valid.success).toBe(true);
     expect(invalid.success).toBe(false);
+  });
+
+  it("maps account movements without treating capital redemption as performance", () => {
+    expect(investmentEventTransactionType("contribution")).toBe("expense");
+    expect(investmentEventTransactionType("redemption")).toBe("income");
+    expect(investmentEventTransactionType("dividend")).toBe("income");
+
+    const parsed = investmentAccountEntryFormSchema.safeParse({
+      accountId: "5bca08ad-3663-4bf3-bec1-edceb86146d8",
+      positionId: "67528771-faa2-4ec0-b0f1-bbb90795c514",
+      eventType: "interest_on_capital",
+      description: "JCP recebido",
+      amountMinor: "123,45",
+      quantity: "",
+      transactionDate: "2026-09-01",
+      notes: "",
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.amountMinor).toBe(12_345);
+
+    const newPosition = investmentAccountEntryFormSchema.safeParse({
+      accountId: "5bca08ad-3663-4bf3-bec1-edceb86146d8",
+      positionId: "new",
+      eventType: "contribution",
+      description: "Primeiro aporte",
+      amountMinor: "1.000,00",
+      quantity: "10",
+      transactionDate: "2026-09-01",
+      notes: "",
+      newInstitution: "Corretora",
+      newInvestmentClass: "fixed_income",
+      newInvestmentType: "cdb",
+      newAssetName: "CDB 2028",
+    });
+    const invalidNewPosition = investmentAccountEntryFormSchema.safeParse({
+      accountId: "5bca08ad-3663-4bf3-bec1-edceb86146d8",
+      positionId: "new",
+      eventType: "redemption",
+      description: "Resgate sem posição",
+      amountMinor: "1.000,00",
+      quantity: "",
+      transactionDate: "2026-09-01",
+      notes: "",
+      newInstitution: "Corretora",
+      newInvestmentClass: "fixed_income",
+      newInvestmentType: "cdb",
+      newAssetName: "CDB 2028",
+    });
+
+    expect(newPosition.success).toBe(true);
+    expect(invalidNewPosition.success).toBe(false);
   });
 
   it("separates contributions, redemptions, income and unrealized change", () => {

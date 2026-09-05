@@ -59,7 +59,7 @@ export function buildAccountRegister(
 ) {
   let runningBalanceMinor = openingBalanceMinor;
 
-  return [...entries]
+  const chronologicalEntries = [...entries]
     .sort(
       (left, right) =>
         left.transactionDate.localeCompare(right.transactionDate) ||
@@ -81,4 +81,8 @@ export function buildAccountRegister(
         runningBalanceMinor,
       };
     });
+
+  // The balance must be accumulated in chronological order, while a bank
+  // register is easier to use with the most recent activity on the first page.
+  return chronologicalEntries.reverse();
 }

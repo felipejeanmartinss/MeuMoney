@@ -25,7 +25,7 @@ export function ArchivedAccountDeletionForm({
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
       <p className="text-sm leading-6 text-red-900">
         Excluir <strong>{accountName}</strong> removerá definitivamente seu
-        extrato, transferências, recorrências e importações vinculadas. Cartões
+        extrato, transferências, contas a pagar e importações vinculadas. Cartões
         ligados à conta serão apenas desvinculados.
       </p>
       <Field

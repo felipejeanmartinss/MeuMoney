@@ -7,12 +7,14 @@ import type {
   AccountType,
   FinancialContext,
   SupportedCurrency,
+  InvestmentPositionSummary,
   TransactionType,
 } from "@/types/database";
 import { TransactionForm } from "./transaction-form";
 import { TransferForm } from "./transfer-form";
+import { InvestmentAccountEntryForm } from "./investment-account-entry-form";
 
-type EntryMode = TransactionType | "transfer";
+type EntryMode = TransactionType | "transfer" | "investment";
 
 type AccountOption = {
   id: string;
@@ -37,6 +39,7 @@ const MODE_LABELS: Record<EntryMode, string> = {
   expense: "Despesa",
   income: "Receita",
   transfer: "Transferência",
+  investment: "Investimento",
 };
 
 export function AccountEntryForm({
@@ -44,6 +47,7 @@ export function AccountEntryForm({
   categories,
   groups,
   creditCards,
+  investmentPositions,
   accountId,
   transactionDate,
   initialMode,
@@ -52,6 +56,7 @@ export function AccountEntryForm({
   categories: CategoryOption[];
   groups: CategoryGroupItem[];
   creditCards: CreditCardTransferDestination[];
+  investmentPositions: InvestmentPositionSummary[];
   accountId?: string;
   transactionDate: string;
   initialMode: EntryMode;
@@ -65,7 +70,7 @@ export function AccountEntryForm({
       <div
         role="tablist"
         aria-label="Tipo de entrada na conta"
-        className="grid grid-cols-3 rounded-xl bg-slate-100 p-1"
+        className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 sm:grid-cols-4"
       >
         {(Object.keys(MODE_LABELS) as EntryMode[]).map((entryMode) => (
           <button
@@ -85,7 +90,20 @@ export function AccountEntryForm({
         ))}
       </div>
 
-      {mode === "transfer" ? (
+      {mode === "investment" ? (
+        <InvestmentAccountEntryForm
+          key="investment"
+          accounts={accounts.filter((account) => account.type === "investment")}
+          positions={investmentPositions}
+          initialAccountId={
+            accounts.find(
+              (account) =>
+                account.id === accountId && account.type === "investment",
+            )?.id
+          }
+          transactionDate={transactionDate}
+        />
+      ) : mode === "transfer" ? (
         <TransferForm
           key="transfer"
           accounts={accounts}

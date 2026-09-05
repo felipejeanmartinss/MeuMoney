@@ -101,7 +101,7 @@ limite sobe para 5.000 linhas. Lançamentos divididos permanecem fora do escopo.
 
 Novas versões e novos bancos com fixtures representativas, lançamentos QIF
 divididos, OCR, importação XLS,
-relatórios analíticos, avaliações automáticas de mercado e recursos avançados
+relatórios analíticos adicionais, avaliações automáticas de mercado e recursos avançados
 de cartão serão planejados separadamente.
 
 ## Incremento visual consolidado — MeuMoney moderno
@@ -147,3 +147,13 @@ autorizados. Não altera as regras financeiras existentes nem exige migration.
 - destinos de transferência de mesma moeda disponíveis no fluxo de lançamento por conta;
 - reclassificação segura de linhas importadas entre lançamento e transferência;
 - pagamentos de cartão preservados no fluxo técnico da fatura, sem dupla contagem.
+
+## Incremento — Operações financeiras e relatórios
+
+- extrato por conta em ordem decrescente, com densidade de relatório bancário;
+- aplicações, resgates e rendimentos vinculados atomicamente entre conta de investimento e posição;
+- manutenção do cadastro direto de posições para saldos históricos sem transação;
+- relatório anual de receitas, despesas e resultado em competência ou caixa;
+- orçamento mensal de receitas e despesas e grade anual com doze meses;
+- módulo Recorrências apresentado ao usuário como Contas a Pagar;
+- autodetecção de CSV Bradesco com metadados antes do cabeçalho e colunas separadas de crédito e débito.

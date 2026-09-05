@@ -125,6 +125,14 @@ function NavigationGlyph({
         <path d="M4 21h16" />
       </>
     ),
+    reports: (
+      <>
+        <path d="M4 19V5" />
+        <path d="M4 19h16" />
+        <path d="m7 15 3-4 3 2 4-6" />
+        <path d="M17 7h3v3" />
+      </>
+    ),
   };
 
   return (

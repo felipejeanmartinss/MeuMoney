@@ -2,6 +2,7 @@ import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   FinancialContext,
+  InvestmentAccountEventType,
   InvestmentCashFlowType,
   InvestmentClass,
   InvestmentType,
@@ -29,6 +30,23 @@ export type InvestmentCashFlowMutationInput = {
   quantity: string | null;
   cashFlowDate: string;
   notes: string | null;
+};
+
+export type InvestmentAccountEntryMutationInput = {
+  accountId: string;
+  positionId: string | null;
+  eventType: InvestmentAccountEventType;
+  description: string;
+  amountMinor: number;
+  quantity: string | null;
+  transactionDate: string;
+  notes: string | null;
+  newPosition: {
+    institution: string;
+    investmentClass: InvestmentClass;
+    investmentType: InvestmentType;
+    assetName: string;
+  } | null;
 };
 
 const positionColumns =
@@ -76,7 +94,7 @@ export async function listCurrentUserInvestmentHistory(positionId: string) {
     supabase
       .from("investment_cash_flows")
       .select(
-        "id, position_id, user_id, cash_flow_type, amount_minor, quantity, cash_flow_date, notes, created_at",
+        "id, position_id, user_id, cash_flow_type, income_type, transaction_id, amount_minor, quantity, cash_flow_date, notes, created_at",
       )
       .eq("user_id", user.id)
       .eq("position_id", positionId)
@@ -208,4 +226,56 @@ export async function createCurrentUserInvestmentCashFlow(
           "Não foi possível registrar o aporte, resgate ou renda desta posição.",
       }
     : { ok: true as const, id: data.id };
+}
+
+export async function createCurrentUserInvestmentAccountEntry(
+  input: InvestmentAccountEntryMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "create_investment_account_entry",
+    {
+      target_account_id: input.accountId,
+      target_position_id: input.positionId,
+      target_event_type: input.eventType,
+      target_description: input.description,
+      target_amount_minor: input.amountMinor,
+      target_quantity: input.quantity,
+      target_transaction_date: input.transactionDate,
+      target_notes: input.notes,
+      target_create_position: input.newPosition !== null,
+      target_new_institution: input.newPosition?.institution ?? null,
+      target_new_investment_class:
+        input.newPosition?.investmentClass ?? null,
+      target_new_investment_type: input.newPosition?.investmentType ?? null,
+      target_new_asset_name: input.newPosition?.assetName ?? null,
+    },
+  );
+
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("investment_account_mismatch")) {
+    return {
+      ok: false as const,
+      message: "A conta e a posição devem ter a mesma moeda e contexto.",
+    };
+  }
+  if (message.includes("invalid_investment_account")) {
+    return {
+      ok: false as const,
+      message: "Selecione uma conta ativa do tipo Investimento.",
+    };
+  }
+  if (message.includes("invalid_new_investment_position")) {
+    return {
+      ok: false as const,
+      message: "Revise os dados da nova posição e do aporte inicial.",
+    };
+  }
+
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível registrar este movimento de investimento.",
+      }
+    : { ok: true as const, transactionId: data };
 }

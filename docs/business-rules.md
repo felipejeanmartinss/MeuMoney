@@ -226,3 +226,15 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - Cartões aparecem pelo valor pendente das faturas, nunca pelo limite de crédito.
 - O simulador de poupança é educativo, não persiste dados e usa capitalização mensal com aritmética inteira em unidades monetárias menores.
 - A taxa anual nominal é convertida para pontos-base. Impostos, inflação, custos e variações reais não são inferidos.
+
+## Operação de investimentos, relatórios e orçamento anual
+
+- Uma aplicação ou aporte cria uma saída realizada somente em uma conta ativa do tipo Investimento e um aporte vinculado à posição escolhida, na mesma moeda, contexto e proprietário. No primeiro aporte, a posição pode ser criada na mesma operação, usando o valor aplicado como custo e valor inicial sem ganho presumido.
+- Uma liquidação ou resgate cria uma entrada na conta e um resgate vinculado. É movimento de capital, não renda econômica, e por isso não compõe receitas dos relatórios.
+- Juros sobre capital, dividendos, bonificações em dinheiro e outros rendimentos criam entrada na conta e renda vinculada à posição. Somente esses eventos compõem a receita econômica de investimentos.
+- O vínculo entre extrato e histórico da posição é criado atomicamente. Nenhum evento atualiza custo, quantidade ou valor atual de forma implícita; essas avaliações continuam manuais para não inventar rentabilidade.
+- Posições anteriores ao histórico transacional podem continuar sendo cadastradas diretamente, com indicação de histórico incompleto.
+- O relatório de competência reconhece compras de cartão pelas parcelas e exclui pagamentos de fatura, transferências e movimentos de capital de investimentos.
+- O relatório de caixa reconhece despesas realizadas na data da saída e pagamentos livres para cartões, mas exclui transferências entre contas e movimentos patrimoniais de investimentos.
+- Orçamentos aceitam categorias ativas de receita e despesa. O realizado de receitas considera entradas categorizadas ativas e concluídas; o realizado de despesas mantém a regra de consumo por competência.
+- A grade anual apenas edita os doze orçamentos mensais em conjunto. Não cria uma nova unidade de consolidação e nunca soma moedas ou contextos diferentes.

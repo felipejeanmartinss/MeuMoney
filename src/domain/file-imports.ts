@@ -37,7 +37,9 @@ export type CsvImportConfig = {
   skipRows: number;
   dateColumn: number;
   descriptionColumn: number;
-  amountColumn: number;
+  amountColumn?: number | null;
+  creditColumn?: number | null;
+  debitColumn?: number | null;
   externalIdColumn?: number | null;
   dateFormat: CsvDateFormat;
   decimalSeparator: CsvDecimalSeparator;
@@ -103,7 +105,9 @@ export const csvImportConfigSchema = z.object({
     .max(20, "Ignore no máximo 20 linhas antes do cabeçalho."),
   dateColumn: columnNumber,
   descriptionColumn: columnNumber,
-  amountColumn: columnNumber,
+  amountColumn: columnNumber.nullable().optional(),
+  creditColumn: columnNumber.nullable().optional(),
+  debitColumn: columnNumber.nullable().optional(),
   externalIdColumn: columnNumber.nullable().optional(),
   dateFormat: z.enum(CSV_DATE_FORMATS, {
     error: "Selecione o formato da data.",
@@ -112,6 +116,16 @@ export const csvImportConfigSchema = z.object({
     error: "Selecione o separador decimal.",
   }),
   invertAmountSign: z.boolean(),
+}).superRefine((value, context) => {
+  const hasSingleAmount = Boolean(value.amountColumn);
+  const hasCreditAndDebit = Boolean(value.creditColumn && value.debitColumn);
+  if (!hasSingleAmount && !hasCreditAndDebit) {
+    context.addIssue({
+      code: "custom",
+      path: ["amountColumn"],
+      message: "Informe a coluna do valor ou as colunas de crédito e débito.",
+    });
+  }
 });
 
 export const importFileTypeSchema = z.enum(IMPORT_FILE_TYPES, {
@@ -432,14 +446,19 @@ export function parseConfiguredCsv(
   const dataRows = allRows.slice(dataStart);
   const dateIndex = config.dateColumn - 1;
   const descriptionIndex = config.descriptionColumn - 1;
-  const amountIndex = config.amountColumn - 1;
+  const amountIndex = config.amountColumn ? config.amountColumn - 1 : null;
+  const creditIndex = config.creditColumn ? config.creditColumn - 1 : null;
+  const debitIndex = config.debitColumn ? config.debitColumn - 1 : null;
   const externalIdIndex = config.externalIdColumn
     ? config.externalIdColumn - 1
     : null;
 
   return dataRows.map((columns, rowIndex) => {
     const sourceDateText = columns[dateIndex]?.trim() ?? "";
-    const sourceAmountText = columns[amountIndex]?.trim() ?? "";
+    const rawAmount = amountIndex === null ? "" : columns[amountIndex]?.trim() ?? "";
+    const rawCredit = creditIndex === null ? "" : columns[creditIndex]?.trim() ?? "";
+    const rawDebit = debitIndex === null ? "" : columns[debitIndex]?.trim() ?? "";
+    const sourceAmountText = rawAmount || rawCredit || rawDebit;
     const rawDescription = columns[descriptionIndex]?.trim() ?? "";
     const rawExternalId =
       externalIdIndex === null ? "" : columns[externalIdIndex]?.trim() ?? "";
@@ -452,10 +471,22 @@ export function parseConfiguredCsv(
     );
     let signedAmountMinor: number | null = null;
     try {
-      signedAmountMinor = parseImportAmountToMinor(
-        sourceAmountText,
-        config.decimalSeparator,
-      );
+      if (amountIndex !== null) {
+        signedAmountMinor = parseImportAmountToMinor(
+          rawAmount,
+          config.decimalSeparator,
+        );
+      } else if (rawCredit && !rawDebit) {
+        signedAmountMinor = Math.abs(
+          parseImportAmountToMinor(rawCredit, config.decimalSeparator),
+        );
+      } else if (rawDebit && !rawCredit) {
+        signedAmountMinor = -Math.abs(
+          parseImportAmountToMinor(rawDebit, config.decimalSeparator),
+        );
+      } else {
+        throw new Error("Informe apenas crédito ou débito.");
+      }
       if (config.invertAmountSign) signedAmountMinor *= -1;
     } catch {
       signedAmountMinor = null;
@@ -492,23 +523,61 @@ function normalizeCsvHeader(value: string) {
     .replace(/\s+/g, " ");
 }
 
+const HEADER_ALIASES = new Set([
+  "data",
+  "date",
+  "historico",
+  "descricao",
+  "lancamento",
+  "memo",
+  "valor",
+  "amount",
+  "credito",
+  "debito",
+  "saldo",
+  "docto",
+  "documento",
+  "identificador",
+]);
+
 function bestDelimitedRows(content: string) {
   const candidates = CSV_DELIMITERS.flatMap((delimiter) => {
     try {
       const rows = parseDelimitedText(content.replace(/^\uFEFF/, ""), delimiter);
-      if (rows.length < 2 || rows[0].length < 2) return [];
-      const expectedColumns = rows[0].length;
-      const sample = rows.slice(0, 20);
-      const consistentRows = sample.filter(
-        (row) => row.length === expectedColumns,
-      ).length;
-      return [
-        {
-          delimiter,
-          rows,
-          score: consistentRows / sample.length + expectedColumns / 100,
-        },
-      ];
+      if (rows.length < 2) return [];
+
+      return rows
+        .slice(0, 20)
+        .flatMap((row, headerIndex) => {
+          if (row.length < 2) return [];
+          const normalized = row.map(normalizeCsvHeader);
+          const headerMatches = normalized.filter((header) =>
+            HEADER_ALIASES.has(header),
+          ).length;
+          const hasDate = normalized.includes("data") || normalized.includes("date");
+          const hasDescription = normalized.some((header) =>
+            ["historico", "descricao", "lancamento", "memo"].includes(header),
+          );
+          const hasAmount = normalized.some((header) =>
+            ["valor", "amount"].includes(header),
+          ) || (normalized.includes("credito") && normalized.includes("debito"));
+          if (!hasDate || !hasDescription || !hasAmount) return [];
+
+          const expectedColumns = row.length;
+          const sample = rows.slice(headerIndex + 1, headerIndex + 21);
+          const consistentRows = sample.filter(
+            (candidateRow) => candidateRow.length === expectedColumns,
+          ).length;
+          return [{
+            delimiter,
+            rows,
+            headerIndex,
+            score:
+              headerMatches * 2 +
+              (sample.length ? consistentRows / sample.length : 0) +
+              expectedColumns / 100,
+          }];
+        });
     } catch {
       return [];
     }
@@ -548,8 +617,8 @@ export function detectCsvImportConfig(content: string): CsvImportDetection {
     throw new Error("Não foi possível identificar as colunas deste CSV.");
   }
 
-  const headers = candidate.rows[0].map(normalizeCsvHeader);
-  const dataRows = candidate.rows.slice(1, 21);
+  const headers = candidate.rows[candidate.headerIndex].map(normalizeCsvHeader);
+  const dataRows = candidate.rows.slice(candidate.headerIndex + 1, candidate.headerIndex + 21);
   const isBradescoStatement =
     headers.includes("data") &&
     headers.includes("historico") &&
@@ -557,7 +626,8 @@ export function detectCsvImportConfig(content: string): CsvImportDetection {
     headers.includes("credito") &&
     headers.includes("debito") &&
     headers.includes("saldo") &&
-    headers.includes("valor");
+    (headers.includes("valor") ||
+      (headers.includes("credito") && headers.includes("debito")));
   const isNubankStatement =
     headers.length === 4 &&
     headers.includes("data") &&
@@ -573,10 +643,18 @@ export function detectCsvImportConfig(content: string): CsvImportDetection {
       config: {
         delimiter: candidate.delimiter,
         hasHeader: true,
-        skipRows: 0,
+        skipRows: candidate.headerIndex,
         dateColumn: headers.indexOf("data") + 1,
         descriptionColumn: headers.indexOf("historico") + 1,
-        amountColumn: headers.indexOf("valor") + 1,
+        amountColumn: headers.includes("valor")
+          ? headers.indexOf("valor") + 1
+          : null,
+        creditColumn: headers.includes("credito")
+          ? headers.indexOf("credito") + 1
+          : null,
+        debitColumn: headers.includes("debito")
+          ? headers.indexOf("debito") + 1
+          : null,
         externalIdColumn: headers.indexOf("docto") + 1,
         dateFormat: "DD/MM/YYYY",
         decimalSeparator: ",",
@@ -593,7 +671,7 @@ export function detectCsvImportConfig(content: string): CsvImportDetection {
       config: {
         delimiter: candidate.delimiter,
         hasHeader: true,
-        skipRows: 0,
+        skipRows: candidate.headerIndex,
         dateColumn: headers.indexOf("data") + 1,
         descriptionColumn: headers.indexOf("descricao") + 1,
         amountColumn: headers.indexOf("valor") + 1,
@@ -642,7 +720,7 @@ export function detectCsvImportConfig(content: string): CsvImportDetection {
   const config: CsvImportConfig = {
     delimiter: candidate.delimiter,
     hasHeader: true,
-    skipRows: 0,
+    skipRows: candidate.headerIndex,
     dateColumn,
     descriptionColumn,
     amountColumn,
@@ -674,9 +752,30 @@ export function detectCsvImportConfig(content: string): CsvImportDetection {
 
 export function parseDetectedCsv(content: string) {
   const detection = detectCsvImportConfig(content);
+  const parsedRows = parseConfiguredCsv(content, detection.config);
+  let usableRows = parsedRows;
+
+  if (detection.presetId === "bradesco-account-statement-v1") {
+    let validMovements = 0;
+    let consecutiveInvalidRows = 0;
+    for (let index = 0; index < parsedRows.length; index += 1) {
+      const row = parsedRows[index];
+      if (row.validationCode === null && row.signedAmountMinor !== 0) {
+        validMovements += 1;
+        consecutiveInvalidRows = 0;
+        continue;
+      }
+      if (row.validationCode !== null) consecutiveInvalidRows += 1;
+      if (validMovements > 0 && consecutiveInvalidRows >= 2) {
+        usableRows = parsedRows.slice(0, index - 1);
+        break;
+      }
+    }
+  }
+
   return {
     detection,
-    rows: parseConfiguredCsv(content, detection.config).filter(
+    rows: usableRows.filter(
       (row) => row.signedAmountMinor !== 0,
     ),
   };
