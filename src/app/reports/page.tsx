@@ -6,7 +6,6 @@ import {
 } from "@/components/reports/financial-report-matrices";
 import {
   FINANCIAL_REPORT_LABELS,
-  FINANCIAL_REPORT_TYPES,
   financialReportFilterSchema,
   financialReportTypeSchema,
   periodComparisonFilterSchema,
@@ -32,16 +31,19 @@ import type {
 
 export const metadata = { title: "Relatórios" };
 
-const REPORT_DESCRIPTIONS: Record<FinancialReportType, string> = {
-  "income-expense":
-    "Matriz anual por grupos, categorias, subcategorias e mês.",
-  "fixed-expenses":
-    "Projeção anual das despesas recorrentes cadastradas em Contas a Pagar.",
-  "period-comparison":
-    "Comparação de categorias entre dois intervalos, com diferença e variação.",
-  "asset-performance":
-    "Aportes, resgates, rendimentos, custo, posição atual e resultado calculável.",
-};
+const REPORT_GROUPS = [
+  {
+    label: "Receitas e despesas",
+    reports: ["income-expense", "fixed-expenses", "period-comparison"],
+  },
+  {
+    label: "Investimentos",
+    reports: ["asset-performance"],
+  },
+] as const satisfies ReadonlyArray<{
+  label: string;
+  reports: readonly FinancialReportType[];
+}>;
 
 const inputClass =
   "min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
@@ -232,61 +234,54 @@ export default async function ReportsPage({
         </p>
       </header>
 
-      <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside>
-          <nav
-            aria-label="Tipos de relatório"
-            className="grid gap-2 sm:grid-cols-2 xl:sticky xl:top-5 xl:grid-cols-1"
-          >
-            {FINANCIAL_REPORT_TYPES.map((item) => {
-              const active = report === item;
-              return (
-                <Link
-                  key={item}
-                  href={reportHref(item, commonFilters)}
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    "rounded-xl border p-3 transition focus:outline-none focus:ring-2 focus:ring-emerald-600 " +
-                    (active
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-950 shadow-sm"
-                      : "border-slate-200 bg-white text-slate-800 hover:border-slate-300")
-                  }
-                >
-                  <span className="block text-sm font-extrabold">
+      <nav
+        aria-label="Tipos de relatório"
+        className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]"
+      >
+        {REPORT_GROUPS.map((group) => (
+          <div key={group.label} className="flex min-w-0 flex-col gap-2">
+            <span className="px-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-slate-500">
+              {group.label}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {group.reports.map((item) => {
+                const active = report === item;
+                return (
+                  <Link
+                    key={item}
+                    href={reportHref(item, commonFilters)}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      "inline-flex min-h-9 items-center rounded-lg px-3 py-1.5 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1 " +
+                      (active
+                        ? "bg-emerald-700 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200")
+                    }
+                  >
                     {FINANCIAL_REPORT_LABELS[item]}
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-500">
-                    {REPORT_DESCRIPTIONS[item]}
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
 
-        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {report === "income-expense" ? (
-            <IncomeExpenseReport filters={filters} context={context} />
-          ) : report === "fixed-expenses" ? (
-            <FixedExpensesReport
-              filters={filters}
-              context={context}
-            />
-          ) : report === "period-comparison" ? (
-            <ComparisonReport
-              filters={filters}
-              context={context}
-              raw={raw}
-            />
-          ) : (
-            <AssetPerformanceReport
-              filters={filters}
-              context={context}
-              state={state}
-            />
-          )}
-        </section>
-      </div>
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {report === "income-expense" ? (
+          <IncomeExpenseReport filters={filters} context={context} />
+        ) : report === "fixed-expenses" ? (
+          <FixedExpensesReport filters={filters} context={context} />
+        ) : report === "period-comparison" ? (
+          <ComparisonReport filters={filters} context={context} raw={raw} />
+        ) : (
+          <AssetPerformanceReport
+            filters={filters}
+            context={context}
+            state={state}
+          />
+        )}
+      </section>
     </main>
   );
 }
@@ -390,11 +385,6 @@ async function FixedExpensesReport({
         <CommonReportFields {...filters} context={context} />
         <ApplyFiltersButton />
       </form>
-      <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
-        Marque uma subcategoria de despesa como fixa ao criar ou editar sua
-        classificação. O relatório respeita o regime de competência ou caixa
-        selecionado.
-      </p>
       {result.hasError ? <ReportError /> : null}
       <MonthlyFinancialMatrix
         rows={result.matrix}

@@ -133,7 +133,6 @@ export function AnnualBudgetForm({ year, context, currency, categories }: {
               const previous = hierarchy[index - 1];
               const showSection = !previous || previous.category.kind !== node.category.kind;
               const expanded = expandedCategories.has(node.key);
-              const hasChildren = node.children.length > 0;
               const rows: React.ReactNode[] = [];
               if (showSection) {
                 rows.push(
@@ -143,10 +142,6 @@ export function AnnualBudgetForm({ year, context, currency, categories }: {
                     </th>
                   </tr>,
                 );
-              }
-              if (!hasChildren) {
-                rows.push(<BudgetInputRow key={node.key} category={node.category} year={year} />);
-                return rows;
               }
               rows.push(
                 <tr key={node.key} className="border-b border-slate-100 bg-emerald-50/50 font-semibold hover:bg-emerald-50">
