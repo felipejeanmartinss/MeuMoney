@@ -75,12 +75,12 @@ export default async function AccountDetailPage({
     : "statement";
   const tabs = [
     { id: "statement", label: "Extrato" },
-    { id: "recurrences", label: "Recorrências" },
+    { id: "recurrences", label: "Contas a Pagar" },
     { id: "import", label: "Importar" },
   ];
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+    <main className="mx-auto grid max-w-[1600px] gap-5 px-3 py-6 sm:px-5 lg:px-6 lg:py-8">
       <div>
         <Link
           href="/accounts"
@@ -162,7 +162,7 @@ export default async function AccountDetailPage({
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-extrabold text-slate-950">
-                Recorrências da conta
+                Contas a pagar da conta
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Compromissos programados sem alterar as regras de geração.
@@ -172,12 +172,12 @@ export default async function AccountDetailPage({
               href={`/recurring-transactions/new?accountId=${account.id}`}
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white"
             >
-              Nova recorrência
+              Nova conta a pagar
             </Link>
           </div>
           {result.recurrences.length === 0 ? (
             <p className="px-5 py-10 text-center text-slate-500">
-              Nenhuma recorrência vinculada a esta conta.
+              Nenhuma conta a pagar vinculada a esta conta.
             </p>
           ) : (
             <div className="divide-y divide-slate-100">

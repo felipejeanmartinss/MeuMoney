@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AccountEntryForm } from "@/components/forms/account-entry-form";
 import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
 import { getTransactionFormOptions } from "@/services/finance/transactions-service";
+import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
 import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Novo lançamento" };
@@ -12,9 +13,10 @@ export default async function NewTransactionPage({
   searchParams: Promise<{ accountId?: string; type?: string }>;
 }) {
   const { accountId, type } = await searchParams;
-  const [formOptions, creditCardOptions] = await Promise.all([
+  const [formOptions, creditCardOptions, investmentOptions] = await Promise.all([
     getTransactionFormOptions(accountId ? { accountId } : undefined),
     listCurrentUserTransferCreditCardDestinations(),
+    listCurrentUserInvestmentPositions(),
   ]);
   const { accounts, categories, groups, hasError } = formOptions;
   const selectedAccountId = accounts.some(
@@ -52,10 +54,15 @@ export default async function NewTransactionPage({
             categories={categories}
             groups={groups}
             creditCards={creditCardOptions.destinations}
+            investmentPositions={investmentOptions.positions}
             accountId={selectedAccountId}
             transactionDate={toIsoDate(new Date())}
             initialMode={
-              type === "income" || type === "transfer" ? type : "expense"
+              type === "income" || type === "transfer" || type === "investment"
+                ? type
+                : accounts.find((account) => account.id === selectedAccountId)?.type === "investment"
+                  ? "investment"
+                  : "expense"
             }
           />
         </section>

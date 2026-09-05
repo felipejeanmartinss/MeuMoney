@@ -36,6 +36,7 @@ export type CreditCardInvoiceStatus = "open" | "closed" | "paid" | "overdue";
 export type TransactionOriginType =
   | "manual"
   | "credit_card_invoice_payment"
+  | "investment"
   | "system";
 export type RecurrenceFrequency = "weekly" | "monthly" | "yearly";
 export type RecurringTransactionState = "active" | "suspended" | "ended";
@@ -71,6 +72,15 @@ export type InvestmentCashFlowType =
   | "contribution"
   | "redemption"
   | "income";
+export type InvestmentIncomeType =
+  | "interest_on_capital"
+  | "dividend"
+  | "bonus"
+  | "other";
+export type InvestmentAccountEventType =
+  | "contribution"
+  | "redemption"
+  | InvestmentIncomeType;
 export type ImportFileType = "csv" | "ofx" | "qif" | "pdf";
 export type ImportJobStatus =
   | "review"
@@ -128,6 +138,7 @@ export type Category = {
   kind: CategoryKind;
   context: FinancialContext;
   is_system: boolean;
+  is_fixed_expense: boolean;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -335,6 +346,10 @@ export type MonthlyConsumption = {
   realized_amount_minor: number;
 };
 
+export type MonthlyBudgetActual = MonthlyConsumption & {
+  category_kind: CategoryKind;
+};
+
 export type MonthlyBudgetProgress = {
   budget_id: string | null;
   user_id: string;
@@ -347,6 +362,7 @@ export type MonthlyBudgetProgress = {
   realized_amount_minor: number;
   available_amount_minor: number;
   percentage_consumed: number | null;
+  category_kind: CategoryKind;
 };
 
 export type FinancialDashboardMonthlySummary = {
@@ -381,6 +397,20 @@ export type FinancialDashboardExpenseCategoryBasis = Omit<
 > & {
   basis: FinancialReportBasis;
   category_id: string | null;
+};
+
+export type FinancialReportCategoryMonthly = {
+  basis: FinancialReportBasis;
+  user_id: string;
+  reference_month: string;
+  currency: SupportedCurrency;
+  section: CategoryKind;
+  row_id: string;
+  category_id: string | null;
+  group_name: string;
+  row_name: string;
+  context: FinancialContext;
+  amount_minor: number;
 };
 
 export type FinancialDashboardUpcomingRecurrence = {
@@ -488,6 +518,8 @@ export type InvestmentCashFlow = {
   position_id: string;
   user_id: string;
   cash_flow_type: InvestmentCashFlowType;
+  income_type: InvestmentIncomeType | null;
+  transaction_id: string | null;
   amount_minor: number;
   quantity: string | null;
   cash_flow_date: string;
@@ -766,6 +798,7 @@ export type Database = {
           kind: CategoryKind;
           context: FinancialContext;
           is_system?: boolean;
+          is_fixed_expense?: boolean;
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -799,7 +832,7 @@ export type Database = {
           id?: string;
           user_id: string;
           account_id: string;
-          category_id: string;
+          category_id: string | null;
           transaction_type: TransactionType;
           description: string;
           amount_minor: number;
@@ -807,6 +840,11 @@ export type Database = {
           status?: TransactionStatus;
           notes?: string | null;
           is_active?: boolean;
+          reconciled_at?: string | null;
+          origin_type?: TransactionOriginType;
+          origin_id?: string | null;
+          credit_card_invoice_id?: string | null;
+          recurring_transaction_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1028,6 +1066,8 @@ export type Database = {
           position_id: string;
           user_id: string;
           cash_flow_type: InvestmentCashFlowType;
+          income_type?: InvestmentIncomeType | null;
+          transaction_id?: string | null;
           amount_minor: number;
           quantity?: string | null;
           cash_flow_date: string;
@@ -1119,6 +1159,10 @@ export type Database = {
         Row: MonthlyBudgetProgress;
         Relationships: [];
       };
+      monthly_budget_actuals: {
+        Row: MonthlyBudgetActual;
+        Relationships: [];
+      };
       financial_dashboard_monthly_summary: {
         Row: FinancialDashboardMonthlySummary;
         Relationships: [];
@@ -1133,6 +1177,10 @@ export type Database = {
       };
       financial_dashboard_expense_categories_basis: {
         Row: FinancialDashboardExpenseCategoryBasis;
+        Relationships: [];
+      };
+      financial_report_category_monthly: {
+        Row: FinancialReportCategoryMonthly;
         Relationships: [];
       };
       financial_dashboard_upcoming_recurrences: {
@@ -1157,6 +1205,24 @@ export type Database = {
       };
     };
     Functions: {
+      create_investment_account_entry: {
+          Args: {
+            target_account_id: string;
+            target_position_id: string | null;
+            target_event_type: InvestmentAccountEventType;
+          target_description: string;
+          target_amount_minor: number;
+          target_quantity: string | null;
+            target_transaction_date: string;
+            target_notes?: string | null;
+            target_create_position?: boolean;
+            target_new_institution?: string | null;
+            target_new_investment_class?: InvestmentClass | null;
+            target_new_investment_type?: InvestmentType | null;
+            target_new_asset_name?: string | null;
+          };
+        Returns: string;
+      };
       delete_category_with_replacement: {
         Args: {
           target_category_id: string;
@@ -1460,6 +1526,7 @@ export type Database = {
       net_worth_item_type: NetWorthItemType;
       investment_class: InvestmentClass;
       investment_cash_flow_type: InvestmentCashFlowType;
+      investment_income_type: InvestmentIncomeType;
     };
     CompositeTypes: Record<string, never>;
   };

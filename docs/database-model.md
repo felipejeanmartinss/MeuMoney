@@ -275,3 +275,42 @@ As migrations cumulativas deste incremento são aplicadas, nesta ordem:
 `20260815161500_card_financing_fk_indexes.sql` para os índices das chaves
 estrangeiras. A classificação de linhas importadas como pagamentos livres é
 adicionada por `20260823090000_import_credit_card_payments.sql`.
+
+## Movimentos de investimento e relatórios
+
+`transactions.origin_type` recebe o valor `investment`. Nessas linhas,
+`origin_id` referencia semanticamente a posição e a categoria permanece nula.
+`investment_cash_flows.transaction_id` cria o vínculo único e reversível com o
+extrato; `income_type` detalha JCP, dividendos, bonificações ou outros
+rendimentos e permanece nulo em aportes e resgates.
+
+`create_investment_account_entry` valida proprietário, atividade, tipo da
+conta, posição, moeda, contexto, valor inteiro e data. A transação e o fluxo são
+inseridos na mesma transação PostgreSQL. O trigger também valida o vínculo,
+impedindo associação cruzada entre usuários ou valores divergentes.
+Quando solicitado no primeiro aporte, a mesma RPC cria antes a posição e sua
+fotografia automática, usando aporte como custo e valor inicial.
+
+`monthly_budget_actuals` une o consumo de despesas existente às receitas
+categorizadas realizadas. `monthly_budget_progress` expõe `category_kind` e
+mantém uma linha por usuário, mês, moeda e categoria. As views de dashboard por
+regime foram recompostas para excluir aportes e resgates do resultado e incluir
+pagamentos para cartão somente no caixa.
+
+`financial_report_category_monthly` é a fonte das matrizes de relatórios. A
+view usa `security_invoker`, preserva usuário, regime, mês, moeda, natureza,
+grupo, categoria ou subcategoria e contexto financeiro. Rendimentos de
+investimentos entram somente quando ligados a um fluxo do tipo `income`;
+aportes e resgates continuam fora de receitas e despesas. O acesso é revogado
+de `anon` e concedido explicitamente a `authenticated`.
+
+`categories.is_fixed_expense` é uma preferência do usuário permitida apenas em
+subcategorias de despesa. Uma restrição no banco mantém essa regra, um índice
+parcial atende a seleção e os privilégios de escrita da nova coluna são
+concedidos explicitamente a `authenticated`. O relatório de despesas fixas
+filtra a mesma fonte mensal por essa classificação, sem criar acumuladores.
+
+Migrations cumulativas, nesta ordem:
+`20260905090000_investment_transactions_reports.sql` e
+`20260905143000_financial_report_matrices.sql` e
+`20260905153310_fixed_expense_subcategories.sql`.

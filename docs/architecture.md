@@ -201,7 +201,7 @@ acessa o Supabase e não persiste simulações.
 ## Experiência centrada na conta
 
 O dashboard e a central de Contas encaminham para `/accounts/[id]`, que reúne
-Extrato, Recorrências e Importar. O formulário `/transactions/new` aceita a
+Extrato, Contas a Pagar e Importar. O formulário `/transactions/new` aceita a
 conta de origem e alterna entre Receita, Despesa e Transferência; cada modo
 continua chamando suas Server Actions e serviços financeiros existentes.
 
@@ -210,3 +210,38 @@ como opções mínimas aos formulários cliente. Nenhum Client Component acessa 
 Supabase diretamente. A central de Investimentos apenas organiza posições por
 família e reutiliza passivos patrimoniais para financiamentos e empréstimos,
 sem mover registros entre domínios.
+
+## Operações financeiras e relatórios executivos
+
+O formulário unificado de lançamentos oferece um modo de investimento somente
+para contas desse tipo. A Server Action valida a entrada e chama
+`create_investment_account_entry`, uma fachada `security invoker` para a
+operação privada e atômica que grava a transação da conta e o fluxo da posição.
+A posição atual não é recalculada a partir do evento: quantidade, custo e valor
+continuam sendo fotografias manuais e auditáveis.
+
+`/reports` é um módulo principal e uma central de matrizes financeiras. Cada
+relatório consulta somente suas fontes no servidor:
+`financial_report_category_monthly` consolida competência e caixa por grupo,
+categoria e subcategoria; a preferência `categories.is_fixed_expense` define
+quais subcategorias reais entram em Despesas fixas; e
+`investment_position_summary` fornece a fotografia agregada dos
+ativos. O navegador recebe apenas linhas já agregadas para o recorte
+solicitado, sem carregar transações ou parcelas brutas.
+
+Receitas x despesas, Despesas fixas, Comparativo entre períodos e Performance
+de ativos compartilham filtros em URL, o `AppShell` global e tabelas acessíveis
+com rolagem horizontal. O seletor de relatórios fica em uma faixa horizontal
+agrupada abaixo do cabeçalho. Categorias principais são linhas consolidadas e
+usam o mesmo controle de divulgação mesmo sem subcategorias; nesse caso, a
+abertura identifica o valor direto como `Sem subcategoria`. As views financeiras continuam
+`security_invoker`, e os serviços repetem o filtro por `user_id`, moeda,
+contexto e período. Nenhuma nova tabela é necessária para a central.
+
+`/budgets` mantém a edição mensal e adiciona uma grade anual que executa
+`UPSERT` sobre as mesmas linhas mensais. As duas grades começam por receitas e
+consolidam cada categoria principal com um controle uniforme de abertura; uma
+categoria sem filhas expõe sua edição direta na linha `Sem subcategoria`.
+`monthly_budget_actuals` e
+`monthly_budget_progress` são views `security_invoker` e agregam receitas e
+despesas por proprietário, categoria, contexto, moeda e mês.

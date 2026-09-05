@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  annualBudgetBatchSchema,
   monthlyBudgetBatchSchema,
   toReferenceMonth,
 } from "@/domain/budgets";
 import {
   copyCurrentUserPreviousMonthBudgets,
+  upsertCurrentUserAnnualBudgets,
   upsertCurrentUserMonthlyBudgets,
 } from "@/services/finance/budgets-service";
 
@@ -31,6 +33,49 @@ function budgetUrl(input: {
   if (input.message) params.set("message", input.message);
   if (input.count !== undefined) params.set("count", String(input.count));
   return `/budgets?${params.toString()}`;
+}
+
+export async function saveAnnualBudgets(
+  _previousState: BudgetFormState,
+  formData: FormData,
+): Promise<BudgetFormState> {
+  const cells = formData.getAll("budgetCell");
+  const amounts = formData.getAll("plannedAmountMinor");
+  const parsed = annualBudgetBatchSchema.safeParse({
+    year: formData.get("year"),
+    context: formData.get("context"),
+    currency: formData.get("currency"),
+    rows: cells.map((cell, index) => {
+      const [categoryId, referenceMonth] = String(cell).split("|");
+      return {
+        categoryId,
+        referenceMonth,
+        plannedAmountMinor: amounts[index],
+      };
+    }),
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Revise os valores do orçamento anual.",
+    };
+  }
+  const keys = parsed.data.rows.map(
+    (row) => `${row.categoryId}|${row.referenceMonth}`,
+  );
+  if (new Set(keys).size !== keys.length) {
+    return { status: "error", message: "Existem células duplicadas no orçamento." };
+  }
+
+  const result = await upsertCurrentUserAnnualBudgets(
+    parsed.data.currency,
+    parsed.data.rows,
+  );
+  if (!result.ok) return { status: "error", message: result.message };
+
+  revalidatePath("/budgets");
+  revalidatePath("/dashboard");
+  redirect(`/budgets?view=annual&year=${parsed.data.year}&context=${parsed.data.context}&currency=${parsed.data.currency}&message=saved`);
 }
 
 function budgetBatchFrom(formData: FormData) {

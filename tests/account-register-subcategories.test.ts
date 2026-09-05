@@ -107,13 +107,13 @@ describe("account register and subcategories", () => {
     );
 
     expect(register.map((item) => item.id)).toEqual([
-      "income",
-      "pending",
-      "expense",
       "transfer",
+      "expense",
+      "pending",
+      "income",
     ]);
     expect(register.map((item) => item.runningBalanceMinor)).toEqual([
-      15000, 15000, 12500, 14000,
+      14000, 12500, 15000, 15000,
     ]);
   });
 

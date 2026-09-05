@@ -25,6 +25,18 @@ ponto flutuante e atende ativos fracionários, inclusive criptomoedas.
 - um fluxo histórico não altera silenciosamente a posição atual. O usuário
   atualiza a posição separadamente quando quantidade, custo ou valor mudarem.
 
+O lançamento por conta oferece o modo Investimento. Aplicações geram saída na
+conta e aporte na posição; liquidações geram entrada e resgate; JCP, dividendos,
+bonificações em dinheiro e outros rendimentos geram entrada e renda detalhada.
+Os dois registros são criados atomicamente e exibem o vínculo no histórico.
+Conta e posição precisam ter o mesmo proprietário, moeda e contexto.
+No primeiro aporte, o mesmo fluxo pode criar a posição; o valor aplicado se
+torna custo e valor da fotografia inicial, sem valorização presumida.
+
+O cadastro direto de posição continua disponível para patrimônio anterior ao
+histórico transacional. Nessa situação, o usuário pode marcar o histórico como
+incompleto e nenhuma rentabilidade total é inferida.
+
 A diferença sobre o custo é `valor atual - custo acumulado`. Aportes, resgates e
 rendas são somados separadamente. O resultado total
 `valor atual + resgates + rendas - aportes` só é exibido quando o usuário

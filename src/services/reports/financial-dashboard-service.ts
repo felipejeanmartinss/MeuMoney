@@ -35,7 +35,7 @@ const invoiceColumns =
 const accountColumns =
   "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor";
 const budgetProgressColumns =
-  "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed";
+  "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed, category_kind";
 const netWorthColumns =
   "user_id, currency, assets_minor, manual_assets_minor, investments_minor, liabilities_minor, net_worth_minor";
 const creditCardBalanceColumns =
@@ -197,6 +197,7 @@ export async function getFinancialDashboard(
       .select(budgetProgressColumns)
       .eq("user_id", user.id)
       .eq("reference_month", selectedReferenceMonth)
+      .eq("category_kind", "expense")
       .order("percentage_consumed", { ascending: false }),
     supabase
       .from("net_worth_summary")

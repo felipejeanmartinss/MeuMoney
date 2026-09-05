@@ -50,7 +50,21 @@ export const monthlyBudgetBatchSchema = z.object({
   referenceMonth: referenceMonthSchema,
   context: z.enum(FINANCIAL_CONTEXTS),
   currency: z.enum(SUPPORTED_CURRENCIES),
-  rows: z.array(monthlyBudgetRowSchema).max(500),
+  rows: z.array(monthlyBudgetRowSchema).max(1200),
+});
+
+export const annualBudgetBatchSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2200),
+  context: z.enum(FINANCIAL_CONTEXTS),
+  currency: z.enum(SUPPORTED_CURRENCIES),
+  rows: z.array(z.object({
+    categoryId: z.uuid("Categoria inválida."),
+    referenceMonth: z.string().regex(
+      /^\d{4}-(0[1-9]|1[0-2])-01$/,
+      "Mês do orçamento inválido.",
+    ),
+    plannedAmountMinor: plannedMoneyInput,
+  })).max(2400),
 });
 
 export function toReferenceMonth(month: string) {

@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  investmentAccountEntryFormSchema,
   investmentCashFlowFormSchema,
   investmentPositionFormSchema,
   investmentPositionIdSchema,
 } from "@/domain/investments";
 import {
+  createCurrentUserInvestmentAccountEntry,
   createCurrentUserInvestmentCashFlow,
   createCurrentUserInvestmentPosition,
   setCurrentUserInvestmentPositionArchived,
@@ -132,4 +134,62 @@ export async function createInvestmentCashFlow(
   revalidatePath("/investments");
   revalidatePath(`/investments/${parsed.data.positionId}/history`);
   redirect(`/investments/${parsed.data.positionId}/history?message=flow-created`);
+}
+
+export async function createInvestmentAccountEntry(
+  _previousState: InvestmentFormState,
+  formData: FormData,
+): Promise<InvestmentFormState> {
+  const parsed = investmentAccountEntryFormSchema.safeParse({
+    accountId: formData.get("accountId"),
+    positionId: formData.get("positionId"),
+    eventType: formData.get("eventType"),
+    description: formData.get("description"),
+    amountMinor: formData.get("amountMinor"),
+    quantity: formData.get("quantity") ?? "",
+    transactionDate: formData.get("transactionDate"),
+    notes: formData.get("notes") ?? "",
+    newInstitution: formData.get("newInstitution") ?? "",
+    newInvestmentClass: formData.get("newInvestmentClass") || undefined,
+    newInvestmentType: formData.get("newInvestmentType") || undefined,
+    newAssetName: formData.get("newAssetName") ?? "",
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const result = await createCurrentUserInvestmentAccountEntry({
+    accountId: parsed.data.accountId,
+    positionId:
+      parsed.data.positionId === "new" ? null : parsed.data.positionId,
+    eventType: parsed.data.eventType,
+    description: parsed.data.description,
+    amountMinor: parsed.data.amountMinor,
+    quantity: parsed.data.quantity,
+    transactionDate: parsed.data.transactionDate,
+    notes: parsed.data.notes,
+    newPosition:
+      parsed.data.positionId === "new"
+        ? {
+            institution: parsed.data.newInstitution,
+            investmentClass: parsed.data.newInvestmentClass!,
+            investmentType: parsed.data.newInvestmentType!,
+            assetName: parsed.data.newAssetName,
+          }
+        : null,
+  });
+  if (!result.ok) return { status: "error", message: result.message };
+
+  revalidatePath("/accounts");
+  revalidatePath(`/accounts/${parsed.data.accountId}`);
+  revalidatePath("/investments");
+  if (parsed.data.positionId !== "new") {
+    revalidatePath(`/investments/${parsed.data.positionId}/history`);
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  redirect(`/accounts/${parsed.data.accountId}?message=investment-recorded`);
 }

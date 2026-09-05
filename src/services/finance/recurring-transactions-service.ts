@@ -31,15 +31,15 @@ function mutationErrorMessage(error: { message?: string } | null) {
     return "Selecione uma conta ativa.";
   }
   if (message.includes("recurring_transaction_already_ended")) {
-    return "Uma recorrência encerrada não pode ser reativada.";
+    return "Uma conta a pagar encerrada não pode ser reativada.";
   }
   if (message.includes("recurring_transaction_schedule_ended")) {
-    return "A recorrência já ultrapassou sua data final.";
+    return "A conta a pagar já ultrapassou sua data final.";
   }
   if (message.includes("recurring_transaction_generation_limit")) {
     return "O período solicitado é muito extenso. Escolha uma data mais próxima.";
   }
-  return "Não foi possível concluir a operação com a recorrência.";
+  return "Não foi possível concluir a operação com a conta a pagar.";
 }
 
 export async function listCurrentUserRecurringTransactions() {

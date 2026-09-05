@@ -21,15 +21,15 @@ import type {
 import { toIsoDate } from "@/utils/dates";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
-export const metadata = { title: "Recorrências" };
+export const metadata = { title: "Contas a Pagar" };
 
 const messages: Record<string, string> = {
-  created: "Recorrência criada com sucesso.",
-  updated: "Recorrência atualizada com sucesso.",
-  "state-active": "Recorrência reativada.",
-  "state-suspended": "Recorrência suspensa.",
-  "state-ended": "Recorrência encerrada definitivamente.",
-  "status-error": "Não foi possível alterar o estado da recorrência.",
+  created: "Conta a pagar criada com sucesso.",
+  updated: "Conta a pagar atualizada com sucesso.",
+  "state-active": "Conta a pagar reativada.",
+  "state-suspended": "Conta a pagar suspensa.",
+  "state-ended": "Conta a pagar encerrada definitivamente.",
+  "status-error": "Não foi possível alterar o estado da conta a pagar.",
   "generation-error": "Não foi possível gerar os lançamentos previstos.",
 };
 
@@ -215,7 +215,7 @@ export default async function RecurringTransactionsPage({
             Agenda financeira
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Recorrências
+            Contas a Pagar
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
             Acompanhe compromissos futuros e gere previsões sem alterar o saldo
@@ -226,7 +226,7 @@ export default async function RecurringTransactionsPage({
           href="/recurring-transactions/new"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
-          Nova recorrência
+          Nova conta a pagar
         </Link>
       </header>
 
@@ -338,7 +338,7 @@ export default async function RecurringTransactionsPage({
           </button>
         </form>
         <p className="text-xs text-slate-500">
-          Recorrências encerradas saem da agenda, mas permanecem preservadas no
+          Contas encerradas saem da agenda, mas permanecem preservadas no
           histórico para auditoria.
         </p>
       </section>
@@ -376,14 +376,14 @@ export default async function RecurringTransactionsPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Não foi possível carregar as recorrências. Tente novamente.
+          Não foi possível carregar as contas a pagar. Tente novamente.
         </p>
       ) : null}
 
       {!hasError && filtered.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <h2 className="text-xl font-extrabold text-slate-950">
-            Nenhuma recorrência encontrada
+            Nenhuma conta a pagar encontrada
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-slate-600">
             Ajuste os filtros ou cadastre um novo compromisso.
