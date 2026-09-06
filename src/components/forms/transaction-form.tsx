@@ -70,6 +70,7 @@ export function TransactionForm({
   transferAccounts,
   transferCreditCards,
   onTransferSelected,
+  returnAccountId,
 }: {
   accounts: AccountOption[];
   categories: CategoryOption[];
@@ -79,6 +80,7 @@ export function TransactionForm({
   transferAccounts?: AccountOption[];
   transferCreditCards?: CreditCardTransferDestination[];
   onTransferSelected?: (destinationTarget: string) => void;
+  returnAccountId?: string;
 }) {
   const action = values.id ? updateTransaction : createTransaction;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -139,6 +141,9 @@ export function TransactionForm({
       <form action={formAction} className="grid gap-5">
         {values.id ? (
           <input type="hidden" name="id" value={values.id} />
+        ) : null}
+        {returnAccountId ? (
+          <input type="hidden" name="returnAccountId" value={returnAccountId} />
         ) : null}
         {fixedType ? (
           <input type="hidden" name="transactionType" value={fixedType} />

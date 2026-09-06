@@ -51,10 +51,12 @@ export function TransferForm({
   accounts,
   creditCards = [],
   values,
+  returnAccountId,
 }: {
   accounts: AccountOption[];
   creditCards?: CreditCardTransferDestination[];
   values: TransferFormValues;
+  returnAccountId?: string;
 }) {
   const action = values.id ? updateTransfer : createTransfer;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -119,6 +121,9 @@ export function TransferForm({
   return (
     <form action={formAction} className="grid gap-5">
       {values.id ? <input type="hidden" name="id" value={values.id} /> : null}
+      {returnAccountId ? (
+        <input type="hidden" name="returnAccountId" value={returnAccountId} />
+      ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
       <div className="grid gap-5 sm:grid-cols-2">

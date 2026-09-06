@@ -14,9 +14,9 @@ import { TransactionForm } from "./transaction-form";
 import { TransferForm } from "./transfer-form";
 import { InvestmentAccountEntryForm } from "./investment-account-entry-form";
 
-type EntryMode = TransactionType | "transfer" | "investment";
+export type AccountEntryMode = TransactionType | "transfer" | "investment";
 
-type AccountOption = {
+export type AccountEntryAccountOption = {
   id: string;
   name: string;
   currency: SupportedCurrency;
@@ -24,7 +24,7 @@ type AccountOption = {
   type: AccountType;
 };
 
-type CategoryOption = {
+export type AccountEntryCategoryOption = {
   id: string;
   group_id: string;
   parent_id: string | null;
@@ -35,7 +35,7 @@ type CategoryOption = {
   archived_at: string | null;
 };
 
-const MODE_LABELS: Record<EntryMode, string> = {
+const MODE_LABELS: Record<AccountEntryMode, string> = {
   expense: "Despesa",
   income: "Receita",
   transfer: "Transferência",
@@ -51,17 +51,19 @@ export function AccountEntryForm({
   accountId,
   transactionDate,
   initialMode,
+  returnAccountId,
 }: {
-  accounts: AccountOption[];
-  categories: CategoryOption[];
+  accounts: AccountEntryAccountOption[];
+  categories: AccountEntryCategoryOption[];
   groups: CategoryGroupItem[];
   creditCards: CreditCardTransferDestination[];
   investmentPositions: InvestmentPositionSummary[];
   accountId?: string;
   transactionDate: string;
-  initialMode: EntryMode;
+  initialMode: AccountEntryMode;
+  returnAccountId?: string;
 }) {
-  const [mode, setMode] = useState<EntryMode>(initialMode);
+  const [mode, setMode] = useState<AccountEntryMode>(initialMode);
   const [transferDestinationTarget, setTransferDestinationTarget] =
     useState("");
 
@@ -72,7 +74,7 @@ export function AccountEntryForm({
         aria-label="Tipo de entrada na conta"
         className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 sm:grid-cols-4"
       >
-        {(Object.keys(MODE_LABELS) as EntryMode[]).map((entryMode) => (
+        {(Object.keys(MODE_LABELS) as AccountEntryMode[]).map((entryMode) => (
           <button
             key={entryMode}
             type="button"
@@ -102,6 +104,7 @@ export function AccountEntryForm({
             )?.id
           }
           transactionDate={transactionDate}
+          returnAccountId={returnAccountId}
         />
       ) : mode === "transfer" ? (
         <TransferForm
@@ -115,6 +118,7 @@ export function AccountEntryForm({
             status: "completed",
             amountMinor: "0,00",
           }}
+          returnAccountId={returnAccountId}
         />
       ) : (
         <TransactionForm
@@ -135,6 +139,7 @@ export function AccountEntryForm({
             transactionDate,
             amountMinor: "0,00",
           }}
+          returnAccountId={returnAccountId}
         />
       )}
     </div>

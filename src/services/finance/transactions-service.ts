@@ -212,6 +212,25 @@ export async function updateCurrentUserTransaction(
     : { ok: true as const };
 }
 
+export async function deleteCurrentUserTransaction(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .eq("origin_type", "manual")
+    .select("id")
+    .maybeSingle();
+
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir o lançamento.",
+      }
+    : { ok: true as const };
+}
+
 export async function setCurrentUserTransactionActive(
   id: string,
   active: boolean,

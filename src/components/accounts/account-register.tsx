@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { toggleAccountEntryReconciliation } from "@/app/actions/transactions";
+import {
+  deleteTransaction,
+  toggleAccountEntryReconciliation,
+} from "@/app/actions/transactions";
+import {
+  AccountRegisterEntryComposer,
+  type AccountRegisterEntryComposerProps,
+} from "@/components/accounts/account-register-entry-composer";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import type { AccountRegisterEntry } from "@/domain/account-register";
 import { formatMoney } from "@/domain/money";
 import { TRANSACTION_STATUS_LABELS } from "@/domain/transactions";
@@ -18,6 +26,19 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   },
   "investment-recorded": {
     text: "Movimento de investimento registrado e vinculado à posição.",
+  },
+  "transaction-created": {
+    text: "Lançamento criado com sucesso.",
+  },
+  "transfer-created": {
+    text: "Transferência criada com sucesso.",
+  },
+  "transaction-deleted": {
+    text: "Lançamento excluído com sucesso.",
+  },
+  "transaction-delete-error": {
+    text: "Não foi possível excluir o lançamento.",
+    error: true,
   },
 };
 
@@ -119,6 +140,7 @@ export function AccountRegister({
   openingBalanceMinor,
   requestedPage,
   message,
+  entryComposer,
 }: {
   accountId: string;
   currency: SupportedCurrency;
@@ -127,6 +149,7 @@ export function AccountRegister({
   openingBalanceMinor: number;
   requestedPage?: string;
   message?: string;
+  entryComposer?: AccountRegisterEntryComposerProps;
 }) {
   const pageCount = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
   const parsedPage = Number.parseInt(requestedPage ?? "1", 10);
@@ -141,7 +164,7 @@ export function AccountRegister({
 
   return (
     <section id="account-register" className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="border-b border-slate-200 px-3 py-2.5">
         <div>
           <h2 className="font-extrabold text-slate-950">
             Extrato da conta
@@ -152,20 +175,9 @@ export function AccountRegister({
             {formatFinancialDate(openingBalanceDate)}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/transactions/new?accountId=${accountId}`}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
-          >
-            Nova movimentação
-          </Link>
-          <Link
-            href={`/transactions/new?accountId=${accountId}&type=transfer`}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
-          >
-            Transferir
-          </Link>
-        </div>
+        {entryComposer ? (
+          <AccountRegisterEntryComposer {...entryComposer} />
+        ) : null}
       </div>
 
       {feedback ? (
@@ -220,7 +232,7 @@ export function AccountRegister({
                   <th scope="col" className="w-28 px-2 py-1.5 text-right">
                     Saldo
                   </th>
-                  <th scope="col" className="w-20 px-2 py-1.5 text-right">
+                  <th scope="col" className="w-36 px-2 py-1.5 text-right">
                     Ações
                   </th>
                 </tr>
@@ -284,12 +296,27 @@ export function AccountRegister({
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         {entry.editHref ? (
-                          <Link
-                            href={entry.editHref}
-                            className="text-sm font-bold text-blue-700 hover:underline"
-                          >
-                            Editar
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={entry.editHref}
+                              className="text-sm font-bold text-blue-700 hover:underline"
+                            >
+                              Editar
+                            </Link>
+                            {entry.entryType === "transaction" ? (
+                              <form action={deleteTransaction}>
+                                <input type="hidden" name="id" value={entry.id} />
+                                <input type="hidden" name="accountId" value={accountId} />
+                                <input type="hidden" name="page" value={page} />
+                                <ConfirmSubmitButton
+                                  confirmation={`Excluir definitivamente “${entry.description}”?`}
+                                  className="text-sm font-bold text-red-700 hover:underline disabled:opacity-50"
+                                >
+                                  Excluir
+                                </ConfirmSubmitButton>
+                              </form>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-400">
                             Automático
@@ -351,12 +378,27 @@ export function AccountRegister({
                         page={page}
                       />
                       {entry.editHref ? (
-                        <Link
-                          href={entry.editHref}
-                          className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700"
-                        >
-                          Editar
-                        </Link>
+                        <>
+                          <Link
+                            href={entry.editHref}
+                            className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700"
+                          >
+                            Editar
+                          </Link>
+                          {entry.entryType === "transaction" ? (
+                            <form action={deleteTransaction}>
+                              <input type="hidden" name="id" value={entry.id} />
+                              <input type="hidden" name="accountId" value={accountId} />
+                              <input type="hidden" name="page" value={page} />
+                              <ConfirmSubmitButton
+                                confirmation={`Excluir definitivamente “${entry.description}”?`}
+                                className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-red-700 disabled:opacity-50"
+                              >
+                                Excluir
+                              </ConfirmSubmitButton>
+                            </form>
+                          ) : null}
+                        </>
                       ) : null}
                     </div>
                   </div>

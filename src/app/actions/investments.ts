@@ -191,5 +191,10 @@ export async function createInvestmentAccountEntry(
   }
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  if (formData.get("returnAccountId") === parsed.data.accountId) {
+    redirect(
+      `/accounts/${parsed.data.accountId}?tab=statement&page=1&message=investment-recorded#account-register`,
+    );
+  }
   redirect(`/accounts/${parsed.data.accountId}?message=investment-recorded`);
 }

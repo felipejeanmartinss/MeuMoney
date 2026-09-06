@@ -8,11 +8,15 @@ import {
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
 import { getCurrentUserAccountHub } from "@/services/finance/accounts-service";
+import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
+import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
+import { getTransactionFormOptions } from "@/services/finance/transactions-service";
 import type {
   ImportJobStatus,
   RecurringTransactionState,
 } from "@/types/database";
 import { formatFinancialDate } from "@/utils/financial-formatters";
+import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Detalhe da conta" };
 
@@ -43,7 +47,13 @@ export default async function AccountDetailPage({
   searchParams: Promise<{ tab?: string; page?: string; message?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const result = await getCurrentUserAccountHub(id);
+  const [result, formOptions, creditCardOptions, investmentOptions] =
+    await Promise.all([
+      getCurrentUserAccountHub(id),
+      getTransactionFormOptions({ accountId: id }),
+      listCurrentUserTransferCreditCardDestinations(),
+      listCurrentUserInvestmentPositions(),
+    ]);
   if (!result.account && !result.hasError) notFound();
 
   const account = result.account;
@@ -154,6 +164,24 @@ export default async function AccountDetailPage({
           openingBalanceMinor={account.opening_balance_minor}
           requestedPage={query.page}
           message={query.message}
+          entryComposer={
+            account.archived_at
+              ? undefined
+              : {
+                  accountId: account.id,
+                  accountType: account.type,
+                  transactionDate: toIsoDate(new Date()),
+                  accounts: formOptions.accounts,
+                  categories: formOptions.categories,
+                  groups: formOptions.groups,
+                  creditCards: creditCardOptions.destinations,
+                  investmentPositions: investmentOptions.positions,
+                  hasError:
+                    formOptions.hasError ||
+                    creditCardOptions.hasError ||
+                    investmentOptions.hasError,
+                }
+          }
         />
       ) : null}
 

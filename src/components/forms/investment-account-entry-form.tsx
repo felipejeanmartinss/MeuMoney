@@ -38,11 +38,13 @@ export function InvestmentAccountEntryForm({
   positions,
   initialAccountId,
   transactionDate,
+  returnAccountId,
 }: {
   accounts: InvestmentAccountOption[];
   positions: InvestmentPositionSummary[];
   initialAccountId?: string;
   transactionDate: string;
+  returnAccountId?: string;
 }) {
   const [state, formAction, pending] = useActionState(
     createInvestmentAccountEntry,
@@ -81,6 +83,9 @@ export function InvestmentAccountEntryForm({
 
   return (
     <form action={formAction} className="grid gap-5">
+      {returnAccountId ? (
+        <input type="hidden" name="returnAccountId" value={returnAccountId} />
+      ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
