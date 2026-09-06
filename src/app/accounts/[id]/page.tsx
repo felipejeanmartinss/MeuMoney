@@ -119,7 +119,7 @@ export default async function AccountDetailPage({
                   Saldo atual
                 </p>
                 <p className="mt-1 text-[0.68rem] text-slate-400">
-                  até {formatFinancialDate(result.balanceSummary.asOfDate)}
+                  fechamento até ontem
                 </p>
                 <p
                   className={`mt-1 text-2xl font-black ${
@@ -139,7 +139,7 @@ export default async function AccountDetailPage({
                   Saldo projetado
                 </p>
                 <p className="mt-1 text-[0.68rem] text-slate-400">
-                  inclui datas futuras
+                  inclui hoje e datas futuras
                 </p>
                 <p
                   className={`mt-1 text-2xl font-black ${

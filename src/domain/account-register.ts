@@ -34,7 +34,7 @@ export type AccountRegisterSourceEntry = {
 export type AccountRegisterEntry = AccountRegisterSourceEntry & {
   signedAmountMinor: number;
   runningBalanceMinor: number;
-  isFuture: boolean;
+  isProjected: boolean;
 };
 
 export type AccountRegisterBalanceSummary = {
@@ -67,7 +67,7 @@ function affectsCurrentBalance(
   return (
     entry.isActive &&
     entry.status === "completed" &&
-    entry.transactionDate <= asOfDate
+    entry.transactionDate < asOfDate
   );
 }
 
@@ -77,7 +77,7 @@ function affectsProjectedBalance(
 ) {
   return (
     affectsCurrentBalance(entry, asOfDate) ||
-    (entry.isActive && entry.transactionDate > asOfDate)
+    (entry.isActive && entry.transactionDate >= asOfDate)
   );
 }
 
@@ -132,7 +132,7 @@ export function buildAccountRegister(
         ...entry,
         signedAmountMinor,
         runningBalanceMinor,
-        isFuture: entry.transactionDate > asOfDate,
+        isProjected: entry.transactionDate >= asOfDate,
       };
     });
 

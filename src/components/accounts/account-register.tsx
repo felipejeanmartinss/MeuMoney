@@ -160,7 +160,9 @@ export function AccountRegister({
     : 1;
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageEntries = entries.slice(pageStart, page * PAGE_SIZE);
-  const firstCurrentEntryIndex = entries.findIndex((entry) => !entry.isFuture);
+  const firstCurrentEntryIndex = entries.findIndex(
+    (entry) => !entry.isProjected,
+  );
   const feedback = message ? messages[message] : undefined;
 
   return (

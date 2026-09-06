@@ -170,15 +170,15 @@ describe("account register and subcategories", () => {
       summarizeAccountRegisterBalances(source, 5_000, "2026-09-06"),
     ).toEqual({
       asOfDate: "2026-09-06",
-      currentBalanceMinor: 15_000,
+      currentBalanceMinor: 5_000,
       projectedBalanceMinor: 10_000,
     });
 
     const register = buildAccountRegister(source, 5_000, "2026-09-06");
-    expect(register.map((item) => [item.id, item.isFuture])).toEqual([
+    expect(register.map((item) => [item.id, item.isProjected])).toEqual([
       ["future-pending", true],
       ["future-completed", true],
-      ["realized-today", false],
+      ["realized-today", true],
       ["overdue-pending", false],
     ]);
     expect(register[0]?.runningBalanceMinor).toBe(10_000);
