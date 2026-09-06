@@ -3,6 +3,8 @@ import {
   deleteTransaction,
   toggleAccountEntryReconciliation,
 } from "@/app/actions/transactions";
+import { deleteInvestmentCashFlow } from "@/app/actions/investments";
+import { deleteTransfer } from "@/app/actions/transfers";
 import {
   AccountRegisterEntryComposer,
   type AccountRegisterEntryComposerProps,
@@ -41,6 +43,18 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   },
   "transaction-delete-error": {
     text: "Não foi possível excluir o lançamento.",
+    error: true,
+  },
+  "investment-flow-deleted": {
+    text: "Movimento de investimento excluído e posição recalculada.",
+  },
+  "investment-flow-delete-error": {
+    text: "Não foi possível excluir o movimento de investimento.",
+    error: true,
+  },
+  "transfer-deleted": { text: "Transferência excluída definitivamente." },
+  "transfer-delete-error": {
+    text: "Não foi possível excluir a transferência.",
     error: true,
   },
 };
@@ -297,12 +311,28 @@ export function AccountRegister({
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         {entry.investmentPositionId ? (
-                          <Link
-                            href={`/investments/${entry.investmentPositionId}/history`}
-                            className="text-sm font-bold text-emerald-700 hover:underline"
-                          >
-                            Posição
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/investments/${entry.investmentPositionId}/history`}
+                              className="text-sm font-bold text-emerald-700 hover:underline"
+                            >
+                              Posição
+                            </Link>
+                            {entry.investmentCashFlowId ? (
+                              <form action={deleteInvestmentCashFlow}>
+                                <input type="hidden" name="cashFlowId" value={entry.investmentCashFlowId} />
+                                <input type="hidden" name="positionId" value={entry.investmentPositionId} />
+                                <input type="hidden" name="accountId" value={accountId} />
+                                <input type="hidden" name="page" value={page} />
+                                <ConfirmSubmitButton
+                                  confirmation={`Excluir o vínculo de investimento de “${entry.description}” e reverter seu efeito na posição?`}
+                                  className="text-sm font-bold text-red-700 hover:underline disabled:opacity-50"
+                                >
+                                  Excluir vínculo
+                                </ConfirmSubmitButton>
+                              </form>
+                            ) : null}
+                          </div>
                         ) : accountType === "investment" &&
                           entry.entryType === "transfer_entry" &&
                           entry.isActive &&
@@ -328,6 +358,18 @@ export function AccountRegister({
                                 <input type="hidden" name="page" value={page} />
                                 <ConfirmSubmitButton
                                   confirmation={`Excluir definitivamente “${entry.description}”?`}
+                                  className="text-sm font-bold text-red-700 hover:underline disabled:opacity-50"
+                                >
+                                  Excluir
+                                </ConfirmSubmitButton>
+                              </form>
+                            ) : entry.transferId ? (
+                              <form action={deleteTransfer}>
+                                <input type="hidden" name="id" value={entry.transferId} />
+                                <input type="hidden" name="accountId" value={accountId} />
+                                <input type="hidden" name="page" value={page} />
+                                <ConfirmSubmitButton
+                                  confirmation={`Excluir definitivamente a transferência “${entry.description}”?`}
                                   className="text-sm font-bold text-red-700 hover:underline disabled:opacity-50"
                                 >
                                   Excluir
@@ -399,12 +441,28 @@ export function AccountRegister({
                         page={page}
                       />
                       {entry.investmentPositionId ? (
-                        <Link
-                          href={`/investments/${entry.investmentPositionId}/history`}
-                          className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-emerald-700"
-                        >
-                          Posição
-                        </Link>
+                        <>
+                          <Link
+                            href={`/investments/${entry.investmentPositionId}/history`}
+                            className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-emerald-700"
+                          >
+                            Posição
+                          </Link>
+                          {entry.investmentCashFlowId ? (
+                            <form action={deleteInvestmentCashFlow}>
+                              <input type="hidden" name="cashFlowId" value={entry.investmentCashFlowId} />
+                              <input type="hidden" name="positionId" value={entry.investmentPositionId} />
+                              <input type="hidden" name="accountId" value={accountId} />
+                              <input type="hidden" name="page" value={page} />
+                              <ConfirmSubmitButton
+                                confirmation={`Excluir o vínculo de investimento de “${entry.description}” e reverter seu efeito na posição?`}
+                                className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-red-700 disabled:opacity-50"
+                              >
+                                Excluir vínculo
+                              </ConfirmSubmitButton>
+                            </form>
+                          ) : null}
+                        </>
                       ) : accountType === "investment" &&
                         entry.entryType === "transfer_entry" &&
                         entry.isActive &&
@@ -430,6 +488,18 @@ export function AccountRegister({
                               <input type="hidden" name="page" value={page} />
                               <ConfirmSubmitButton
                                 confirmation={`Excluir definitivamente “${entry.description}”?`}
+                                className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-red-700 disabled:opacity-50"
+                              >
+                                Excluir
+                              </ConfirmSubmitButton>
+                            </form>
+                          ) : entry.transferId ? (
+                            <form action={deleteTransfer}>
+                              <input type="hidden" name="id" value={entry.transferId} />
+                              <input type="hidden" name="accountId" value={accountId} />
+                              <input type="hidden" name="page" value={page} />
+                              <ConfirmSubmitButton
+                                confirmation={`Excluir definitivamente a transferência “${entry.description}”?`}
                                 className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-red-700 disabled:opacity-50"
                               >
                                 Excluir

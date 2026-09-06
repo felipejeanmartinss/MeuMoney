@@ -13,6 +13,7 @@ import {
 import {
   createCurrentUserCreditCardTransfer,
   createCurrentUserTransfer,
+  deleteCurrentUserTransfer,
   setCurrentUserTransferActive,
   updateCurrentUserCreditCardTransfer,
   updateCurrentUserTransfer,
@@ -176,4 +177,30 @@ export async function toggleTransferActivity(formData: FormData) {
   redirect(
     `/transfers?message=${result.ok ? "status-updated" : "status-error"}`,
   );
+}
+
+export async function deleteTransfer(formData: FormData) {
+  const parsedId = transferIdSchema.safeParse(formData.get("id"));
+  const returnAccountId = formData.get("accountId")?.toString();
+  const page = Math.max(
+    1,
+    Number.parseInt(String(formData.get("page") ?? "1"), 10) || 1,
+  );
+  if (!parsedId.success) {
+    if (returnAccountId) {
+      redirect(
+        `/accounts/${returnAccountId}?tab=statement&page=${page}&message=transfer-delete-error#account-register`,
+      );
+    }
+    redirect("/transfers?message=delete-error");
+  }
+  const result = await deleteCurrentUserTransfer(parsedId.data);
+  revalidateFinancialPaths();
+  if (returnAccountId) {
+    revalidatePath(`/accounts/${returnAccountId}`);
+    redirect(
+      `/accounts/${returnAccountId}?tab=statement&page=${page}&message=${result.ok ? "transfer-deleted" : "transfer-delete-error"}#account-register`,
+    );
+  }
+  redirect(`/transfers?message=${result.ok ? "deleted" : "delete-error"}`);
 }

@@ -243,3 +243,31 @@ export async function setCurrentUserTransferActive(
       }
     : { ok: true as const };
 }
+
+export async function deleteCurrentUserTransfer(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("transfers")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  const message = error?.message?.toLowerCase() ?? "";
+  if (
+    message.includes("investment_cash_flows") ||
+    message.includes("linked_investment_transfer")
+  ) {
+    return {
+      ok: false as const,
+      message:
+        "Exclua primeiro o vínculo com a posição de investimento; depois a transferência poderá ser excluída.",
+    };
+  }
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir a transferência.",
+      }
+    : { ok: true as const };
+}

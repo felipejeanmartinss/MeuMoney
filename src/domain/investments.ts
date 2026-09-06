@@ -489,6 +489,64 @@ export const investmentPositionIdSchema = z.uuid(
   "Posição de investimento inválida.",
 );
 
+export const investmentCashFlowIdSchema = z.uuid(
+  "Movimentação de investimento inválida.",
+);
+
+export type InvestmentPositionMoneyEffect = {
+  valueDeltaMinor: number;
+  costDeltaMinor: number;
+  nextCurrentValueMinor: number;
+  nextAccumulatedCostMinor: number;
+};
+
+export function calculateInvestmentPositionMoneyEffect(input: {
+  cashFlowType: InvestmentCashFlowType;
+  amountMinor: number;
+  currentValueMinor: number;
+  accumulatedCostMinor: number;
+}): InvestmentPositionMoneyEffect {
+  const amount = assertMinorUnits(input.amountMinor);
+  const currentValue = assertMinorUnits(input.currentValueMinor);
+  const accumulatedCost = assertMinorUnits(input.accumulatedCostMinor);
+  if (amount <= 0) throw new Error("Investment cash flows must be positive.");
+  if (currentValue < 0 || accumulatedCost < 0) {
+    throw new Error("Investment position values cannot be negative.");
+  }
+
+  let valueDeltaMinor = 0;
+  let costDeltaMinor = 0;
+  if (input.cashFlowType === "contribution") {
+    valueDeltaMinor = amount;
+    costDeltaMinor = amount;
+  } else if (input.cashFlowType === "redemption") {
+    if (amount > currentValue) {
+      throw new Error("Investment redemption exceeds the current position.");
+    }
+    const redeemedCost =
+      amount === currentValue
+        ? accumulatedCost
+        : currentValue === 0
+          ? 0
+          : Number(
+              (BigInt(accumulatedCost) * BigInt(amount) +
+                BigInt(Math.floor(currentValue / 2))) /
+                BigInt(currentValue),
+            );
+    valueDeltaMinor = -amount;
+    costDeltaMinor = -redeemedCost;
+  }
+
+  return {
+    valueDeltaMinor,
+    costDeltaMinor,
+    nextCurrentValueMinor: assertMinorUnits(currentValue + valueDeltaMinor),
+    nextAccumulatedCostMinor: assertMinorUnits(
+      accumulatedCost + costDeltaMinor,
+    ),
+  };
+}
+
 export type InvestmentAggregationPosition = {
   id: string;
   userId: string;

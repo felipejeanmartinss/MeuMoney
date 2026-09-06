@@ -5,9 +5,12 @@ import { redirect } from "next/navigation";
 import {
   netWorthItemFormSchema,
   netWorthItemIdSchema,
+  netWorthValuationIdSchema,
 } from "@/domain/net-worth";
 import {
   createCurrentUserNetWorthItem,
+  deleteCurrentUserNetWorthItem,
+  deleteCurrentUserNetWorthValuation,
   setCurrentUserNetWorthItemArchived,
   updateCurrentUserNetWorthItem,
 } from "@/services/finance/net-worth-service";
@@ -91,4 +94,33 @@ export async function toggleNetWorthItemStatus(formData: FormData) {
   redirect(
     `/net-worth?message=${result.ok ? "status-updated" : "status-error"}`,
   );
+}
+
+export async function deleteNetWorthValuation(formData: FormData) {
+  const parsedId = netWorthValuationIdSchema.safeParse(
+    formData.get("valuationId"),
+  );
+  const parsedItemId = netWorthItemIdSchema.safeParse(formData.get("itemId"));
+  if (!parsedId.success || !parsedItemId.success) {
+    redirect("/net-worth?message=valuation-delete-error");
+  }
+  const result = await deleteCurrentUserNetWorthValuation(parsedId.data);
+  revalidatePath("/net-worth");
+  revalidatePath(`/net-worth/${parsedItemId.data}/history`);
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  redirect(
+    `/net-worth/${parsedItemId.data}/history?message=${result.ok ? "valuation-deleted" : "valuation-delete-error"}`,
+  );
+}
+
+export async function deleteNetWorthItem(formData: FormData) {
+  const parsedId = netWorthItemIdSchema.safeParse(formData.get("id"));
+  if (!parsedId.success) redirect("/net-worth?message=delete-error");
+  const result = await deleteCurrentUserNetWorthItem(parsedId.data);
+  revalidatePath("/net-worth");
+  revalidatePath("/investments");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  redirect(`/net-worth?message=${result.ok ? "deleted" : "delete-error"}`);
 }

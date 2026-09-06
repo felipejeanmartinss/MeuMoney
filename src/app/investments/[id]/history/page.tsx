@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteInvestmentCashFlow } from "@/app/actions/investments";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
   formatInvestmentQuantity,
@@ -15,6 +17,15 @@ import {
 } from "@/services/finance/investments-service";
 
 export const metadata = { title: "Histórico do investimento" };
+
+const messages: Record<string, { text: string; error?: boolean }> = {
+  "flow-created": { text: "Movimento registrado e posição atualizada." },
+  "flow-deleted": { text: "Movimento excluído e efeito na posição revertido." },
+  "flow-delete-error": {
+    text: "Não foi possível excluir este movimento.",
+    error: true,
+  },
+};
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(
@@ -43,6 +54,7 @@ export default async function InvestmentHistoryPage({
   }
 
   const position = positionResult.position;
+  const feedback = query.message ? messages[query.message] : undefined;
 
   return (
     <main className="mx-auto grid max-w-5xl gap-8 px-4 py-8 sm:px-6 sm:py-12">
@@ -81,12 +93,16 @@ export default async function InvestmentHistoryPage({
         </div>
       </div>
 
-      {query.message === "flow-created" ? (
+      {feedback ? (
         <p
-          role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+          role={feedback.error ? "alert" : "status"}
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            feedback.error
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
         >
-          Registro histórico criado com sucesso.
+          {feedback.text}
         </p>
       ) : null}
 
@@ -98,7 +114,7 @@ export default async function InvestmentHistoryPage({
           Aportes, resgates e rendas
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Histórico da posição sem atualização automática da avaliação atual.
+          Aportes e resgates atualizam a posição; rendas ficam separadas do principal.
         </p>
         {historyResult.cashFlows.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
@@ -125,7 +141,8 @@ export default async function InvestmentHistoryPage({
                       {formatDate(cashFlow.cash_flow_date)}
                     </time>
                   </div>
-                  <div className="sm:text-right">
+                  <div className="flex items-center gap-4 sm:justify-end sm:text-right">
+                    <div>
                     <p className="text-xl font-extrabold text-slate-950">
                       {formatMoney(
                         cashFlow.amount_minor,
@@ -145,6 +162,17 @@ export default async function InvestmentHistoryPage({
                           : "Vinculado ao extrato da conta"}
                       </p>
                     ) : null}
+                    </div>
+                    <form action={deleteInvestmentCashFlow}>
+                      <input type="hidden" name="cashFlowId" value={cashFlow.id} />
+                      <input type="hidden" name="positionId" value={position.id} />
+                      <ConfirmSubmitButton
+                        confirmation={`Excluir este ${INVESTMENT_CASH_FLOW_LABELS[cashFlow.cash_flow_type].toLocaleLowerCase("pt-BR")}? O efeito na posição também será revertido.`}
+                        className="rounded-lg px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Excluir
+                      </ConfirmSubmitButton>
+                    </form>
                   </div>
                 </div>
                 {cashFlow.notes ? (

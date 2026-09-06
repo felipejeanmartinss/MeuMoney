@@ -312,13 +312,20 @@ filtra a mesma fonte mensal por essa classificação, sem criar acumuladores.
 
 `investment_cash_flows.source_transfer_id` e `source_account_id` registram a
 perna de transferência que financiou uma aplicação ou recebeu uma liquidação
-ou renda. `link_investment_transfer_entry` cria o movimento de investimento e o
-vínculo na mesma transação, exige direções de caixa compatíveis e bloqueia
-duplicidade. A view `investment_transfer_candidates`, com
+ou renda. `link_investment_transfer_entry` aplica o efeito na posição e cria o
+movimento oposto ao da transferência na conta de investimento, mantendo caixa
+livre e principal investido separados. A operação exige direções compatíveis e
+bloqueia duplicidade. As colunas `position_value_delta_minor`,
+`position_cost_delta_minor` e `position_quantity_delta` guardam o efeito exato
+para reversão segura. As RPCs de exclusão validam `auth.uid()` e preservam a
+transferência original ao remover somente o vínculo. A view
+`investment_transfer_candidates`, com
 `security_invoker`, expõe somente transferências realizadas de contas de
 Investimento visíveis ao proprietário.
 
 Migrations cumulativas, nesta ordem:
 `20260905090000_investment_transactions_reports.sql` e
 `20260905143000_financial_report_matrices.sql` e
-`20260905153310_fixed_expense_subcategories.sql`.
+`20260905153310_fixed_expense_subcategories.sql` e
+`20260906223812_reconcile_financial_movements.sql` e
+`20260906223900_preserve_investment_account_cash_entries.sql`.

@@ -127,7 +127,7 @@ export async function listCurrentUserInvestmentHistory(positionId: string) {
     supabase
       .from("investment_cash_flows")
       .select(
-        "id, position_id, user_id, cash_flow_type, income_type, transaction_id, source_transfer_id, source_account_id, amount_minor, quantity, cash_flow_date, notes, created_at",
+        "id, position_id, user_id, cash_flow_type, income_type, transaction_id, source_transfer_id, source_account_id, amount_minor, quantity, cash_flow_date, notes, position_value_delta_minor, position_cost_delta_minor, position_quantity_delta, created_at",
       )
       .eq("user_id", user.id)
       .eq("position_id", positionId)
@@ -237,20 +237,29 @@ export async function createCurrentUserInvestmentCashFlow(
   positionId: string,
   input: InvestmentCashFlowMutationInput,
 ) {
-  const { supabase, user } = await requireUser();
-  const { data, error } = await supabase
-    .from("investment_cash_flows")
-    .insert({
-      position_id: positionId,
-      user_id: user.id,
-      cash_flow_type: input.cashFlowType,
-      amount_minor: input.amountMinor,
-      quantity: input.quantity,
-      cash_flow_date: input.cashFlowDate,
-      notes: input.notes,
-    })
-    .select("id")
-    .single();
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("create_investment_cash_flow", {
+    target_position_id: positionId,
+    target_cash_flow_type: input.cashFlowType,
+    target_amount_minor: input.amountMinor,
+    target_quantity: input.quantity,
+    target_cash_flow_date: input.cashFlowDate,
+    target_notes: input.notes,
+  });
+
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("investment_redemption_exceeds_position")) {
+    return {
+      ok: false as const,
+      message: "O resgate não pode superar o valor atual da posição.",
+    };
+  }
+  if (message.includes("investment_redemption_exceeds_quantity")) {
+    return {
+      ok: false as const,
+      message: "A quantidade resgatada não pode superar a posição atual.",
+    };
+  }
 
   return error || !data
     ? {
@@ -258,7 +267,41 @@ export async function createCurrentUserInvestmentCashFlow(
         message:
           "Não foi possível registrar o aporte, resgate ou renda desta posição.",
       }
-    : { ok: true as const, id: data.id };
+    : { ok: true as const, id: data };
+}
+
+export async function deleteCurrentUserInvestmentCashFlow(id: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("delete_investment_cash_flow", {
+    target_cash_flow_id: id,
+  });
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("investment_cash_flow_reversal_conflict")) {
+    return {
+      ok: false as const,
+      message:
+        "Não é possível desfazer este movimento antes de excluir os movimentos posteriores que dependem dele.",
+    };
+  }
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir o movimento de investimento.",
+      }
+    : { ok: true as const, positionId: data };
+}
+
+export async function deleteCurrentUserInvestmentPosition(id: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("delete_investment_position", {
+    target_position_id: id,
+  });
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir a posição de investimento.",
+      }
+    : { ok: true as const };
 }
 
 export async function createCurrentUserInvestmentAccountEntry(
@@ -302,6 +345,18 @@ export async function createCurrentUserInvestmentAccountEntry(
     return {
       ok: false as const,
       message: "Revise os dados da nova posição e do aporte inicial.",
+    };
+  }
+  if (message.includes("investment_redemption_exceeds_position")) {
+    return {
+      ok: false as const,
+      message: "O resgate não pode superar o valor atual da posição.",
+    };
+  }
+  if (message.includes("investment_redemption_exceeds_quantity")) {
+    return {
+      ok: false as const,
+      message: "A quantidade resgatada não pode superar a posição atual.",
     };
   }
 
@@ -359,6 +414,18 @@ export async function linkCurrentUserInvestmentTransferEntry(
     return {
       ok: false as const,
       message: "A conta e a posição devem ter a mesma moeda e contexto.",
+    };
+  }
+  if (message.includes("investment_redemption_exceeds_position")) {
+    return {
+      ok: false as const,
+      message: "O resgate não pode superar o valor atual da posição.",
+    };
+  }
+  if (message.includes("investment_redemption_exceeds_quantity")) {
+    return {
+      ok: false as const,
+      message: "A quantidade resgatada não pode superar a posição atual.",
     };
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateInvestmentBreakdown,
+  calculateInvestmentPositionMoneyEffect,
   formatInvestmentQuantity,
   inferInvestmentTransferEvent,
   investmentAccountEntryFormSchema,
@@ -23,6 +24,75 @@ const basePosition = {
 };
 
 describe("investment rules", () => {
+  it("updates the position for contributions and leaves income outside principal", () => {
+    expect(
+      calculateInvestmentPositionMoneyEffect({
+        cashFlowType: "contribution",
+        amountMinor: 25_000,
+        currentValueMinor: 100_000,
+        accumulatedCostMinor: 90_000,
+      }),
+    ).toEqual({
+      valueDeltaMinor: 25_000,
+      costDeltaMinor: 25_000,
+      nextCurrentValueMinor: 125_000,
+      nextAccumulatedCostMinor: 115_000,
+    });
+    expect(
+      calculateInvestmentPositionMoneyEffect({
+        cashFlowType: "income",
+        amountMinor: 2_500,
+        currentValueMinor: 100_000,
+        accumulatedCostMinor: 90_000,
+      }),
+    ).toEqual({
+      valueDeltaMinor: 0,
+      costDeltaMinor: 0,
+      nextCurrentValueMinor: 100_000,
+      nextAccumulatedCostMinor: 90_000,
+    });
+  });
+
+  it("reduces value and proportional cost on partial and full redemption", () => {
+    expect(
+      calculateInvestmentPositionMoneyEffect({
+        cashFlowType: "redemption",
+        amountMinor: 25_000,
+        currentValueMinor: 100_000,
+        accumulatedCostMinor: 80_000,
+      }),
+    ).toEqual({
+      valueDeltaMinor: -25_000,
+      costDeltaMinor: -20_000,
+      nextCurrentValueMinor: 75_000,
+      nextAccumulatedCostMinor: 60_000,
+    });
+    expect(
+      calculateInvestmentPositionMoneyEffect({
+        cashFlowType: "redemption",
+        amountMinor: 100_000,
+        currentValueMinor: 100_000,
+        accumulatedCostMinor: 80_000,
+      }),
+    ).toEqual({
+      valueDeltaMinor: -100_000,
+      costDeltaMinor: -80_000,
+      nextCurrentValueMinor: 0,
+      nextAccumulatedCostMinor: 0,
+    });
+  });
+
+  it("rejects redemption above the current investment value", () => {
+    expect(() =>
+      calculateInvestmentPositionMoneyEffect({
+        cashFlowType: "redemption",
+        amountMinor: 100_001,
+        currentValueMinor: 100_000,
+        accumulatedCostMinor: 80_000,
+      }),
+    ).toThrow("exceeds");
+  });
+
   it("preserves exact quantities with up to twelve decimal places", () => {
     expect(normalizeInvestmentQuantity("0,00000001")).toBe("0.00000001");
     expect(normalizeInvestmentQuantity("00012.340000000000")).toBe("12.34");

@@ -526,6 +526,9 @@ export type InvestmentCashFlow = {
   quantity: string | null;
   cash_flow_date: string;
   notes: string | null;
+  position_value_delta_minor: number;
+  position_cost_delta_minor: number;
+  position_quantity_delta: string;
   created_at: string;
 };
 
@@ -1080,21 +1083,7 @@ export type Database = {
       };
       investment_cash_flows: {
         Row: InvestmentCashFlow;
-        Insert: {
-          id?: string;
-          position_id: string;
-          user_id: string;
-          cash_flow_type: InvestmentCashFlowType;
-          income_type?: InvestmentIncomeType | null;
-          transaction_id?: string | null;
-          source_transfer_id?: string | null;
-          source_account_id?: string | null;
-          amount_minor: number;
-          quantity?: string | null;
-          cash_flow_date: string;
-          notes?: string | null;
-          created_at?: string;
-        };
+        Insert: never;
         Update: never;
         Relationships: [];
       };
@@ -1263,6 +1252,33 @@ export type Database = {
           target_new_asset_name?: string | null;
         };
         Returns: string;
+      };
+      create_investment_cash_flow: {
+        Args: {
+          target_position_id: string;
+          target_cash_flow_type: InvestmentCashFlowType;
+          target_amount_minor: number;
+          target_quantity: string | null;
+          target_cash_flow_date: string;
+          target_notes?: string | null;
+        };
+        Returns: string;
+      };
+      delete_investment_cash_flow: {
+        Args: { target_cash_flow_id: string };
+        Returns: string;
+      };
+      delete_investment_position: {
+        Args: { target_position_id: string };
+        Returns: boolean;
+      };
+      delete_net_worth_valuation: {
+        Args: { target_valuation_id: string };
+        Returns: string;
+      };
+      delete_net_worth_item: {
+        Args: { target_item_id: string };
+        Returns: boolean;
       };
       delete_category_with_replacement: {
         Args: {

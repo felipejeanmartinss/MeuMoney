@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   investmentAccountEntryFormSchema,
+  investmentCashFlowIdSchema,
   investmentCashFlowFormSchema,
   investmentPositionFormSchema,
   investmentPositionIdSchema,
@@ -13,10 +14,13 @@ import {
   createCurrentUserInvestmentAccountEntry,
   createCurrentUserInvestmentCashFlow,
   createCurrentUserInvestmentPosition,
+  deleteCurrentUserInvestmentCashFlow,
+  deleteCurrentUserInvestmentPosition,
   linkCurrentUserInvestmentTransferEntry,
   setCurrentUserInvestmentPositionArchived,
   updateCurrentUserInvestmentPosition,
 } from "@/services/finance/investments-service";
+import { accountIdSchema } from "@/domain/accounts";
 
 export type InvestmentFormState = {
   status: "idle" | "error";
@@ -136,6 +140,57 @@ export async function createInvestmentCashFlow(
   revalidatePath("/investments");
   revalidatePath(`/investments/${parsed.data.positionId}/history`);
   redirect(`/investments/${parsed.data.positionId}/history?message=flow-created`);
+}
+
+export async function deleteInvestmentCashFlow(formData: FormData) {
+  const parsedId = investmentCashFlowIdSchema.safeParse(
+    formData.get("cashFlowId"),
+  );
+  const accountId = accountIdSchema.safeParse(formData.get("accountId"));
+  const page = Math.max(
+    1,
+    Number.parseInt(String(formData.get("page") ?? "1"), 10) || 1,
+  );
+  if (!parsedId.success) {
+    if (accountId.success) {
+      redirect(
+        `/accounts/${accountId.data}?tab=statement&page=${page}&message=investment-flow-delete-error#account-register`,
+      );
+    }
+    redirect("/investments?message=flow-delete-error");
+  }
+
+  const result = await deleteCurrentUserInvestmentCashFlow(parsedId.data);
+  revalidatePath("/accounts");
+  revalidatePath("/investments");
+  revalidatePath("/net-worth");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  if (result.ok) {
+    revalidatePath(`/investments/${result.positionId}/history`);
+  }
+  if (accountId.success) {
+    revalidatePath(`/accounts/${accountId.data}`);
+    redirect(
+      `/accounts/${accountId.data}?tab=statement&page=${page}&message=${result.ok ? "investment-flow-deleted" : "investment-flow-delete-error"}#account-register`,
+    );
+  }
+  redirect(
+    `/investments/${result.ok ? result.positionId : String(formData.get("positionId") ?? "")}/history?message=${result.ok ? "flow-deleted" : "flow-delete-error"}`,
+  );
+}
+
+export async function deleteInvestmentPosition(formData: FormData) {
+  const parsedId = investmentPositionIdSchema.safeParse(formData.get("id"));
+  if (!parsedId.success) redirect("/investments?message=delete-error");
+
+  const result = await deleteCurrentUserInvestmentPosition(parsedId.data);
+  revalidatePath("/accounts");
+  revalidatePath("/investments");
+  revalidatePath("/net-worth");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  redirect(`/investments?message=${result.ok ? "deleted" : "delete-error"}`);
 }
 
 export async function createInvestmentAccountEntry(

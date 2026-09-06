@@ -93,6 +93,7 @@ export const netWorthItemFormSchema = z.object({
 });
 
 export const netWorthItemIdSchema = z.uuid("Item patrimonial inválido.");
+export const netWorthValuationIdSchema = z.uuid("Avaliação patrimonial inválida.");
 
 export function kindForNetWorthItemType(
   itemType: NetWorthItemType,

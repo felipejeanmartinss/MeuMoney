@@ -94,8 +94,8 @@ export function InvestmentCashFlowForm({
       </Field>
 
       <FormMessage tone="info">
-        O registro histórico não altera automaticamente a posição atual. Se a
-        quantidade, o custo ou o valor atual mudaram, atualize também a posição.
+        Aportes aumentam a posição e resgates a reduzem. Dividendos, juros e
+        outras rendas permanecem separados do principal investido.
       </FormMessage>
       <SubmitButton pending={pending}>Registrar no histórico</SubmitButton>
     </form>

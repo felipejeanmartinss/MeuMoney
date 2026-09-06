@@ -22,8 +22,13 @@ ponto flutuante e atende ativos fracionários, inclusive criptomoedas.
   valor em cada data de posição;
 - `investment_cash_flows` registra aportes, resgates e rendas informados pelo
   usuário;
-- um fluxo histórico não altera silenciosamente a posição atual. O usuário
-  atualiza a posição separadamente quando quantidade, custo ou valor mudarem.
+- aportes aumentam valor, custo e quantidade da posição; resgates reduzem o
+  valor e o custo proporcionalmente e reduzem a quantidade quando informada;
+- rendas permanecem fora do principal e não alteram valor, custo ou quantidade.
+
+Cada fluxo guarda os deltas exatos aplicados à posição. Ao excluí-lo, esses
+deltas são revertidos na mesma transação. Um resgate integral zera valor, custo
+e, quando a quantidade não foi informada, toda a quantidade remanescente.
 
 O lançamento por conta oferece o modo Investimento. Aplicações geram saída na
 conta e aporte na posição; liquidações geram entrada e resgate; JCP, dividendos,
@@ -40,10 +45,12 @@ incompleto e nenhuma rentabilidade total é inferida.
 Transferências já realizadas em contas do tipo Investimento aparecem em uma
 fila de vínculo. Uma entrada pode originar uma aplicação de mesmo valor; uma
 saída pode corresponder a liquidação, JCP, dividendos, bonificação ou outro
-rendimento. O sistema mantém a transferência original e cria atomicamente o
-movimento oposto de investimento, evitando que o caixa e a posição sejam
-contados como o mesmo dinheiro. Cada perna da transferência aceita um único
-vínculo e fica financeiramente imutável depois dele.
+rendimento. O sistema mantém a transferência original e cria o movimento
+oposto na conta de investimento: a entrada de recursos é consumida pelo aporte
+e o resgate disponibiliza recursos antes da saída. Assim, o saldo representa o
+caixa livre, enquanto a posição representa o principal investido. Cada perna da
+transferência aceita um único vínculo e fica financeiramente imutável enquanto
+esse vínculo existir.
 
 A diferença sobre o custo é `valor atual - custo acumulado`. Aportes, resgates e
 rendas são somados separadamente. O resultado total
@@ -60,11 +67,11 @@ passivos manuais. Todos os grupos permanecem separados por moeda.
 
 ## Segurança
 
-As três tabelas usam RLS por `user_id`. Posições aceitam leitura, inserção e
-atualização do proprietário, sem exclusão física. Fotografias são somente
-leitura para o cliente e criadas por trigger. Fluxos históricos são
-acrescentados de forma imutável pela interface. Chaves estrangeiras compostas
-impedem ligar histórico a uma posição de outro usuário.
+As três tabelas usam RLS por `user_id`. Posições e fluxos são excluídos por RPCs
+transacionais com validação explícita do proprietário; a exclusão de uma
+posição preserva transferências originais. Fotografias são somente leitura para
+o cliente e criadas por trigger. Chaves estrangeiras compostas impedem ligar
+histórico a uma posição de outro usuário.
 
 ## Financiamentos estruturados
 
