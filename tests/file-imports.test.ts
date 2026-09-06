@@ -339,6 +339,34 @@ describe("file imports", () => {
     );
   });
 
+  it("preserves all previously ignored rows during later recalculations", () => {
+    const migration = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260905224330_preserve_multiple_ignored_import_rows.sql",
+      ),
+      "utf8",
+    );
+    const capturePosition = migration.indexOf(
+      "array_agg(staging.id order by staging.source_row_number)",
+    );
+    const refreshPosition = migration.indexOf(
+      "perform private.refresh_import_job_before_persistent_ignored_rows(",
+    );
+    const restorePosition = migration.indexOf(
+      "and id = any(ignored_row_ids)",
+    );
+
+    expect(migration).toContain("and staging.status = 'ignored'");
+    expect(migration).toContain("and not staging.is_selected");
+    expect(capturePosition).toBeGreaterThan(-1);
+    expect(refreshPosition).toBeGreaterThan(capturePosition);
+    expect(restorePosition).toBeGreaterThan(refreshPosition);
+    expect(migration).toContain("set status = 'ignored'");
+    expect(migration).toContain("is_selected = false");
+  });
+
   it("fails the plan before any mutation when one selected row is invalid", () => {
     const candidates = [
       {
