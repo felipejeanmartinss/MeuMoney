@@ -147,9 +147,10 @@ valores monetários permanecem inteiros.
 
 `investment_positions` mantém a fotografia atual. Triggers atômicos criam
 `investment_position_snapshots` no cadastro e em alterações de quantidade,
-custo, valor ou data. `investment_cash_flows` é um histórico separado e
-acrescentável de aportes, resgates e rendas; registrar um fluxo não altera
-silenciosamente a posição.
+custo, valor ou data. `investment_cash_flows` registra aportes, resgates e
+rendas com os deltas exatos aplicados à posição. Aportes e resgates atualizam a
+posição atomicamente; rendas permanecem separadas do principal e a exclusão
+reverte os mesmos deltas.
 
 As views `investment_position_summary` e `net_worth_summary` usam
 `security_invoker`. A primeira separa fluxos e só deriva o resultado total com

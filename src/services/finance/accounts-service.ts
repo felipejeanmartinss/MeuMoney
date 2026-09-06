@@ -167,10 +167,10 @@ export async function getCurrentUserAccountHub(id: string) {
     supabase
       .from("investment_cash_flows")
       .select(
-        "position_id, source_transfer_id, source_account_id",
+        "id, position_id, transaction_id, source_transfer_id, source_account_id",
       )
       .eq("user_id", user.id)
-      .eq("source_account_id", id),
+      .limit(5000),
   ]);
 
   const categories = (categoriesResult.data ?? []) as Category[];
@@ -193,7 +193,20 @@ export async function getCurrentUserAccountHub(id: string) {
   const investmentLinkByTransfer = new Map(
     (investmentLinksResult.data ?? []).flatMap((flow) =>
       flow.source_transfer_id && flow.source_account_id
-        ? [[`${flow.source_transfer_id}:${flow.source_account_id}`, flow.position_id] as const]
+        ? [[
+            `${flow.source_transfer_id}:${flow.source_account_id}`,
+            { positionId: flow.position_id, cashFlowId: flow.id },
+          ] as const]
+        : [],
+    ),
+  );
+  const investmentLinkByTransaction = new Map(
+    (investmentLinksResult.data ?? []).flatMap((flow) =>
+      flow.transaction_id
+        ? [[
+            flow.transaction_id,
+            { positionId: flow.position_id, cashFlowId: flow.id },
+          ] as const]
         : [],
     ),
   );
@@ -228,9 +241,12 @@ export async function getCurrentUserAccountHub(id: string) {
             ? `/transactions/${transaction.id}/edit`
             : null,
         investmentPositionId:
-          transaction.origin_type === "investment"
+          investmentLinkByTransaction.get(transaction.id)?.positionId ??
+          (transaction.origin_type === "investment"
             ? transaction.origin_id
-            : null,
+            : null),
+        investmentCashFlowId:
+          investmentLinkByTransaction.get(transaction.id)?.cashFlowId ?? null,
       };
     }),
     ...transferEntriesResult.data.map((entry) => {
@@ -263,7 +279,11 @@ export async function getCurrentUserAccountHub(id: string) {
         amountMinor: entry.amount_minor,
         editHref: `/transfers/${entry.transfer_id}/edit`,
         investmentPositionId:
-          investmentLinkByTransfer.get(`${entry.transfer_id}:${id}`) ?? null,
+          investmentLinkByTransfer.get(`${entry.transfer_id}:${id}`)
+            ?.positionId ?? null,
+        investmentCashFlowId:
+          investmentLinkByTransfer.get(`${entry.transfer_id}:${id}`)
+            ?.cashFlowId ?? null,
       };
     }),
   ];

@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { toggleTransferActivity } from "@/app/actions/transfers";
+import {
+  deleteTransfer,
+  toggleTransferActivity,
+} from "@/app/actions/transfers";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
@@ -20,6 +24,8 @@ const messages: Record<string, string> = {
   updated: "Transferência atualizada com sucesso.",
   "status-updated": "Status da transferência atualizado com sucesso.",
   "status-error": "Não foi possível alterar o status da transferência.",
+  deleted: "Transferência excluída definitivamente.",
+  "delete-error": "Não foi possível excluir a transferência.",
 };
 
 export default async function TransfersPage({
@@ -47,7 +53,7 @@ export default async function TransfersPage({
   const messageCode =
     typeof rawParams.message === "string" ? rawParams.message : undefined;
   const feedback = messageCode ? messages[messageCode] : undefined;
-  const feedbackIsError = messageCode === "status-error";
+  const feedbackIsError = messageCode?.endsWith("error") ?? false;
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -254,6 +260,15 @@ export default async function TransfersPage({
                   <button className="min-h-10 rounded-lg px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                     {transfer.is_active ? "Inativar" : "Reativar"}
                   </button>
+                </form>
+                <form action={deleteTransfer}>
+                  <input type="hidden" name="id" value={transfer.id} />
+                  <ConfirmSubmitButton
+                    confirmation={`Excluir definitivamente a transferência de “${source?.name ?? "Conta"}” para “${destination?.name ?? "Destino"}”?`}
+                    className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Excluir
+                  </ConfirmSubmitButton>
                 </form>
               </div>
             </article>

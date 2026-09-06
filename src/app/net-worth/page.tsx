@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { toggleNetWorthItemStatus } from "@/app/actions/net-worth";
+import {
+  deleteNetWorthItem,
+  toggleNetWorthItemStatus,
+} from "@/app/actions/net-worth";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { SavingsSimulator } from "@/components/net-worth/savings-simulator";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
@@ -21,6 +25,8 @@ const messages: Record<string, string> = {
   updated: "Item e avaliação atualizados com sucesso.",
   "status-updated": "Estado do item patrimonial atualizado com sucesso.",
   "status-error": "Não foi possível alterar o estado do item patrimonial.",
+  deleted: "Item patrimonial e seu histórico foram excluídos.",
+  "delete-error": "Não foi possível excluir o item patrimonial.",
 };
 
 function formatDate(value: string) {
@@ -186,6 +192,15 @@ function ItemsList({
                         {archived ? "Reativar" : "Arquivar"}
                       </button>
                     </form>
+                    <form action={deleteNetWorthItem}>
+                      <input type="hidden" name="id" value={item.id} />
+                      <ConfirmSubmitButton
+                        confirmation={`Excluir definitivamente “${item.name}” e todo o histórico de avaliações?`}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Excluir
+                      </ConfirmSubmitButton>
+                    </form>
                   </div>
                 </details>
               </article>
@@ -208,7 +223,7 @@ export default async function NetWorthPage({
   ]);
   const activeTab = params.tab === "simulator" ? "simulator" : "overview";
   const feedback = params.message ? messages[params.message] : undefined;
-  const feedbackIsError = params.message === "status-error";
+  const feedbackIsError = params.message?.endsWith("error") ?? false;
   const executive = calculateExecutiveNetWorthByCurrency({
     currentUserId: result.userId,
     accounts: result.accounts.map((account) => ({

@@ -176,3 +176,45 @@ export async function setCurrentUserNetWorthItemArchived(
       }
     : { ok: true as const };
 }
+
+export async function deleteCurrentUserNetWorthValuation(id: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("delete_net_worth_valuation", {
+    target_valuation_id: id,
+  });
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("last_net_worth_valuation")) {
+    return {
+      ok: false as const,
+      message:
+        "A avaliação inicial só pode ser removida excluindo o item patrimonial.",
+    };
+  }
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir a avaliação patrimonial.",
+      }
+    : { ok: true as const, itemId: data };
+}
+
+export async function deleteCurrentUserNetWorthItem(id: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("delete_net_worth_item", {
+    target_item_id: id,
+  });
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("managed_financing_item")) {
+    return {
+      ok: false as const,
+      message:
+        "Este item pertence a um financiamento importado e deve ser excluído pelo contrato.",
+    };
+  }
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir o item patrimonial.",
+      }
+    : { ok: true as const };
+}

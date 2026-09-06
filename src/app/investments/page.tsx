@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { toggleInvestmentPositionStatus } from "@/app/actions/investments";
+import {
+  deleteInvestmentPosition,
+  toggleInvestmentPositionStatus,
+} from "@/app/actions/investments";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
@@ -28,6 +32,8 @@ const messages: Record<string, string> = {
   updated: "Posição e fotografia histórica atualizadas com sucesso.",
   "status-updated": "Estado da posição atualizado com sucesso.",
   "status-error": "Não foi possível alterar o estado da posição.",
+  deleted: "Posição e seus movimentos de investimento foram excluídos.",
+  "delete-error": "Não foi possível excluir a posição de investimento.",
   "import-cancelled": "Prévia de financiamento cancelada.",
   "import-error": "Não foi possível concluir a importação do financiamento.",
 };
@@ -142,7 +148,7 @@ function PositionsView({
       {[...groups.values()].map((group) => (
         <section
           key={`${group.currency}-${group.family}`}
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm"
         >
           <div className="border-b border-slate-200 px-5 py-4">
             <p className="text-xs font-extrabold uppercase tracking-[0.15em] text-emerald-700">
@@ -225,11 +231,11 @@ function PositionsView({
                         : percentage(position.current_value_minor, total)}
                     </p>
                   </div>
-                  <details className="relative">
+                  <details className="relative z-20">
                     <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-slate-300 px-3 text-sm font-bold">
                       Ações
                     </summary>
-                    <div className="z-10 mt-2 grid min-w-36 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl lg:absolute lg:right-0">
+                    <div className="z-30 mt-2 grid min-w-40 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl lg:absolute lg:right-0">
                       <Link
                         href={`/investments/${position.id}/edit`}
                         className="rounded-lg px-3 py-2 text-sm font-bold hover:bg-slate-100"
@@ -252,6 +258,15 @@ function PositionsView({
                         <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-slate-100">
                           {archived ? "Reativar" : "Arquivar"}
                         </button>
+                      </form>
+                      <form action={deleteInvestmentPosition}>
+                        <input type="hidden" name="id" value={position.id} />
+                        <ConfirmSubmitButton
+                          confirmation={`Excluir definitivamente a posição “${position.asset_name}” e seus movimentos? Transferências originais serão preservadas.`}
+                          className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          Excluir
+                        </ConfirmSubmitButton>
                       </form>
                     </div>
                   </details>
@@ -519,8 +534,12 @@ export default async function InvestmentsPage({
 
       {feedback ? (
         <p
-          role={params.message === "status-error" ? "alert" : "status"}
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900"
+          role={params.message?.endsWith("error") ? "alert" : "status"}
+          className={`rounded-xl border px-4 py-3 ${
+            params.message?.endsWith("error")
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}
         >
           {feedback}
         </p>

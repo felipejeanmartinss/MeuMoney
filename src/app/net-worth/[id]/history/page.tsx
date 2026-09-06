@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteNetWorthValuation } from "@/app/actions/net-worth";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import { formatMoney } from "@/domain/money";
@@ -14,6 +16,16 @@ import {
 
 export const metadata = { title: "Histórico patrimonial" };
 
+const messages: Record<string, { text: string; error?: boolean }> = {
+  "valuation-deleted": {
+    text: "Avaliação excluída e valor atual recalculado quando necessário.",
+  },
+  "valuation-delete-error": {
+    text: "Não foi possível excluir esta avaliação.",
+    error: true,
+  },
+};
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(
     new Date(`${value}T12:00:00`),
@@ -22,15 +34,18 @@ function formatDate(value: string) {
 
 export default async function NetWorthHistoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ message?: string }>;
 }) {
   const parsedId = netWorthItemIdSchema.safeParse((await params).id);
   if (!parsedId.success) notFound();
 
-  const [itemResult, valuationResult] = await Promise.all([
+  const [itemResult, valuationResult, query] = await Promise.all([
     getCurrentUserNetWorthItem(parsedId.data),
     listCurrentUserNetWorthValuations(parsedId.data),
+    searchParams,
   ]);
   if (itemResult.hasError || !itemResult.item) notFound();
   if (valuationResult.hasError) {
@@ -38,6 +53,7 @@ export default async function NetWorthHistoryPage({
   }
 
   const item = itemResult.item;
+  const feedback = query.message ? messages[query.message] : undefined;
 
   return (
     <main className="mx-auto grid max-w-4xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
@@ -71,6 +87,19 @@ export default async function NetWorthHistoryPage({
         </div>
       </div>
 
+      {feedback ? (
+        <p
+          role={feedback.error ? "alert" : "status"}
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            feedback.error
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          {feedback.text}
+        </p>
+      ) : null}
+
       {valuationResult.valuations.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
           Nenhuma avaliação foi registrada.
@@ -103,27 +132,41 @@ export default async function NetWorthHistoryPage({
                       )}
                     </p>
                   </div>
-                  {changeMinor !== null ? (
-                    <p
-                      className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                        changeMinor < 0
-                          ? "bg-red-50 text-red-700"
-                          : "bg-emerald-50 text-emerald-700"
-                      }`}
-                    >
-                      {changeMinor >= 0 ? "+" : ""}
-                      {formatMoney(
-                        changeMinor,
-                        valuation.currency,
-                        CURRENCY_LOCALES[valuation.currency],
-                      )}{" "}
-                      desde a anterior
-                    </p>
-                  ) : (
-                    <p className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-600">
-                      Avaliação inicial
-                    </p>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {changeMinor !== null ? (
+                      <p
+                        className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                          changeMinor < 0
+                            ? "bg-red-50 text-red-700"
+                            : "bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        {changeMinor >= 0 ? "+" : ""}
+                        {formatMoney(
+                          changeMinor,
+                          valuation.currency,
+                          CURRENCY_LOCALES[valuation.currency],
+                        )}{" "}
+                        desde a anterior
+                      </p>
+                    ) : (
+                      <p className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-600">
+                        Avaliação inicial
+                      </p>
+                    )}
+                    {valuationResult.valuations.length > 1 ? (
+                      <form action={deleteNetWorthValuation}>
+                        <input type="hidden" name="valuationId" value={valuation.id} />
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <ConfirmSubmitButton
+                          confirmation={`Excluir a avaliação de ${formatDate(valuation.valuation_date)}?`}
+                          className="rounded-lg px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          Excluir
+                        </ConfirmSubmitButton>
+                      </form>
+                    ) : null}
+                  </div>
                 </div>
               </li>
             );
