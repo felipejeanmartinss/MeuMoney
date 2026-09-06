@@ -34,6 +34,13 @@ export type AccountRegisterSourceEntry = {
 export type AccountRegisterEntry = AccountRegisterSourceEntry & {
   signedAmountMinor: number;
   runningBalanceMinor: number;
+  isProjected: boolean;
+};
+
+export type AccountRegisterBalanceSummary = {
+  asOfDate: string;
+  currentBalanceMinor: number;
+  projectedBalanceMinor: number;
 };
 
 export const accountRegisterReconciliationSchema = z.object({
@@ -53,9 +60,55 @@ export function accountRegisterSignedAmount(
     : -amountMinor;
 }
 
+function affectsCurrentBalance(
+  entry: AccountRegisterSourceEntry,
+  asOfDate: string,
+) {
+  return (
+    entry.isActive &&
+    entry.status === "completed" &&
+    entry.transactionDate < asOfDate
+  );
+}
+
+function affectsProjectedBalance(
+  entry: AccountRegisterSourceEntry,
+  asOfDate: string,
+) {
+  return (
+    affectsCurrentBalance(entry, asOfDate) ||
+    (entry.isActive && entry.transactionDate >= asOfDate)
+  );
+}
+
+export function summarizeAccountRegisterBalances(
+  entries: AccountRegisterSourceEntry[],
+  openingBalanceMinor: number,
+  asOfDate: string,
+): AccountRegisterBalanceSummary {
+  let currentBalanceMinor = openingBalanceMinor;
+  let projectedBalanceMinor = openingBalanceMinor;
+
+  for (const entry of entries) {
+    const signedAmountMinor = accountRegisterSignedAmount(
+      entry.direction,
+      entry.amountMinor,
+    );
+    if (affectsCurrentBalance(entry, asOfDate)) {
+      currentBalanceMinor += signedAmountMinor;
+    }
+    if (affectsProjectedBalance(entry, asOfDate)) {
+      projectedBalanceMinor += signedAmountMinor;
+    }
+  }
+
+  return { asOfDate, currentBalanceMinor, projectedBalanceMinor };
+}
+
 export function buildAccountRegister(
   entries: AccountRegisterSourceEntry[],
   openingBalanceMinor: number,
+  asOfDate = "9999-12-31",
 ) {
   let runningBalanceMinor = openingBalanceMinor;
 
@@ -71,7 +124,7 @@ export function buildAccountRegister(
         entry.direction,
         entry.amountMinor,
       );
-      if (entry.isActive && entry.status === "completed") {
+      if (affectsProjectedBalance(entry, asOfDate)) {
         runningBalanceMinor += signedAmountMinor;
       }
 
@@ -79,6 +132,7 @@ export function buildAccountRegister(
         ...entry,
         signedAmountMinor,
         runningBalanceMinor,
+        isProjected: entry.transactionDate >= asOfDate,
       };
     });
 

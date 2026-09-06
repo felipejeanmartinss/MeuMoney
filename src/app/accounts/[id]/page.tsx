@@ -8,11 +8,15 @@ import {
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
 import { getCurrentUserAccountHub } from "@/services/finance/accounts-service";
+import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
+import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
+import { getTransactionFormOptions } from "@/services/finance/transactions-service";
 import type {
   ImportJobStatus,
   RecurringTransactionState,
 } from "@/types/database";
 import { formatFinancialDate } from "@/utils/financial-formatters";
+import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Detalhe da conta" };
 
@@ -43,7 +47,13 @@ export default async function AccountDetailPage({
   searchParams: Promise<{ tab?: string; page?: string; message?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const result = await getCurrentUserAccountHub(id);
+  const [result, formOptions, creditCardOptions, investmentOptions] =
+    await Promise.all([
+      getCurrentUserAccountHub(id),
+      getTransactionFormOptions({ accountId: id }),
+      listCurrentUserTransferCreditCardDestinations(),
+      listCurrentUserInvestmentPositions(),
+    ]);
   if (!result.account && !result.hasError) notFound();
 
   const account = result.account;
@@ -80,7 +90,7 @@ export default async function AccountDetailPage({
   ];
 
   return (
-    <main className="mx-auto grid max-w-[1600px] gap-5 px-3 py-6 sm:px-5 lg:px-6 lg:py-8">
+    <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">
       <div>
         <Link
           href="/accounts"
@@ -88,36 +98,56 @@ export default async function AccountDetailPage({
         >
           ← Voltar para Contas
         </Link>
-        <header className="mt-5 flex flex-col gap-5 rounded-3xl bg-slate-950 p-6 text-white sm:flex-row sm:items-end sm:justify-between sm:p-8">
+        <header className="mt-4 flex flex-col gap-4 rounded-3xl bg-slate-950 p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
             <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-300">
               {ACCOUNT_TYPE_LABELS[account.type]} ·{" "}
               {CONTEXT_LABELS[account.context]}
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+            <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">
               {account.name}
             </h1>
-            <p className="mt-3 text-sm text-slate-300">
-              {account.archived_at ? "Conta inativa" : "Conta ativa"} · saldo em{" "}
-              {account.currency}
-            </p>
           </div>
           <div className="sm:text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Saldo atual
-            </p>
-            <p
-              className={`mt-1 text-3xl font-black ${
-                account.current_balance_minor < 0
-                  ? "text-rose-300"
-                  : "text-white"
-              }`}
-            >
-              {formatMoney(account.current_balance_minor, account.currency)}
-            </p>
+            <div className="grid grid-cols-2 gap-4 sm:gap-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Saldo atual
+                </p>
+                <p
+                  className={`mt-1.5 text-2xl font-black ${
+                    result.balanceSummary.currentBalanceMinor < 0
+                      ? "text-rose-300"
+                      : "text-white"
+                  }`}
+                >
+                  {formatMoney(
+                    result.balanceSummary.currentBalanceMinor,
+                    account.currency,
+                  )}
+                </p>
+              </div>
+              <div className="border-l border-slate-700 pl-5 sm:pl-7">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Saldo projetado
+                </p>
+                <p
+                  className={`mt-1.5 text-2xl font-black ${
+                    result.balanceSummary.projectedBalanceMinor < 0
+                      ? "text-rose-300"
+                      : "text-white"
+                  }`}
+                >
+                  {formatMoney(
+                    result.balanceSummary.projectedBalanceMinor,
+                    account.currency,
+                  )}
+                </p>
+              </div>
+            </div>
             <Link
               href={`/accounts/${account.id}/edit`}
-              className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-slate-600 px-3 text-sm font-bold hover:bg-slate-800"
+              className="mt-2.5 inline-flex min-h-9 items-center rounded-lg border border-slate-600 px-3 text-sm font-bold hover:bg-slate-800"
             >
               Editar conta
             </Link>
@@ -127,14 +157,14 @@ export default async function AccountDetailPage({
 
       <nav
         aria-label="Seções da conta"
-        className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
+        className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
       >
         {tabs.map((tab) => (
           <Link
             key={tab.id}
             href={`/accounts/${account.id}?tab=${tab.id}`}
             aria-current={activeTab === tab.id ? "page" : undefined}
-            className={`min-h-11 shrink-0 rounded-xl px-4 py-2.5 text-sm font-extrabold ${
+            className={`min-h-9 shrink-0 rounded-lg px-3 py-2 text-sm font-extrabold ${
               activeTab === tab.id
                 ? "bg-emerald-700 text-white"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
@@ -150,10 +180,27 @@ export default async function AccountDetailPage({
           accountId={account.id}
           currency={account.currency}
           entries={result.registerEntries}
-          openingBalanceDate={account.opening_balance_date}
-          openingBalanceMinor={account.opening_balance_minor}
+          asOfDate={result.balanceSummary.asOfDate}
           requestedPage={query.page}
           message={query.message}
+          entryComposer={
+            account.archived_at
+              ? undefined
+              : {
+                  accountId: account.id,
+                  accountType: account.type,
+                  transactionDate: toIsoDate(new Date()),
+                  accounts: formOptions.accounts,
+                  categories: formOptions.categories,
+                  groups: formOptions.groups,
+                  creditCards: creditCardOptions.destinations,
+                  investmentPositions: investmentOptions.positions,
+                  hasError:
+                    formOptions.hasError ||
+                    creditCardOptions.hasError ||
+                    investmentOptions.hasError,
+                }
+          }
         />
       ) : null}
 

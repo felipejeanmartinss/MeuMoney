@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { toggleTransactionActivity } from "@/app/actions/transactions";
+import { deleteTransaction } from "@/app/actions/transactions";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import { getCategoryQualifiedName } from "@/domain/categories";
@@ -23,8 +24,8 @@ const messages: Record<string, string> = {
   "card-paid":
     "Transferência para o cartão registrada e fatura paga com sucesso.",
   updated: "Lançamento atualizado com sucesso.",
-  "status-updated": "Status do lançamento atualizado com sucesso.",
-  "status-error": "Não foi possível alterar o status do lançamento.",
+  deleted: "Lançamento excluído com sucesso.",
+  "delete-error": "Não foi possível excluir o lançamento.",
 };
 
 export default async function TransactionsPage({
@@ -52,7 +53,7 @@ export default async function TransactionsPage({
   const messageCode =
     typeof rawParams.message === "string" ? rawParams.message : undefined;
   const feedback = messageCode ? messages[messageCode] : undefined;
-  const feedbackIsError = messageCode === "status-error";
+  const feedbackIsError = messageCode === "delete-error";
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -313,16 +314,14 @@ export default async function TransactionsPage({
                     >
                       Editar
                     </Link>
-                    <form action={toggleTransactionActivity}>
+                    <form action={deleteTransaction}>
                       <input type="hidden" name="id" value={transaction.id} />
-                      <input
-                        type="hidden"
-                        name="active"
-                        value={transaction.is_active ? "false" : "true"}
-                      />
-                      <button className="min-h-10 rounded-lg px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-                        {transaction.is_active ? "Inativar" : "Reativar"}
-                      </button>
+                      <ConfirmSubmitButton
+                        confirmation={`Excluir definitivamente “${transaction.description}”?`}
+                        className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Excluir
+                      </ConfirmSubmitButton>
                     </form>
                   </>
                 )}

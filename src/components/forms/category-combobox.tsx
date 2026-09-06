@@ -24,6 +24,7 @@ export function CategoryCombobox({
   sourceAccountId = null,
   prefixCategoryValue = false,
   invalid = false,
+  compact = false,
 }: {
   name?: string;
   categories: CategorySelectionCategory[];
@@ -36,6 +37,7 @@ export function CategoryCombobox({
   sourceAccountId?: string | null;
   prefixCategoryValue?: boolean;
   invalid?: boolean;
+  compact?: boolean;
 }) {
   const options = [
     ...buildCategorySelectionOptions(categories, transactionType, {
@@ -56,6 +58,7 @@ export function CategoryCombobox({
       defaultValue={defaultValue}
       onValueChange={onValueChange}
       invalid={invalid}
+      compact={compact}
       emptyMessage="Nenhuma categoria ou conta compatível encontrada."
     />
   );
