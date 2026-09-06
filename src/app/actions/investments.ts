@@ -7,11 +7,13 @@ import {
   investmentCashFlowFormSchema,
   investmentPositionFormSchema,
   investmentPositionIdSchema,
+  investmentTransferLinkFormSchema,
 } from "@/domain/investments";
 import {
   createCurrentUserInvestmentAccountEntry,
   createCurrentUserInvestmentCashFlow,
   createCurrentUserInvestmentPosition,
+  linkCurrentUserInvestmentTransferEntry,
   setCurrentUserInvestmentPositionArchived,
   updateCurrentUserInvestmentPosition,
 } from "@/services/finance/investments-service";
@@ -197,4 +199,69 @@ export async function createInvestmentAccountEntry(
     );
   }
   redirect(`/accounts/${parsed.data.accountId}?message=investment-recorded`);
+}
+
+export async function linkInvestmentTransferEntry(
+  _previousState: InvestmentFormState,
+  formData: FormData,
+): Promise<InvestmentFormState> {
+  const parsed = investmentTransferLinkFormSchema.safeParse({
+    accountId: formData.get("accountId"),
+    transferEntryId: formData.get("transferEntryId"),
+    positionId: formData.get("positionId"),
+    eventType: formData.get("eventType"),
+    quantity: formData.get("quantity") ?? "",
+    notes: formData.get("notes") ?? "",
+    newInstitution: formData.get("newInstitution") ?? "",
+    newInvestmentClass: formData.get("newInvestmentClass") || undefined,
+    newInvestmentType: formData.get("newInvestmentType") || undefined,
+    newAssetName: formData.get("newAssetName") ?? "",
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const result = await linkCurrentUserInvestmentTransferEntry({
+    accountId: parsed.data.accountId,
+    transferEntryId: parsed.data.transferEntryId,
+    positionId:
+      parsed.data.positionId === "new" ? null : parsed.data.positionId,
+    eventType: parsed.data.eventType,
+    quantity: parsed.data.quantity,
+    notes: parsed.data.notes,
+    newPosition:
+      parsed.data.positionId === "new"
+        ? {
+            institution: parsed.data.newInstitution,
+            investmentClass: parsed.data.newInvestmentClass!,
+            investmentType: parsed.data.newInvestmentType!,
+            assetName: parsed.data.newAssetName,
+          }
+        : null,
+  });
+  if (!result.ok) return { status: "error", message: result.message };
+
+  revalidatePath("/accounts");
+  revalidatePath(`/accounts/${parsed.data.accountId}`);
+  revalidatePath("/investments");
+  revalidatePath("/investments/movements");
+  if (parsed.data.positionId !== "new") {
+    revalidatePath(`/investments/${parsed.data.positionId}/history`);
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+
+  const returnPage = Number.parseInt(
+    String(formData.get("returnPage") ?? "1"),
+    10,
+  );
+  if (formData.get("returnAccountId") === parsed.data.accountId) {
+    redirect(
+      `/accounts/${parsed.data.accountId}?tab=statement&page=${Number.isFinite(returnPage) && returnPage > 0 ? returnPage : 1}&message=investment-linked#account-register`,
+    );
+  }
+  redirect("/investments/movements?message=linked");
 }

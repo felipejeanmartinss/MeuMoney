@@ -11,7 +11,7 @@ import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import type { AccountRegisterEntry } from "@/domain/account-register";
 import { formatMoney } from "@/domain/money";
 import { TRANSACTION_STATUS_LABELS } from "@/domain/transactions";
-import type { SupportedCurrency } from "@/types/database";
+import type { AccountType, SupportedCurrency } from "@/types/database";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
 const PAGE_SIZE = 100;
@@ -26,6 +26,9 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   },
   "investment-recorded": {
     text: "Movimento de investimento registrado e vinculado à posição.",
+  },
+  "investment-linked": {
+    text: "Transferência vinculada à posição de investimento.",
   },
   "transaction-created": {
     text: "Lançamento criado com sucesso.",
@@ -130,6 +133,7 @@ function Pagination({
 
 export function AccountRegister({
   accountId,
+  accountType,
   currency,
   entries,
   asOfDate,
@@ -138,6 +142,7 @@ export function AccountRegister({
   entryComposer,
 }: {
   accountId: string;
+  accountType: AccountType;
   currency: SupportedCurrency;
   entries: AccountRegisterEntry[];
   asOfDate: string;
@@ -291,7 +296,24 @@ export function AccountRegister({
                         {formatMoney(entry.runningBalanceMinor, currency)}
                       </td>
                       <td className="px-2 py-1.5 text-right">
-                        {entry.editHref ? (
+                        {entry.investmentPositionId ? (
+                          <Link
+                            href={`/investments/${entry.investmentPositionId}/history`}
+                            className="text-sm font-bold text-emerald-700 hover:underline"
+                          >
+                            Posição
+                          </Link>
+                        ) : accountType === "investment" &&
+                          entry.entryType === "transfer_entry" &&
+                          entry.isActive &&
+                          entry.status === "completed" ? (
+                          <Link
+                            href={`/investments/movements?accountId=${accountId}&entryId=${entry.id}&returnAccountId=${accountId}&returnPage=${page}`}
+                            className="text-sm font-bold text-emerald-700 hover:underline"
+                          >
+                            Vincular
+                          </Link>
+                        ) : entry.editHref ? (
                           <div className="flex items-center justify-end gap-2">
                             <Link
                               href={entry.editHref}
@@ -376,7 +398,24 @@ export function AccountRegister({
                         entry={entry}
                         page={page}
                       />
-                      {entry.editHref ? (
+                      {entry.investmentPositionId ? (
+                        <Link
+                          href={`/investments/${entry.investmentPositionId}/history`}
+                          className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-emerald-700"
+                        >
+                          Posição
+                        </Link>
+                      ) : accountType === "investment" &&
+                        entry.entryType === "transfer_entry" &&
+                        entry.isActive &&
+                        entry.status === "completed" ? (
+                        <Link
+                          href={`/investments/movements?accountId=${accountId}&entryId=${entry.id}&returnAccountId=${accountId}&returnPage=${page}`}
+                          className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-emerald-700"
+                        >
+                          Vincular
+                        </Link>
+                      ) : entry.editHref ? (
                         <>
                           <Link
                             href={entry.editHref}

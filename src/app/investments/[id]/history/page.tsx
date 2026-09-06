@@ -98,7 +98,7 @@ export default async function InvestmentHistoryPage({
           Aportes, resgates e rendas
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Eventos informados manualmente. Eles não alteram a posição atual.
+          Histórico da posição sem atualização automática da avaliação atual.
         </p>
         {historyResult.cashFlows.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
@@ -140,7 +140,9 @@ export default async function InvestmentHistoryPage({
                     ) : null}
                     {cashFlow.transaction_id ? (
                       <p className="mt-1 text-xs font-semibold text-emerald-700">
-                        Vinculado ao extrato da conta
+                        {cashFlow.source_transfer_id
+                          ? "Vinculado à transferência e ao extrato"
+                          : "Vinculado ao extrato da conta"}
                       </p>
                     ) : null}
                   </div>

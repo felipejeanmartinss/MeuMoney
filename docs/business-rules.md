@@ -237,6 +237,8 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - Juros sobre capital, dividendos, bonificações em dinheiro e outros rendimentos criam entrada na conta e renda vinculada à posição. Somente esses eventos compõem a receita econômica de investimentos.
 - O vínculo entre extrato e histórico da posição é criado atomicamente. Nenhum evento atualiza custo, quantidade ou valor atual de forma implícita; essas avaliações continuam manuais para não inventar rentabilidade.
 - Posições anteriores ao histórico transacional podem continuar sendo cadastradas diretamente, com indicação de histórico incompleto.
+- Uma transferência realizada que entra em conta de Investimento pode financiar uma aplicação de igual valor; o vínculo cria a saída de aplicação e preserva a entrada original. Uma transferência que sai da conta pode ser ligada a uma liquidação ou renda, criando a entrada correspondente. Dessa forma, o caixa líquido não é duplicado e a posição recebe um histórico auditável.
+- Cada lado de uma transferência só pode financiar ou liquidar uma posição uma vez. Depois do vínculo, os campos financeiros da transferência ficam imutáveis para não divergir do movimento da posição.
 - O relatório de competência reconhece compras de cartão pelas parcelas e exclui pagamentos de fatura, transferências e movimentos de capital de investimentos.
 - O relatório de caixa reconhece despesas realizadas na data da saída e pagamentos livres para cartões, mas exclui transferências entre contas e movimentos patrimoniais de investimentos.
 - Orçamentos aceitam categorias ativas de receita e despesa. O realizado de receitas considera entradas categorizadas ativas e concluídas; o realizado de despesas mantém a regra de consumo por competência.

@@ -44,6 +44,9 @@ function transferErrorMessage(error: { message?: string } | null) {
   if (message.includes("invalid_transfer_credit_card")) {
     return "O cartão não está disponível ou usa outra moeda.";
   }
+  if (message.includes("linked_investment_transfer_is_immutable")) {
+    return "Esta transferência já está vinculada a uma posição de investimento e não pode ser alterada.";
+  }
   return "Não foi possível salvar a transferência.";
 }
 
@@ -232,7 +235,11 @@ export async function setCurrentUserTransferActive(
   return error
     ? {
         ok: false as const,
-        message: "Não foi possível alterar o status da transferência.",
+        message: error.message
+          .toLowerCase()
+          .includes("linked_investment_transfer_is_immutable")
+          ? "Esta transferência já está vinculada a uma posição de investimento e não pode ser excluída."
+          : "Não foi possível alterar o status da transferência.",
       }
     : { ok: true as const };
 }

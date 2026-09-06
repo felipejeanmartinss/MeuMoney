@@ -469,12 +469,24 @@ export default async function InvestmentsPage({
             rentabilidade ou conversão cambial inventada.
           </p>
         </div>
-        <Link
-          href={activeTab === "positions" ? "/investments/new" : "/investments/financing-imports/new"}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
-        >
-          {activeTab === "positions" ? "Nova posição" : "Importar financiamento"}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {activeTab === "positions" ? (
+            <Link
+              href="/investments/movements"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800 hover:bg-slate-50"
+            >
+              Vincular movimentações
+            </Link>
+          ) : null}
+          <Link
+            href={activeTab === "positions" ? "/investments/new" : "/investments/financing-imports/new"}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+          >
+            {activeTab === "positions"
+              ? "Posição sem movimentação"
+              : "Importar financiamento"}
+          </Link>
+        </div>
       </header>
 
       <nav

@@ -37,6 +37,14 @@ O cadastro direto de posição continua disponível para patrimônio anterior ao
 histórico transacional. Nessa situação, o usuário pode marcar o histórico como
 incompleto e nenhuma rentabilidade total é inferida.
 
+Transferências já realizadas em contas do tipo Investimento aparecem em uma
+fila de vínculo. Uma entrada pode originar uma aplicação de mesmo valor; uma
+saída pode corresponder a liquidação, JCP, dividendos, bonificação ou outro
+rendimento. O sistema mantém a transferência original e cria atomicamente o
+movimento oposto de investimento, evitando que o caixa e a posição sejam
+contados como o mesmo dinheiro. Cada perna da transferência aceita um único
+vínculo e fica financeiramente imutável depois dele.
+
 A diferença sobre o custo é `valor atual - custo acumulado`. Aportes, resgates e
 rendas são somados separadamente. O resultado total
 `valor atual + resgates + rendas - aportes` só é exibido quando o usuário

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   calculateInvestmentBreakdown,
   formatInvestmentQuantity,
+  inferInvestmentTransferEvent,
   investmentAccountEntryFormSchema,
   investmentCashFlowFormSchema,
   investmentEventTransactionType,
   investmentPositionFormSchema,
+  investmentTransferLinkFormSchema,
   normalizeInvestmentQuantity,
   summarizeInvestmentsByCurrency,
 } from "../src/domain/investments";
@@ -27,6 +29,7 @@ describe("investment rules", () => {
     expect(formatInvestmentQuantity("1234567.00000001")).toBe(
       "1.234.567,00000001",
     );
+    expect(formatInvestmentQuantity(1234.5)).toBe("1.234,5");
   });
 
   it("rejects exponent notation, excessive scale and negative quantities", () => {
@@ -136,6 +139,47 @@ describe("investment rules", () => {
     });
 
     expect(newPosition.success).toBe(true);
+    expect(invalidNewPosition.success).toBe(false);
+  });
+
+  it("suggests investment events from transfer direction and description", () => {
+    expect(inferInvestmentTransferEvent("inflow", "LTN 2029")).toBe(
+      "contribution",
+    );
+    expect(inferInvestmentTransferEvent("outflow", "Empiricus Selic FIRF")).toBe(
+      "redemption",
+    );
+    expect(inferInvestmentTransferEvent("outflow", "Dividendos")).toBe(
+      "dividend",
+    );
+    expect(inferInvestmentTransferEvent("outflow", "JCP recebido")).toBe(
+      "interest_on_capital",
+    );
+  });
+
+  it("accepts a transfer link and keeps legacy positions independent", () => {
+    const linked = investmentTransferLinkFormSchema.safeParse({
+      accountId: "5bca08ad-3663-4bf3-bec1-edceb86146d8",
+      transferEntryId: "67528771-faa2-4ec0-b0f1-bbb90795c514",
+      positionId: "eab58fd0-981e-44b7-8413-64b634130f9c",
+      eventType: "redemption",
+      quantity: "",
+      notes: "",
+    });
+    const invalidNewPosition = investmentTransferLinkFormSchema.safeParse({
+      accountId: "5bca08ad-3663-4bf3-bec1-edceb86146d8",
+      transferEntryId: "67528771-faa2-4ec0-b0f1-bbb90795c514",
+      positionId: "new",
+      eventType: "dividend",
+      quantity: "",
+      notes: "",
+      newInstitution: "BTG",
+      newInvestmentClass: "fund",
+      newInvestmentType: "variable_fund",
+      newAssetName: "Alaska Black FIA",
+    });
+
+    expect(linked.success).toBe(true);
     expect(invalidNewPosition.success).toBe(false);
   });
 
