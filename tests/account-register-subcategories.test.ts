@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountRegisterReconciliationSchema,
   buildAccountRegister,
+  summarizeAccountRegisterBalances,
   type AccountRegisterSourceEntry,
 } from "../src/domain/account-register";
 import {
@@ -133,6 +134,54 @@ describe("account register and subcategories", () => {
 
     expect(result.signedAmountMinor).toBe(-1000);
     expect(result.runningBalanceMinor).toBe(4000);
+  });
+
+  it("separates today's realized balance from the future projection", () => {
+    const source = [
+      entry({
+        id: "realized-today",
+        transactionDate: "2026-09-06",
+        direction: "income",
+        amountMinor: 10_000,
+      }),
+      entry({
+        id: "future-completed",
+        transactionDate: "2026-09-08",
+        direction: "expense",
+        amountMinor: 3_000,
+      }),
+      entry({
+        id: "future-pending",
+        transactionDate: "2026-09-10",
+        direction: "expense",
+        amountMinor: 2_000,
+        status: "pending",
+      }),
+      entry({
+        id: "overdue-pending",
+        transactionDate: "2026-09-05",
+        direction: "expense",
+        amountMinor: 9_000,
+        status: "pending",
+      }),
+    ];
+
+    expect(
+      summarizeAccountRegisterBalances(source, 5_000, "2026-09-06"),
+    ).toEqual({
+      asOfDate: "2026-09-06",
+      currentBalanceMinor: 15_000,
+      projectedBalanceMinor: 10_000,
+    });
+
+    const register = buildAccountRegister(source, 5_000, "2026-09-06");
+    expect(register.map((item) => [item.id, item.isFuture])).toEqual([
+      ["future-pending", true],
+      ["future-completed", true],
+      ["realized-today", false],
+      ["overdue-pending", false],
+    ]);
+    expect(register[0]?.runningBalanceMinor).toBe(10_000);
   });
 
   it("renders the full category path and restricts eligible parents", () => {

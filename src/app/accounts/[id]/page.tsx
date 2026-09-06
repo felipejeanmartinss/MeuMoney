@@ -113,18 +113,48 @@ export default async function AccountDetailPage({
             </p>
           </div>
           <div className="sm:text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Saldo atual
-            </p>
-            <p
-              className={`mt-1 text-3xl font-black ${
-                account.current_balance_minor < 0
-                  ? "text-rose-300"
-                  : "text-white"
-              }`}
-            >
-              {formatMoney(account.current_balance_minor, account.currency)}
-            </p>
+            <div className="grid grid-cols-2 gap-5 sm:gap-7">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Saldo atual
+                </p>
+                <p className="mt-1 text-[0.68rem] text-slate-400">
+                  até {formatFinancialDate(result.balanceSummary.asOfDate)}
+                </p>
+                <p
+                  className={`mt-1 text-2xl font-black ${
+                    result.balanceSummary.currentBalanceMinor < 0
+                      ? "text-rose-300"
+                      : "text-white"
+                  }`}
+                >
+                  {formatMoney(
+                    result.balanceSummary.currentBalanceMinor,
+                    account.currency,
+                  )}
+                </p>
+              </div>
+              <div className="border-l border-slate-700 pl-5 sm:pl-7">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Saldo projetado
+                </p>
+                <p className="mt-1 text-[0.68rem] text-slate-400">
+                  inclui datas futuras
+                </p>
+                <p
+                  className={`mt-1 text-2xl font-black ${
+                    result.balanceSummary.projectedBalanceMinor < 0
+                      ? "text-rose-300"
+                      : "text-white"
+                  }`}
+                >
+                  {formatMoney(
+                    result.balanceSummary.projectedBalanceMinor,
+                    account.currency,
+                  )}
+                </p>
+              </div>
+            </div>
             <Link
               href={`/accounts/${account.id}/edit`}
               className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-slate-600 px-3 text-sm font-bold hover:bg-slate-800"
@@ -162,6 +192,7 @@ export default async function AccountDetailPage({
           entries={result.registerEntries}
           openingBalanceDate={account.opening_balance_date}
           openingBalanceMinor={account.opening_balance_minor}
+          asOfDate={result.balanceSummary.asOfDate}
           requestedPage={query.page}
           message={query.message}
           entryComposer={

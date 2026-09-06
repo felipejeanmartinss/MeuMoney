@@ -52,6 +52,7 @@ export function AccountEntryForm({
   transactionDate,
   initialMode,
   returnAccountId,
+  compact = false,
 }: {
   accounts: AccountEntryAccountOption[];
   categories: AccountEntryCategoryOption[];
@@ -62,17 +63,18 @@ export function AccountEntryForm({
   transactionDate: string;
   initialMode: AccountEntryMode;
   returnAccountId?: string;
+  compact?: boolean;
 }) {
   const [mode, setMode] = useState<AccountEntryMode>(initialMode);
   const [transferDestinationTarget, setTransferDestinationTarget] =
     useState("");
 
   return (
-    <div className="grid gap-6">
+    <div className={`grid ${compact ? "gap-3" : "gap-6"}`}>
       <div
         role="tablist"
         aria-label="Tipo de entrada na conta"
-        className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 sm:grid-cols-4"
+        className={`grid grid-cols-2 bg-slate-100 sm:grid-cols-4 ${compact ? "rounded-md p-0.5" : "rounded-xl p-1"}`}
       >
         {(Object.keys(MODE_LABELS) as AccountEntryMode[]).map((entryMode) => (
           <button
@@ -81,7 +83,7 @@ export function AccountEntryForm({
             role="tab"
             aria-selected={mode === entryMode}
             onClick={() => setMode(entryMode)}
-            className={`min-h-11 rounded-lg px-3 text-sm font-extrabold transition ${
+            className={`${compact ? "min-h-8 rounded px-2 text-xs" : "min-h-11 rounded-lg px-3 text-sm"} font-extrabold transition ${
               mode === entryMode
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-600 hover:text-slate-950"
@@ -105,6 +107,7 @@ export function AccountEntryForm({
           }
           transactionDate={transactionDate}
           returnAccountId={returnAccountId}
+          compact={compact}
         />
       ) : mode === "transfer" ? (
         <TransferForm
@@ -119,6 +122,7 @@ export function AccountEntryForm({
             amountMinor: "0,00",
           }}
           returnAccountId={returnAccountId}
+          compact={compact}
         />
       ) : (
         <TransactionForm
@@ -140,6 +144,7 @@ export function AccountEntryForm({
             amountMinor: "0,00",
           }}
           returnAccountId={returnAccountId}
+          compact={compact}
         />
       )}
     </div>

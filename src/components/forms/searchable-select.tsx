@@ -13,6 +13,7 @@ export function SearchableSelect({
   placeholder = "Selecione ou digite para buscar",
   emptyMessage = "Nenhuma opção encontrada.",
   invalid = false,
+  compact = false,
 }: {
   name: string;
   options: SearchableSelectionOption[];
@@ -22,6 +23,7 @@ export function SearchableSelect({
   placeholder?: string;
   emptyMessage?: string;
   invalid?: boolean;
+  compact?: boolean;
 }) {
   const generatedId = useId();
   const listboxId = `${generatedId}-options`;
@@ -82,7 +84,7 @@ export function SearchableSelect({
           value={open ? query : (selectedOption?.label ?? query)}
           placeholder={placeholder}
           autoComplete="off"
-          className={`min-h-12 w-full rounded-xl border bg-white px-3 pr-10 text-slate-950 outline-none transition focus:ring-4 ${
+          className={`${compact ? "min-h-9 rounded-md px-2.5 pr-9 text-sm focus:ring-2" : "min-h-12 rounded-xl px-3 pr-10 focus:ring-4"} w-full border bg-white text-slate-950 outline-none transition ${
             invalid
               ? "border-red-400 focus:border-red-500 focus:ring-red-100"
               : "border-slate-300 focus:border-blue-600 focus:ring-blue-100"

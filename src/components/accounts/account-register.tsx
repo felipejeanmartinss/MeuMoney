@@ -138,6 +138,7 @@ export function AccountRegister({
   entries,
   openingBalanceDate,
   openingBalanceMinor,
+  asOfDate,
   requestedPage,
   message,
   entryComposer,
@@ -147,6 +148,7 @@ export function AccountRegister({
   entries: AccountRegisterEntry[];
   openingBalanceDate: string;
   openingBalanceMinor: number;
+  asOfDate: string;
   requestedPage?: string;
   message?: string;
   entryComposer?: AccountRegisterEntryComposerProps;
@@ -156,10 +158,9 @@ export function AccountRegister({
   const page = Number.isFinite(parsedPage)
     ? Math.min(Math.max(parsedPage, 1), pageCount)
     : 1;
-  const pageEntries = entries.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
-  );
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageEntries = entries.slice(pageStart, page * PAGE_SIZE);
+  const firstCurrentEntryIndex = entries.findIndex((entry) => !entry.isFuture);
   const feedback = message ? messages[message] : undefined;
 
   return (
@@ -237,15 +238,23 @@ export function AccountRegister({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
-                {pageEntries.map((entry) => {
+              <tbody>
+                {pageEntries.map((entry, index) => {
                   const isIncome = entry.signedAmountMinor > 0;
+                  const startsCurrentPeriod =
+                    firstCurrentEntryIndex > 0 &&
+                    pageStart + index === firstCurrentEntryIndex;
                   return (
                     <tr
                       key={`${entry.entryType}-${entry.id}`}
-                      className={`${entry.isActive ? "" : "opacity-55"} hover:bg-emerald-50/40`}
+                      className={`${entry.isActive ? "" : "opacity-55"} ${startsCurrentPeriod ? "border-t-4 border-t-slate-700" : "border-t border-t-slate-200"} hover:bg-emerald-50/40`}
                     >
                       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-slate-700">
+                        {startsCurrentPeriod ? (
+                          <span className="sr-only">
+                            Lançamentos realizados até {formatFinancialDate(asOfDate)}
+                          </span>
+                        ) : null}
                         {formatFinancialDate(entry.transactionDate)}
                       </td>
                       <td className="px-2 py-1.5">
@@ -330,13 +339,16 @@ export function AccountRegister({
             </table>
           </div>
 
-          <div className="divide-y divide-slate-100 md:hidden">
-            {pageEntries.map((entry) => {
+          <div className="md:hidden">
+            {pageEntries.map((entry, index) => {
               const isIncome = entry.signedAmountMinor > 0;
+              const startsCurrentPeriod =
+                firstCurrentEntryIndex > 0 &&
+                pageStart + index === firstCurrentEntryIndex;
               return (
                 <article
                   key={`${entry.entryType}-${entry.id}`}
-                  className={`grid gap-3 px-4 py-4 ${entry.isActive ? "" : "opacity-55"}`}
+                  className={`grid gap-3 border-t px-4 py-4 ${startsCurrentPeriod ? "border-t-4 border-t-slate-700" : "border-t-slate-100"} ${entry.isActive ? "" : "opacity-55"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

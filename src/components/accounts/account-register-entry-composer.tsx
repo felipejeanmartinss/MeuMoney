@@ -49,14 +49,14 @@ export function AccountRegisterEntryComposer({
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-2">
       <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
           aria-expanded={mode === movementMode}
           aria-controls={panelId}
           onClick={() => toggleMode(movementMode)}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
+          className="inline-flex min-h-9 items-center justify-center rounded-md bg-emerald-700 px-3 text-xs font-bold text-white hover:bg-emerald-800"
         >
           Novo lançamento
         </button>
@@ -65,7 +65,7 @@ export function AccountRegisterEntryComposer({
           aria-expanded={mode === "transfer"}
           aria-controls={panelId}
           onClick={() => toggleMode("transfer")}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
+          className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50"
         >
           Transferir
         </button>
@@ -75,16 +75,16 @@ export function AccountRegisterEntryComposer({
         <section
           id={panelId}
           aria-label="Novo registro na conta"
-          className="mt-3 border-t border-amber-200 bg-amber-50/70 px-3 py-4 sm:px-4"
+          className="mt-2 border-t border-amber-300 bg-amber-50/70 px-2.5 py-2.5 sm:px-3"
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="font-extrabold text-slate-950">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-extrabold text-slate-950">
               Registrar direto no extrato
             </h3>
             <button
               type="button"
               onClick={() => setMode(null)}
-              className="min-h-9 rounded-lg px-3 text-sm font-bold text-slate-600 hover:bg-white"
+              className="min-h-8 rounded-md px-2 text-xs font-bold text-slate-600 hover:bg-white"
             >
               Cancelar
             </button>
@@ -105,6 +105,7 @@ export function AccountRegisterEntryComposer({
               transactionDate={transactionDate}
               initialMode={mode}
               returnAccountId={accountId}
+              compact
             />
           )}
         </section>

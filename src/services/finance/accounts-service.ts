@@ -1,6 +1,7 @@
 import "server-only";
 import {
   buildAccountRegister,
+  summarizeAccountRegisterBalances,
   type AccountRegisterSourceEntry,
 } from "@/domain/account-register";
 import { getCategoryQualifiedName } from "@/domain/categories";
@@ -15,6 +16,7 @@ import type {
   Transfer,
   TransferEntry,
 } from "@/types/database";
+import { currentIsoDate } from "@/utils/dates";
 
 export type AccountMutationInput = {
   name: string;
@@ -244,14 +246,23 @@ export async function getCurrentUserAccountHub(id: string) {
       };
     }),
   ];
+  const asOfDate = currentIsoDate();
+  const openingBalanceMinor = accountResult.data?.opening_balance_minor ?? 0;
   const registerEntries = buildAccountRegister(
     registerSource,
-    accountResult.data?.opening_balance_minor ?? 0,
+    openingBalanceMinor,
+    asOfDate,
+  );
+  const balanceSummary = summarizeAccountRegisterBalances(
+    registerSource,
+    openingBalanceMinor,
+    asOfDate,
   );
 
   return {
     account: accountResult.data,
     registerEntries,
+    balanceSummary,
     recurrences: recurrencesResult.data ?? [],
     imports: importsResult.data ?? [],
     categories,

@@ -71,6 +71,7 @@ export function TransactionForm({
   transferCreditCards,
   onTransferSelected,
   returnAccountId,
+  compact = false,
 }: {
   accounts: AccountOption[];
   categories: CategoryOption[];
@@ -81,6 +82,7 @@ export function TransactionForm({
   transferCreditCards?: CreditCardTransferDestination[];
   onTransferSelected?: (destinationTarget: string) => void;
   returnAccountId?: string;
+  compact?: boolean;
 }) {
   const action = values.id ? updateTransaction : createTransaction;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -137,8 +139,8 @@ export function TransactionForm({
   }
 
   return (
-    <div className="grid gap-5">
-      <form action={formAction} className="grid gap-5">
+    <div className={`grid ${compact ? "gap-3" : "gap-5"}`}>
+      <form action={formAction} className={`grid ${compact ? "gap-3" : "gap-5"}`}>
         {values.id ? (
           <input type="hidden" name="id" value={values.id} />
         ) : null}
@@ -153,9 +155,10 @@ export function TransactionForm({
         <Field
           label="Tipo de lançamento"
           error={state.fieldErrors?.transactionType?.[0]}
+          compact={compact}
         >
           <select
-            className={inputClass(Boolean(state.fieldErrors?.transactionType))}
+            className={inputClass(Boolean(state.fieldErrors?.transactionType), compact)}
             name={fixedType ? undefined : "transactionType"}
             value={transactionType}
             disabled={Boolean(fixedType)}
@@ -172,9 +175,9 @@ export function TransactionForm({
           </select>
         </Field>
 
-      <Field label="Descrição" error={state.fieldErrors?.description?.[0]}>
+      <Field label="Descrição" error={state.fieldErrors?.description?.[0]} compact={compact}>
         <input
-          className={inputClass(Boolean(state.fieldErrors?.description))}
+          className={inputClass(Boolean(state.fieldErrors?.description), compact)}
           name="description"
           defaultValue={values.description}
           maxLength={180}
@@ -188,10 +191,10 @@ export function TransactionForm({
         />
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Conta" error={state.fieldErrors?.accountId?.[0]}>
+      <div className={`grid sm:grid-cols-2 ${compact ? "gap-3" : "gap-5"}`}>
+        <Field label="Conta" error={state.fieldErrors?.accountId?.[0]} compact={compact}>
           <select
-            className={inputClass(Boolean(state.fieldErrors?.accountId))}
+            className={inputClass(Boolean(state.fieldErrors?.accountId), compact)}
             name="accountId"
             value={accountId}
             onChange={(event) => {
@@ -212,8 +215,8 @@ export function TransactionForm({
           </select>
         </Field>
 
-        <Field label="Categoria" error={state.fieldErrors?.categoryId?.[0]}>
-          <div className="grid gap-2">
+        <Field label="Categoria" error={state.fieldErrors?.categoryId?.[0]} compact={compact}>
+          <div className={`grid ${compact ? "gap-1" : "gap-2"}`}>
             <CategoryCombobox
               name="categoryId"
               categories={categoryOptions}
@@ -226,6 +229,7 @@ export function TransactionForm({
               }
               sourceAccountId={accountId}
               invalid={Boolean(state.fieldErrors?.categoryId)}
+              compact={compact}
             />
             {!values.id && accountId && onTransferSelected ? (
               <p className="text-xs text-slate-500">
@@ -236,7 +240,7 @@ export function TransactionForm({
             <button
               type="button"
               onClick={() => setQuickCreateOpen(true)}
-              className="min-h-10 justify-self-start rounded-lg px-2 text-sm font-bold text-blue-700 hover:bg-blue-50"
+              className={`${compact ? "min-h-8 text-xs" : "min-h-10 text-sm"} justify-self-start rounded-lg px-2 font-bold text-blue-700 hover:bg-blue-50`}
             >
               + Criar categoria ou subcategoria
             </button>
@@ -244,10 +248,10 @@ export function TransactionForm({
         </Field>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
-        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]}>
+      <div className={`grid sm:grid-cols-3 ${compact ? "gap-3" : "gap-5"}`}>
+        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]} compact={compact}>
           <input
-            className={inputClass(Boolean(state.fieldErrors?.amountMinor))}
+            className={inputClass(Boolean(state.fieldErrors?.amountMinor), compact)}
             name="amountMinor"
             defaultValue={values.amountMinor}
             inputMode="decimal"
@@ -257,10 +261,11 @@ export function TransactionForm({
           />
         </Field>
 
-        <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]}>
+        <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]} compact={compact}>
           <input
             className={inputClass(
               Boolean(state.fieldErrors?.transactionDate),
+              compact,
             )}
             name="transactionDate"
             type="date"
@@ -270,9 +275,9 @@ export function TransactionForm({
           />
         </Field>
 
-        <Field label="Status" error={state.fieldErrors?.status?.[0]}>
+        <Field label="Status" error={state.fieldErrors?.status?.[0]} compact={compact}>
           <select
-            className={inputClass(Boolean(state.fieldErrors?.status))}
+            className={inputClass(Boolean(state.fieldErrors?.status), compact)}
             name="status"
             defaultValue={values.status ?? "completed"}
             required
@@ -286,9 +291,9 @@ export function TransactionForm({
         </Field>
       </div>
 
-      <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>
+      <Field label="Observações" error={state.fieldErrors?.notes?.[0]} compact={compact}>
         <textarea
-          className={`${inputClass(Boolean(state.fieldErrors?.notes))} min-h-28 py-3`}
+          className={`${inputClass(Boolean(state.fieldErrors?.notes), compact)} ${compact ? "min-h-14 py-2" : "min-h-28 py-3"}`}
           name="notes"
           defaultValue={values.notes}
           maxLength={1000}
@@ -297,7 +302,7 @@ export function TransactionForm({
         />
       </Field>
 
-        <SubmitButton pending={pending}>
+        <SubmitButton pending={pending} compact={compact}>
           {values.id ? "Salvar alterações" : "Criar lançamento"}
         </SubmitButton>
       </form>

@@ -51,7 +51,36 @@ describe("inline account entry and manual transaction deletion", () => {
     expect(composer).toContain("<AccountEntryForm");
     expect(composer).toContain("initialMode={mode}");
     expect(composer).toContain("returnAccountId={accountId}");
+    expect(composer).toContain("compact");
     expect(composer).toContain("aria-expanded");
+  });
+
+  it("shows current and projected balances separated by today's date", () => {
+    const migration = readSource(
+      "supabase",
+      "migrations",
+      "20260905235656_current_and_projected_account_balances.sql",
+    );
+    const accountPage = readSource(
+      "src",
+      "app",
+      "accounts",
+      "[id]",
+      "page.tsx",
+    );
+    const register = readSource(
+      "src",
+      "components",
+      "accounts",
+      "account-register.tsx",
+    );
+
+    expect(migration).toContain("transactions.transaction_date");
+    expect(migration).toContain("transfer_entries.transaction_date");
+    expect(migration).toContain("America/Sao_Paulo");
+    expect(accountPage).toContain("Saldo projetado");
+    expect(accountPage).toContain("currentBalanceMinor");
+    expect(register).toContain("border-t-4 border-t-slate-700");
   });
 
   it("replaces transaction activity actions with inline deletion", () => {
