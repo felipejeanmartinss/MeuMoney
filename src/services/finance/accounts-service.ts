@@ -108,6 +108,7 @@ export async function getCurrentUserAccountHub(id: string) {
     importsResult,
     categoriesResult,
     categoryGroupsResult,
+    investmentLinksResult,
   ] = await Promise.all([
     supabase
       .from("account_balances")
@@ -163,6 +164,13 @@ export async function getCurrentUserAccountHub(id: string) {
       .from("category_groups")
       .select("id, user_id, name, kind, context, is_system, archived_at, created_at, updated_at")
       .eq("user_id", user.id),
+    supabase
+      .from("investment_cash_flows")
+      .select(
+        "position_id, source_transfer_id, source_account_id",
+      )
+      .eq("user_id", user.id)
+      .eq("source_account_id", id),
   ]);
 
   const categories = (categoriesResult.data ?? []) as Category[];
@@ -181,6 +189,13 @@ export async function getCurrentUserAccountHub(id: string) {
   );
   const creditCardById = new Map(
     (creditCardsResult.data ?? []).map((card) => [card.id, card.name]),
+  );
+  const investmentLinkByTransfer = new Map(
+    (investmentLinksResult.data ?? []).flatMap((flow) =>
+      flow.source_transfer_id && flow.source_account_id
+        ? [[`${flow.source_transfer_id}:${flow.source_account_id}`, flow.position_id] as const]
+        : [],
+    ),
   );
   const registerSource: AccountRegisterSourceEntry[] = [
     ...transactionsResult.data.map((transaction) => {
@@ -211,6 +226,10 @@ export async function getCurrentUserAccountHub(id: string) {
         editHref:
           transaction.origin_type === "manual"
             ? `/transactions/${transaction.id}/edit`
+            : null,
+        investmentPositionId:
+          transaction.origin_type === "investment"
+            ? transaction.origin_id
             : null,
       };
     }),
@@ -243,6 +262,8 @@ export async function getCurrentUserAccountHub(id: string) {
         direction: entry.direction,
         amountMinor: entry.amount_minor,
         editHref: `/transfers/${entry.transfer_id}/edit`,
+        investmentPositionId:
+          investmentLinkByTransfer.get(`${entry.transfer_id}:${id}`) ?? null,
       };
     }),
   ];
@@ -276,7 +297,8 @@ export async function getCurrentUserAccountHub(id: string) {
         recurrencesResult.error ||
       importsResult.error ||
       categoriesResult.error ||
-      categoryGroupsResult.error,
+      categoryGroupsResult.error ||
+      investmentLinksResult.error,
     ),
   };
 }

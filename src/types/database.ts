@@ -520,11 +520,30 @@ export type InvestmentCashFlow = {
   cash_flow_type: InvestmentCashFlowType;
   income_type: InvestmentIncomeType | null;
   transaction_id: string | null;
+  source_transfer_id: string | null;
+  source_account_id: string | null;
   amount_minor: number;
   quantity: string | null;
   cash_flow_date: string;
   notes: string | null;
   created_at: string;
+};
+
+export type InvestmentTransferCandidate = {
+  entry_id: string;
+  transfer_id: string;
+  user_id: string;
+  account_id: string;
+  account_name: string;
+  currency: SupportedCurrency;
+  context: FinancialContext;
+  direction: TransferDirection;
+  amount_minor: number;
+  transaction_date: string;
+  description: string;
+  cash_flow_id: string | null;
+  position_id: string | null;
+  position_asset_name: string | null;
 };
 
 export type InvestmentPositionSummary = InvestmentPosition & {
@@ -1068,6 +1087,8 @@ export type Database = {
           cash_flow_type: InvestmentCashFlowType;
           income_type?: InvestmentIncomeType | null;
           transaction_id?: string | null;
+          source_transfer_id?: string | null;
+          source_account_id?: string | null;
           amount_minor: number;
           quantity?: string | null;
           cash_flow_date: string;
@@ -1199,6 +1220,10 @@ export type Database = {
         Row: InvestmentPositionSummary;
         Relationships: [];
       };
+      investment_transfer_candidates: {
+        Row: InvestmentTransferCandidate;
+        Relationships: [];
+      };
       financing_contract_summaries: {
         Row: FinancingContractSummary;
         Relationships: [];
@@ -1221,6 +1246,22 @@ export type Database = {
             target_new_investment_type?: InvestmentType | null;
             target_new_asset_name?: string | null;
           };
+        Returns: string;
+      };
+      link_investment_transfer_entry: {
+        Args: {
+          target_account_id: string;
+          target_transfer_entry_id: string;
+          target_position_id: string | null;
+          target_event_type: InvestmentAccountEventType;
+          target_quantity: string | null;
+          target_notes?: string | null;
+          target_create_position?: boolean;
+          target_new_institution?: string | null;
+          target_new_investment_class?: InvestmentClass | null;
+          target_new_investment_type?: InvestmentType | null;
+          target_new_asset_name?: string | null;
+        };
         Returns: string;
       };
       delete_category_with_replacement: {

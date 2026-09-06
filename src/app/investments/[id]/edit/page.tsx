@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { InvestmentPositionForm } from "@/components/forms/investment-position-form";
-import { investmentPositionIdSchema } from "@/domain/investments";
+import {
+  investmentPositionIdSchema,
+  normalizeInvestmentQuantity,
+} from "@/domain/investments";
 import { minorUnitsToInput } from "@/domain/money";
 import { getCurrentUserInvestmentPosition } from "@/services/finance/investments-service";
 import { toIsoDate } from "@/utils/dates";
@@ -51,7 +54,10 @@ export default async function EditInvestmentPositionPage({
             investmentType: position.investment_type,
             assetName: position.asset_name,
             currency: position.currency,
-            quantity: position.quantity.replace(".", ","),
+            quantity: normalizeInvestmentQuantity(position.quantity).replace(
+              ".",
+              ",",
+            ),
             accumulatedCostMinor: minorUnitsToInput(
               position.accumulated_cost_minor,
             ),

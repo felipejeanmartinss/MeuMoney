@@ -310,6 +310,14 @@ parcial atende a seleção e os privilégios de escrita da nova coluna são
 concedidos explicitamente a `authenticated`. O relatório de despesas fixas
 filtra a mesma fonte mensal por essa classificação, sem criar acumuladores.
 
+`investment_cash_flows.source_transfer_id` e `source_account_id` registram a
+perna de transferência que financiou uma aplicação ou recebeu uma liquidação
+ou renda. `link_investment_transfer_entry` cria o movimento de investimento e o
+vínculo na mesma transação, exige direções de caixa compatíveis e bloqueia
+duplicidade. A view `investment_transfer_candidates`, com
+`security_invoker`, expõe somente transferências realizadas de contas de
+Investimento visíveis ao proprietário.
+
 Migrations cumulativas, nesta ordem:
 `20260905090000_investment_transactions_reports.sql` e
 `20260905143000_financial_report_matrices.sql` e
