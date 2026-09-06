@@ -103,31 +103,27 @@ function Pagination({
   return (
     <nav
       aria-label="Páginas do extrato"
-      className="flex items-center justify-between gap-3 border-t border-slate-200 px-3 py-3"
+      className="flex items-center justify-end gap-1.5 border-t border-slate-200 px-2 py-1.5"
     >
       {page > 1 ? (
         <Link
           href={`/accounts/${accountId}?tab=statement&page=${page - 1}#account-register`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           ← Anterior
         </Link>
-      ) : (
-        <span />
-      )}
-      <span className="text-sm font-semibold text-slate-500">
+      ) : null}
+      <span className="px-1 text-xs font-semibold text-slate-500">
         Página {page} de {pageCount}
       </span>
       {page < pageCount ? (
         <Link
           href={`/accounts/${accountId}?tab=statement&page=${page + 1}#account-register`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           Próxima →
         </Link>
-      ) : (
-        <span />
-      )}
+      ) : null}
     </nav>
   );
 }
@@ -136,8 +132,6 @@ export function AccountRegister({
   accountId,
   currency,
   entries,
-  openingBalanceDate,
-  openingBalanceMinor,
   asOfDate,
   requestedPage,
   message,
@@ -146,8 +140,6 @@ export function AccountRegister({
   accountId: string;
   currency: SupportedCurrency;
   entries: AccountRegisterEntry[];
-  openingBalanceDate: string;
-  openingBalanceMinor: number;
   asOfDate: string;
   requestedPage?: string;
   message?: string;
@@ -167,17 +159,10 @@ export function AccountRegister({
 
   return (
     <section id="account-register" className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-3 py-2.5">
-        <div>
-          <h2 className="font-extrabold text-slate-950">
-            Extrato da conta
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {entries.length} movimentações · saldo inicial de{" "}
-            {formatMoney(openingBalanceMinor, currency)} em{" "}
-            {formatFinancialDate(openingBalanceDate)}
-          </p>
-        </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-slate-200 px-3 py-2">
+        <h2 className="text-sm font-extrabold text-slate-950">
+          Extrato da conta
+        </h2>
         {entryComposer ? (
           <AccountRegisterEntryComposer {...entryComposer} />
         ) : null}
