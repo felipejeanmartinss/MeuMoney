@@ -5,7 +5,7 @@
 1. O usuário envia um arquivo de até 5 MB.
 2. O servidor lê o conteúdo em memória, calcula SHA-256 e descarta os bytes.
 3. O parser normaliza no máximo 5.000 movimentações em staging.
-4. O usuário associa conta e categorias, corrige dados ou ignora linhas.
+4. O usuário associa conta e categorias, corrige dados ou ignora linhas. Uma linha ignorada recebe estado próprio, deixa de exigir revisão e não participa da confirmação; ao reincluir, ela é avaliada novamente.
 5. O banco recalcula assinaturas e duplicidades a cada alteração.
 6. A confirmação explícita cria todos os lançamentos em uma transação.
 7. O staging é apagado ao confirmar ou cancelar.

@@ -291,7 +291,13 @@ export async function toggleFinancialImportRow(formData: FormData) {
   const result = await setCurrentUserImportRowIgnored(rowId.data, ignored);
   revalidatePath(`/imports/${jobId.data}`);
   redirect(
-    `/imports/${jobId.data}?message=${result.ok ? "selection-updated" : "row-error"}&page=${page}`,
+    `/imports/${jobId.data}?message=${
+      result.ok
+        ? ignored
+          ? "row-ignored"
+          : "row-reincluded"
+        : "row-error"
+    }&page=${page}`,
   );
 }
 
