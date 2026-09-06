@@ -315,6 +315,30 @@ describe("file imports", () => {
     expect(firstPlan).toHaveLength(1);
   });
 
+  it("records an ignored row after recalculating job readiness", () => {
+    const migration = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260905223215_allow_ignored_import_rows.sql",
+      ),
+      "utf8",
+    );
+    const refreshPosition = migration.indexOf(
+      "perform private.refresh_import_job(target_job_id, current_user_id);",
+    );
+    const ignoredStatusPosition = migration.indexOf("set status = 'ignored'");
+
+    expect(migration).toContain("set is_selected = not target_ignored");
+    expect(migration).toContain("if target_ignored then");
+    expect(refreshPosition).toBeGreaterThan(-1);
+    expect(ignoredStatusPosition).toBeGreaterThan(refreshPosition);
+    expect(migration).toContain("and not is_selected");
+    expect(migration).toContain(
+      "current_user_id uuid := (select auth.uid());",
+    );
+  });
+
   it("fails the plan before any mutation when one selected row is invalid", () => {
     const candidates = [
       {

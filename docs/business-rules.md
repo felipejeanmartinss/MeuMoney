@@ -153,7 +153,8 @@
 - Conta e categoria devem estar ativas, pertencer ao usuário e ter natureza compatível com a linha.
 - A assinatura SHA-256 usa usuário, conta, data, valor com sinal e descrição normalizada. Ela não substitui as validações de propriedade ou RLS.
 - Duplicidades são detectadas no histórico, em jobs já confirmados e dentro do próprio arquivo. Uma linha duplicada nasce desmarcada e precisa ser corrigida para mudar sua assinatura.
-- A confirmação insere somente linhas válidas e selecionadas, sempre como lançamentos realizados. Qualquer falha reverte todos os lançamentos daquele job.
+- Uma linha ignorada recebe o estado `ignored`, não bloqueia a prontidão do job e é excluída da confirmação. Ao reincluir, todas as validações e verificações de duplicidade são executadas novamente.
+- A confirmação insere somente linhas válidas e selecionadas, sempre como lançamentos realizados. Linhas ignoradas são desconsideradas, e qualquer falha nas linhas selecionadas reverte todos os lançamentos daquele job.
 - O arquivo original é descartado imediatamente após a leitura em memória. Conteúdo financeiro não pode ser enviado a logs.
 - Staging é apagado ao confirmar ou cancelar. O job preserva apenas metadados e contadores de auditoria.
 - O usuário pode limpar definitivamente os metadados dos próprios jobs cancelados. A operação nunca alcança jobs em revisão, prontos, concluídos ou pertencentes a outro usuário.

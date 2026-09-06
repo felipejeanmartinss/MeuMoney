@@ -17,7 +17,9 @@ const messages: Record<string, string> = {
   "account-updated":
     "Conta associada e duplicidades recalculadas com sucesso.",
   "row-updated": "Linha atualizada e validada novamente.",
-  "selection-updated": "Seleção da linha atualizada.",
+  "row-ignored":
+    "Linha ignorada. Ela não será importada nem bloqueará a confirmação.",
+  "row-reincluded": "Linha reincluída e avaliada novamente.",
   "mapping-updated": "Mapeamento aplicado às linhas correspondentes.",
   "row-error": "Não foi possível corrigir a linha.",
   "configuration-error": "Não foi possível associar a conta.",
