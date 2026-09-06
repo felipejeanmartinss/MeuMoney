@@ -19,13 +19,13 @@ describe("inline account entry and manual transaction deletion", () => {
       "transactions-service.ts",
     );
 
-    expect(migration).toContain('for delete\nto authenticated');
+    expect(migration).toMatch(/for delete\r?\nto authenticated/);
     expect(migration).toContain("(select auth.uid()) = user_id");
     expect(migration).toContain("origin_type::text = 'manual'");
     expect(migration).toContain(
       "grant delete on table public.transactions to authenticated",
     );
-    expect(service).toContain('.from("transactions")\n    .delete()');
+    expect(service).toMatch(/\.from\("transactions"\)\r?\n    \.delete\(\)/);
     expect(service).toContain('.eq("user_id", user.id)');
     expect(service).toContain('.eq("origin_type", "manual")');
   });

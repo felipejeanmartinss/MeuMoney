@@ -178,6 +178,7 @@ export default async function AccountDetailPage({
       {activeTab === "statement" ? (
         <AccountRegister
           accountId={account.id}
+          accountType={account.type}
           currency={account.currency}
           entries={result.registerEntries}
           asOfDate={result.balanceSummary.asOfDate}

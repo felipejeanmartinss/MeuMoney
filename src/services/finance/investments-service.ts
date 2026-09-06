@@ -6,6 +6,7 @@ import type {
   InvestmentCashFlowType,
   InvestmentClass,
   InvestmentType,
+  InvestmentTransferCandidate,
   SupportedCurrency,
 } from "@/types/database";
 
@@ -49,6 +50,21 @@ export type InvestmentAccountEntryMutationInput = {
   } | null;
 };
 
+export type InvestmentTransferLinkMutationInput = {
+  accountId: string;
+  transferEntryId: string;
+  positionId: string | null;
+  eventType: InvestmentAccountEventType;
+  quantity: string | null;
+  notes: string | null;
+  newPosition: {
+    institution: string;
+    investmentClass: InvestmentClass;
+    investmentType: InvestmentType;
+    assetName: string;
+  } | null;
+};
+
 const positionColumns =
   "id, user_id, institution, investment_class, investment_type, asset_name, currency, quantity, accumulated_cost_minor, current_value_minor, position_date, context, history_is_complete, notes, is_active, archived_at, created_at, updated_at";
 
@@ -65,6 +81,23 @@ export async function listCurrentUserInvestmentPositions() {
     .order("asset_name", { ascending: true });
 
   return { positions: data ?? [], hasError: Boolean(error) };
+}
+
+export async function listCurrentUserInvestmentTransferCandidates() {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("investment_transfer_candidates")
+    .select(
+      "entry_id, transfer_id, user_id, account_id, account_name, currency, context, direction, amount_minor, transaction_date, description, cash_flow_id, position_id, position_asset_name",
+    )
+    .eq("user_id", user.id)
+    .order("transaction_date", { ascending: false })
+    .order("entry_id", { ascending: false });
+
+  return {
+    candidates: (data ?? []) as InvestmentTransferCandidate[],
+    hasError: Boolean(error),
+  };
 }
 
 export async function getCurrentUserInvestmentPosition(id: string) {
@@ -94,7 +127,7 @@ export async function listCurrentUserInvestmentHistory(positionId: string) {
     supabase
       .from("investment_cash_flows")
       .select(
-        "id, position_id, user_id, cash_flow_type, income_type, transaction_id, amount_minor, quantity, cash_flow_date, notes, created_at",
+        "id, position_id, user_id, cash_flow_type, income_type, transaction_id, source_transfer_id, source_account_id, amount_minor, quantity, cash_flow_date, notes, created_at",
       )
       .eq("user_id", user.id)
       .eq("position_id", positionId)
@@ -276,6 +309,63 @@ export async function createCurrentUserInvestmentAccountEntry(
     ? {
         ok: false as const,
         message: "Não foi possível registrar este movimento de investimento.",
+      }
+    : { ok: true as const, transactionId: data };
+}
+
+export async function linkCurrentUserInvestmentTransferEntry(
+  input: InvestmentTransferLinkMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "link_investment_transfer_entry",
+    {
+      target_account_id: input.accountId,
+      target_transfer_entry_id: input.transferEntryId,
+      target_position_id: input.positionId,
+      target_event_type: input.eventType,
+      target_quantity: input.quantity,
+      target_notes: input.notes,
+      target_create_position: input.newPosition !== null,
+      target_new_institution: input.newPosition?.institution ?? null,
+      target_new_investment_class:
+        input.newPosition?.investmentClass ?? null,
+      target_new_investment_type: input.newPosition?.investmentType ?? null,
+      target_new_asset_name: input.newPosition?.assetName ?? null,
+    },
+  );
+
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("investment_transfer_already_linked")) {
+    return {
+      ok: false as const,
+      message: "Esta transferência já está vinculada a uma posição.",
+    };
+  }
+  if (message.includes("investment_transfer_direction_mismatch")) {
+    return {
+      ok: false as const,
+      message:
+        "Entradas aceitam aplicações; saídas aceitam resgates e rendimentos.",
+    };
+  }
+  if (message.includes("invalid_investment_transfer_entry")) {
+    return {
+      ok: false as const,
+      message: "A transferência não está disponível para vínculo.",
+    };
+  }
+  if (message.includes("investment_account_mismatch")) {
+    return {
+      ok: false as const,
+      message: "A conta e a posição devem ter a mesma moeda e contexto.",
+    };
+  }
+
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível vincular a transferência à posição.",
       }
     : { ok: true as const, transactionId: data };
 }

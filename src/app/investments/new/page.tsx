@@ -19,11 +19,10 @@ export default async function NewInvestmentPositionPage() {
           ← Voltar para investimentos
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950">
-          Nova posição de investimento
+          Posição sem movimentação
         </h1>
         <p className="mt-2 text-slate-600">
-          Informe a posição conhecida. O MeuMoney não consulta cotações nem
-          movimenta contas automaticamente.
+          Cadastre posições anteriores a 2026 ou sem lançamento disponível.
         </p>
       </div>
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">

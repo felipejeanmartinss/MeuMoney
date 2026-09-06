@@ -124,6 +124,8 @@ export const INVESTMENT_ACCOUNT_EVENT_TYPES = [
   "other",
 ] as const;
 
+export const INVESTMENT_TRANSFER_DIRECTIONS = ["inflow", "outflow"] as const;
+
 export const INVESTMENT_ACCOUNT_EVENT_LABELS: Record<
   InvestmentAccountEventType,
   string
@@ -152,10 +154,31 @@ export function investmentEventTransactionType(
   return eventType === "contribution" ? "expense" as const : "income" as const;
 }
 
+export function inferInvestmentTransferEvent(
+  direction: (typeof INVESTMENT_TRANSFER_DIRECTIONS)[number],
+  description: string,
+): InvestmentAccountEventType {
+  const normalized = description
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+
+  if (/\b(dividendo|dividendos)\b/.test(normalized)) return "dividend";
+  if (/\b(jcp|juros sobre capital)\b/.test(normalized)) {
+    return "interest_on_capital";
+  }
+  if (/\b(bonus|bonificacao)\b/.test(normalized)) return "bonus";
+  return direction === "inflow" ? "contribution" : "redemption";
+}
+
 const MAX_QUANTITY_INTEGER_DIGITS = 18;
 
-export function normalizeInvestmentQuantity(input: string): string {
-  const compact = input.trim().replace(/\s/g, "").replace(",", ".");
+export function normalizeInvestmentQuantity(input: string | number): string {
+  const rawInput =
+    typeof input === "number" && Number.isFinite(input)
+      ? input.toFixed(12)
+      : String(input);
+  const compact = rawInput.trim().replace(/\s/g, "").replace(",", ".");
   if (!compact) throw new Error("Informe a quantidade.");
   if (compact.includes("e") || compact.includes("E")) {
     throw new Error("Não use notação científica na quantidade.");
@@ -175,7 +198,7 @@ export function normalizeInvestmentQuantity(input: string): string {
   return decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
 }
 
-export function formatInvestmentQuantity(quantity: string): string {
+export function formatInvestmentQuantity(quantity: string | number): string {
   const normalized = normalizeInvestmentQuantity(quantity);
   const [integerPart, decimalPart] = normalized.split(".");
   const grouped = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -365,6 +388,69 @@ export const investmentAccountEntryFormSchema = z
         code: "custom",
         path: ["positionId"],
         message: "Uma nova posição deve começar por uma aplicação ou aporte.",
+      });
+    }
+    if (!value.newInstitution) {
+      context.addIssue({
+        code: "custom",
+        path: ["newInstitution"],
+        message: "Informe a instituição.",
+      });
+    }
+    if (!value.newAssetName) {
+      context.addIssue({
+        code: "custom",
+        path: ["newAssetName"],
+        message: "Informe o ativo.",
+      });
+    }
+    if (!value.newInvestmentClass || !value.newInvestmentType) {
+      context.addIssue({
+        code: "custom",
+        path: ["newInvestmentType"],
+        message: "Selecione a classe e o produto.",
+      });
+      return;
+    }
+    const validTypes = INVESTMENT_TYPES_BY_CLASS[value.newInvestmentClass];
+    if (!(validTypes as readonly string[]).includes(value.newInvestmentType)) {
+      context.addIssue({
+        code: "custom",
+        path: ["newInvestmentType"],
+        message: "O produto não pertence à classe selecionada.",
+      });
+    }
+  });
+
+export const investmentTransferLinkFormSchema = z
+  .object({
+    accountId: z.uuid("Conta de investimento inválida."),
+    transferEntryId: z.uuid("Transferência inválida."),
+    positionId: z.union([
+      z.uuid("Selecione uma posição de investimento válida."),
+      z.literal("new"),
+    ]),
+    eventType: z.enum(INVESTMENT_ACCOUNT_EVENT_TYPES, {
+      error: "Selecione o tipo do movimento.",
+    }),
+    quantity: optionalQuantityInput,
+    notes: z
+      .string()
+      .trim()
+      .max(1000, "Use até 1.000 caracteres.")
+      .transform((value) => value || null),
+    newInstitution: z.string().trim().max(120).optional().default(""),
+    newInvestmentClass: z.enum(INVESTMENT_CLASSES).optional(),
+    newInvestmentType: z.enum(INVESTMENT_TYPES).optional(),
+    newAssetName: z.string().trim().max(160).optional().default(""),
+  })
+  .superRefine((value, context) => {
+    if (value.positionId !== "new") return;
+    if (value.eventType !== "contribution") {
+      context.addIssue({
+        code: "custom",
+        path: ["positionId"],
+        message: "Crie primeiro a posição anterior e depois vincule esta saída.",
       });
     }
     if (!value.newInstitution) {

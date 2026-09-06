@@ -29,6 +29,7 @@ export type AccountRegisterSourceEntry = {
   direction: AccountRegisterDirection;
   amountMinor: number;
   editHref: string | null;
+  investmentPositionId?: string | null;
 };
 
 export type AccountRegisterEntry = AccountRegisterSourceEntry & {
