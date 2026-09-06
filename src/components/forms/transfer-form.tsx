@@ -51,10 +51,14 @@ export function TransferForm({
   accounts,
   creditCards = [],
   values,
+  returnAccountId,
+  compact = false,
 }: {
   accounts: AccountOption[];
   creditCards?: CreditCardTransferDestination[];
   values: TransferFormValues;
+  returnAccountId?: string;
+  compact?: boolean;
 }) {
   const action = values.id ? updateTransfer : createTransfer;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -117,18 +121,23 @@ export function TransferForm({
   }
 
   return (
-    <form action={formAction} className="grid gap-5">
+    <form action={formAction} className={`grid ${compact ? "gap-3" : "gap-5"}`}>
       {values.id ? <input type="hidden" name="id" value={values.id} /> : null}
+      {returnAccountId ? (
+        <input type="hidden" name="returnAccountId" value={returnAccountId} />
+      ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className={`grid sm:grid-cols-2 ${compact ? "gap-3" : "gap-5"}`}>
         <Field
           label="Conta de origem"
           error={state.fieldErrors?.sourceAccountId?.[0]}
+          compact={compact}
         >
           <select
             className={inputClass(
               Boolean(state.fieldErrors?.sourceAccountId),
+              compact,
             )}
             name="sourceAccountId"
             value={sourceId}
@@ -153,6 +162,7 @@ export function TransferForm({
             state.fieldErrors?.destinationTarget?.[0] ??
             state.fieldErrors?.destinationAccountId?.[0]
           }
+          compact={compact}
         >
           <select
             className={inputClass(
@@ -160,6 +170,7 @@ export function TransferForm({
                 state.fieldErrors?.destinationTarget ??
                   state.fieldErrors?.destinationAccountId,
               ),
+              compact,
             )}
             name="destinationTarget"
             value={destinationTarget}
@@ -206,10 +217,10 @@ export function TransferForm({
         </Field>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
-        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]}>
+      <div className={`grid sm:grid-cols-3 ${compact ? "gap-3" : "gap-5"}`}>
+        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]} compact={compact}>
           <input
-            className={inputClass(Boolean(state.fieldErrors?.amountMinor))}
+            className={inputClass(Boolean(state.fieldErrors?.amountMinor), compact)}
             name="amountMinor"
             value={amountInput}
             onChange={(event) => setAmountInput(event.target.value)}
@@ -219,10 +230,11 @@ export function TransferForm({
           />
         </Field>
 
-        <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]}>
+        <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]} compact={compact}>
           <input
             className={inputClass(
               Boolean(state.fieldErrors?.transactionDate),
+              compact,
             )}
             name="transactionDate"
             type="date"
@@ -231,9 +243,9 @@ export function TransferForm({
           />
         </Field>
 
-        <Field label="Status" error={state.fieldErrors?.status?.[0]}>
+        <Field label="Status" error={state.fieldErrors?.status?.[0]} compact={compact}>
           <select
-            className={inputClass(Boolean(state.fieldErrors?.status))}
+            className={inputClass(Boolean(state.fieldErrors?.status), compact)}
             name="status"
             defaultValue={values.status ?? "completed"}
             required
@@ -248,7 +260,7 @@ export function TransferForm({
       </div>
 
       {selectedCreditCard ? (
-        <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+        <p className={`${compact ? "rounded-md px-3 py-2 text-xs leading-5" : "rounded-xl p-4 text-sm leading-6"} border border-blue-200 bg-blue-50 text-blue-950`}>
           A transferência reduz o caixa da conta de origem e o saldo devedor
           de {selectedCreditCard.cardName}. Ela entra apenas no regime de
           caixa; as compras continuam no mês de competência.
@@ -258,9 +270,10 @@ export function TransferForm({
       <Field
         label="Descrição opcional"
         error={state.fieldErrors?.description?.[0]}
+        compact={compact}
       >
         <input
-          className={inputClass(Boolean(state.fieldErrors?.description))}
+          className={inputClass(Boolean(state.fieldErrors?.description), compact)}
           name="description"
           defaultValue={values.description}
           maxLength={180}
@@ -268,9 +281,9 @@ export function TransferForm({
         />
       </Field>
 
-      <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>
+      <Field label="Observações" error={state.fieldErrors?.notes?.[0]} compact={compact}>
         <textarea
-          className={`${inputClass(Boolean(state.fieldErrors?.notes))} min-h-28 py-3`}
+          className={`${inputClass(Boolean(state.fieldErrors?.notes), compact)} ${compact ? "min-h-14 py-2" : "min-h-28 py-3"}`}
           name="notes"
           defaultValue={values.notes}
           maxLength={1000}
@@ -278,7 +291,7 @@ export function TransferForm({
         />
       </Field>
 
-      <SubmitButton pending={pending}>
+      <SubmitButton pending={pending} compact={compact}>
         {values.id
           ? "Salvar alterações"
           : selectedCreditCard

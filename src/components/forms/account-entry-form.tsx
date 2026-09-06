@@ -14,9 +14,9 @@ import { TransactionForm } from "./transaction-form";
 import { TransferForm } from "./transfer-form";
 import { InvestmentAccountEntryForm } from "./investment-account-entry-form";
 
-type EntryMode = TransactionType | "transfer" | "investment";
+export type AccountEntryMode = TransactionType | "transfer" | "investment";
 
-type AccountOption = {
+export type AccountEntryAccountOption = {
   id: string;
   name: string;
   currency: SupportedCurrency;
@@ -24,7 +24,7 @@ type AccountOption = {
   type: AccountType;
 };
 
-type CategoryOption = {
+export type AccountEntryCategoryOption = {
   id: string;
   group_id: string;
   parent_id: string | null;
@@ -35,7 +35,7 @@ type CategoryOption = {
   archived_at: string | null;
 };
 
-const MODE_LABELS: Record<EntryMode, string> = {
+const MODE_LABELS: Record<AccountEntryMode, string> = {
   expense: "Despesa",
   income: "Receita",
   transfer: "Transferência",
@@ -51,35 +51,39 @@ export function AccountEntryForm({
   accountId,
   transactionDate,
   initialMode,
+  returnAccountId,
+  compact = false,
 }: {
-  accounts: AccountOption[];
-  categories: CategoryOption[];
+  accounts: AccountEntryAccountOption[];
+  categories: AccountEntryCategoryOption[];
   groups: CategoryGroupItem[];
   creditCards: CreditCardTransferDestination[];
   investmentPositions: InvestmentPositionSummary[];
   accountId?: string;
   transactionDate: string;
-  initialMode: EntryMode;
+  initialMode: AccountEntryMode;
+  returnAccountId?: string;
+  compact?: boolean;
 }) {
-  const [mode, setMode] = useState<EntryMode>(initialMode);
+  const [mode, setMode] = useState<AccountEntryMode>(initialMode);
   const [transferDestinationTarget, setTransferDestinationTarget] =
     useState("");
 
   return (
-    <div className="grid gap-6">
+    <div className={`grid ${compact ? "gap-3" : "gap-6"}`}>
       <div
         role="tablist"
         aria-label="Tipo de entrada na conta"
-        className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 sm:grid-cols-4"
+        className={`grid grid-cols-2 bg-slate-100 sm:grid-cols-4 ${compact ? "rounded-md p-0.5" : "rounded-xl p-1"}`}
       >
-        {(Object.keys(MODE_LABELS) as EntryMode[]).map((entryMode) => (
+        {(Object.keys(MODE_LABELS) as AccountEntryMode[]).map((entryMode) => (
           <button
             key={entryMode}
             type="button"
             role="tab"
             aria-selected={mode === entryMode}
             onClick={() => setMode(entryMode)}
-            className={`min-h-11 rounded-lg px-3 text-sm font-extrabold transition ${
+            className={`${compact ? "min-h-8 rounded px-2 text-xs" : "min-h-11 rounded-lg px-3 text-sm"} font-extrabold transition ${
               mode === entryMode
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-600 hover:text-slate-950"
@@ -102,6 +106,8 @@ export function AccountEntryForm({
             )?.id
           }
           transactionDate={transactionDate}
+          returnAccountId={returnAccountId}
+          compact={compact}
         />
       ) : mode === "transfer" ? (
         <TransferForm
@@ -115,6 +121,8 @@ export function AccountEntryForm({
             status: "completed",
             amountMinor: "0,00",
           }}
+          returnAccountId={returnAccountId}
+          compact={compact}
         />
       ) : (
         <TransactionForm
@@ -135,6 +143,8 @@ export function AccountEntryForm({
             transactionDate,
             amountMinor: "0,00",
           }}
+          returnAccountId={returnAccountId}
+          compact={compact}
         />
       )}
     </div>

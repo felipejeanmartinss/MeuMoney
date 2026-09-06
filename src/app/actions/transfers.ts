@@ -73,6 +73,17 @@ export async function createTransfer(
     );
     if (!result.ok) return { status: "error", message: result.message };
     revalidateFinancialPaths();
+    if (
+      formData.get("returnAccountId") ===
+      parsedCardTransfer.data.sourceAccountId
+    ) {
+      revalidatePath(
+        `/accounts/${parsedCardTransfer.data.sourceAccountId}`,
+      );
+      redirect(
+        `/accounts/${parsedCardTransfer.data.sourceAccountId}?tab=statement&page=1&message=transfer-created#account-register`,
+      );
+    }
     redirect("/transfers?message=created");
   }
 
@@ -90,6 +101,12 @@ export async function createTransfer(
   const result = await createCurrentUserTransfer(parsed.data);
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
+  if (formData.get("returnAccountId") === parsed.data.sourceAccountId) {
+    revalidatePath(`/accounts/${parsed.data.sourceAccountId}`);
+    redirect(
+      `/accounts/${parsed.data.sourceAccountId}?tab=statement&page=1&message=transfer-created#account-register`,
+    );
+  }
   redirect("/transfers?message=created");
 }
 

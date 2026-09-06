@@ -38,11 +38,15 @@ export function InvestmentAccountEntryForm({
   positions,
   initialAccountId,
   transactionDate,
+  returnAccountId,
+  compact = false,
 }: {
   accounts: InvestmentAccountOption[];
   positions: InvestmentPositionSummary[];
   initialAccountId?: string;
   transactionDate: string;
+  returnAccountId?: string;
+  compact?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     createInvestmentAccountEntry,
@@ -80,13 +84,16 @@ export function InvestmentAccountEntryForm({
   }
 
   return (
-    <form action={formAction} className="grid gap-5">
+    <form action={formAction} className={`grid ${compact ? "gap-3" : "gap-5"}`}>
+      {returnAccountId ? (
+        <input type="hidden" name="returnAccountId" value={returnAccountId} />
+      ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Conta de investimento" error={state.fieldErrors?.accountId?.[0]}>
+      <div className={`grid sm:grid-cols-2 ${compact ? "gap-3" : "gap-5"}`}>
+        <Field label="Conta de investimento" error={state.fieldErrors?.accountId?.[0]} compact={compact}>
           <select
-            className={inputClass(Boolean(state.fieldErrors?.accountId))}
+            className={inputClass(Boolean(state.fieldErrors?.accountId), compact)}
             name="accountId"
             value={accountId}
             onChange={(event) => {
@@ -104,9 +111,9 @@ export function InvestmentAccountEntryForm({
           </select>
         </Field>
 
-        <Field label="Movimento" error={state.fieldErrors?.eventType?.[0]}>
+        <Field label="Movimento" error={state.fieldErrors?.eventType?.[0]} compact={compact}>
           <select
-            className={inputClass(Boolean(state.fieldErrors?.eventType))}
+            className={inputClass(Boolean(state.fieldErrors?.eventType), compact)}
             name="eventType"
             value={eventType}
             onChange={(event) => {
@@ -127,10 +134,10 @@ export function InvestmentAccountEntryForm({
         </Field>
       </div>
 
-      <Field label="Posição vinculada" error={state.fieldErrors?.positionId?.[0]}>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+      <Field label="Posição vinculada" error={state.fieldErrors?.positionId?.[0]} compact={compact}>
+        <div className={`grid sm:grid-cols-[1fr_auto] ${compact ? "gap-1" : "gap-2"}`}>
           <select
-            className={inputClass(Boolean(state.fieldErrors?.positionId))}
+            className={inputClass(Boolean(state.fieldErrors?.positionId), compact)}
             name="positionId"
             value={positionId}
             onChange={(event) => setPositionId(event.target.value)}
@@ -150,7 +157,7 @@ export function InvestmentAccountEntryForm({
           </select>
           <Link
             href="/investments/new"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            className={`${compact ? "min-h-9 rounded-md px-3 text-xs" : "min-h-11 rounded-xl px-4 text-sm"} inline-flex items-center justify-center border border-slate-300 font-bold text-slate-700 hover:bg-slate-50`}
           >
             Nova posição
           </Link>
@@ -163,37 +170,38 @@ export function InvestmentAccountEntryForm({
       </Field>
 
       {positionId === "new" ? (
-        <fieldset className="grid gap-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+        <fieldset className={`grid border border-emerald-200 bg-emerald-50/60 ${compact ? "gap-2 rounded-md p-3" : "gap-4 rounded-xl p-4"}`}>
           <legend className="px-1 text-sm font-black text-emerald-950">
             Nova posição
           </legend>
-          <p className="text-sm text-emerald-950">
+          <p className={`${compact ? "text-xs" : "text-sm"} text-emerald-950`}>
             O aporte inicial será usado como custo e valor da primeira
             fotografia, sem ganho presumido.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={`grid sm:grid-cols-2 ${compact ? "gap-2" : "gap-4"}`}>
             <Field
               label="Instituição"
               error={state.fieldErrors?.newInstitution?.[0]}
+              compact={compact}
             >
               <input
-                className={inputClass(Boolean(state.fieldErrors?.newInstitution))}
+                className={inputClass(Boolean(state.fieldErrors?.newInstitution), compact)}
                 name="newInstitution"
                 maxLength={120}
                 required
               />
             </Field>
-            <Field label="Ativo" error={state.fieldErrors?.newAssetName?.[0]}>
+            <Field label="Ativo" error={state.fieldErrors?.newAssetName?.[0]} compact={compact}>
               <input
-                className={inputClass(Boolean(state.fieldErrors?.newAssetName))}
+                className={inputClass(Boolean(state.fieldErrors?.newAssetName), compact)}
                 name="newAssetName"
                 maxLength={160}
                 required
               />
             </Field>
-            <Field label="Classe">
+            <Field label="Classe" compact={compact}>
               <select
-                className={inputClass()}
+                className={inputClass(false, compact)}
                 name="newInvestmentClass"
                 value={investmentClass}
                 onChange={(event) =>
@@ -211,11 +219,13 @@ export function InvestmentAccountEntryForm({
             <Field
               label="Produto"
               error={state.fieldErrors?.newInvestmentType?.[0]}
+              compact={compact}
             >
               <select
                 key={investmentClass}
                 className={inputClass(
                   Boolean(state.fieldErrors?.newInvestmentType),
+                  compact,
                 )}
                 name="newInvestmentType"
                 defaultValue={INVESTMENT_TYPES_BY_CLASS[investmentClass][0]}
@@ -232,9 +242,9 @@ export function InvestmentAccountEntryForm({
         </fieldset>
       ) : null}
 
-      <Field label="Descrição" error={state.fieldErrors?.description?.[0]}>
+      <Field label="Descrição" error={state.fieldErrors?.description?.[0]} compact={compact}>
         <input
-          className={inputClass(Boolean(state.fieldErrors?.description))}
+          className={inputClass(Boolean(state.fieldErrors?.description), compact)}
           name="description"
           maxLength={180}
           placeholder={INVESTMENT_ACCOUNT_EVENT_LABELS[eventType]}
@@ -242,27 +252,27 @@ export function InvestmentAccountEntryForm({
         />
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-3">
-        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]}>
+      <div className={`grid sm:grid-cols-3 ${compact ? "gap-3" : "gap-5"}`}>
+        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]} compact={compact}>
           <input
-            className={inputClass(Boolean(state.fieldErrors?.amountMinor))}
+            className={inputClass(Boolean(state.fieldErrors?.amountMinor), compact)}
             name="amountMinor"
             inputMode="decimal"
             placeholder="0,00"
             required
           />
         </Field>
-        <Field label="Quantidade movimentada" error={state.fieldErrors?.quantity?.[0]}>
+        <Field label="Quantidade movimentada" error={state.fieldErrors?.quantity?.[0]} compact={compact}>
           <input
-            className={inputClass(Boolean(state.fieldErrors?.quantity))}
+            className={inputClass(Boolean(state.fieldErrors?.quantity), compact)}
             name="quantity"
             inputMode="decimal"
             placeholder="Opcional"
           />
         </Field>
-        <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]}>
+        <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]} compact={compact}>
           <input
-            className={inputClass(Boolean(state.fieldErrors?.transactionDate))}
+            className={inputClass(Boolean(state.fieldErrors?.transactionDate), compact)}
             name="transactionDate"
             type="date"
             defaultValue={transactionDate}
@@ -271,22 +281,22 @@ export function InvestmentAccountEntryForm({
         </Field>
       </div>
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+      <div className={`${compact ? "rounded-md px-3 py-2 text-xs" : "rounded-xl px-4 py-3 text-sm"} border border-blue-200 bg-blue-50 text-blue-950`}>
         Este movimento entra como <strong>{transactionType === "expense" ? "saída" : "entrada"}</strong> na
         conta. A posição continua com avaliação manual; o vínculo registra o
         histórico sem inventar preço, custo ou rentabilidade.
       </div>
 
-      <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>
+      <Field label="Observações" error={state.fieldErrors?.notes?.[0]} compact={compact}>
         <textarea
-          className={`${inputClass(Boolean(state.fieldErrors?.notes))} min-h-24 py-3`}
+          className={`${inputClass(Boolean(state.fieldErrors?.notes), compact)} ${compact ? "min-h-14 py-2" : "min-h-24 py-3"}`}
           name="notes"
           maxLength={1000}
           placeholder="Opcional"
         />
       </Field>
 
-      <SubmitButton pending={pending}>Registrar investimento</SubmitButton>
+      <SubmitButton pending={pending} compact={compact}>Registrar investimento</SubmitButton>
     </form>
   );
 }

@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { toggleAccountEntryReconciliation } from "@/app/actions/transactions";
+import {
+  deleteTransaction,
+  toggleAccountEntryReconciliation,
+} from "@/app/actions/transactions";
+import {
+  AccountRegisterEntryComposer,
+  type AccountRegisterEntryComposerProps,
+} from "@/components/accounts/account-register-entry-composer";
+import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import type { AccountRegisterEntry } from "@/domain/account-register";
 import { formatMoney } from "@/domain/money";
 import { TRANSACTION_STATUS_LABELS } from "@/domain/transactions";
@@ -18,6 +26,19 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   },
   "investment-recorded": {
     text: "Movimento de investimento registrado e vinculado à posição.",
+  },
+  "transaction-created": {
+    text: "Lançamento criado com sucesso.",
+  },
+  "transfer-created": {
+    text: "Transferência criada com sucesso.",
+  },
+  "transaction-deleted": {
+    text: "Lançamento excluído com sucesso.",
+  },
+  "transaction-delete-error": {
+    text: "Não foi possível excluir o lançamento.",
+    error: true,
   },
 };
 
@@ -82,31 +103,27 @@ function Pagination({
   return (
     <nav
       aria-label="Páginas do extrato"
-      className="flex items-center justify-between gap-3 border-t border-slate-200 px-3 py-3"
+      className="flex items-center justify-end gap-1.5 border-t border-slate-200 px-2 py-1.5"
     >
       {page > 1 ? (
         <Link
           href={`/accounts/${accountId}?tab=statement&page=${page - 1}#account-register`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           ← Anterior
         </Link>
-      ) : (
-        <span />
-      )}
-      <span className="text-sm font-semibold text-slate-500">
+      ) : null}
+      <span className="px-1 text-xs font-semibold text-slate-500">
         Página {page} de {pageCount}
       </span>
       {page < pageCount ? (
         <Link
           href={`/accounts/${accountId}?tab=statement&page=${page + 1}#account-register`}
-          className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           Próxima →
         </Link>
-      ) : (
-        <span />
-      )}
+      ) : null}
     </nav>
   );
 }
@@ -115,57 +132,40 @@ export function AccountRegister({
   accountId,
   currency,
   entries,
-  openingBalanceDate,
-  openingBalanceMinor,
+  asOfDate,
   requestedPage,
   message,
+  entryComposer,
 }: {
   accountId: string;
   currency: SupportedCurrency;
   entries: AccountRegisterEntry[];
-  openingBalanceDate: string;
-  openingBalanceMinor: number;
+  asOfDate: string;
   requestedPage?: string;
   message?: string;
+  entryComposer?: AccountRegisterEntryComposerProps;
 }) {
   const pageCount = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
   const parsedPage = Number.parseInt(requestedPage ?? "1", 10);
   const page = Number.isFinite(parsedPage)
     ? Math.min(Math.max(parsedPage, 1), pageCount)
     : 1;
-  const pageEntries = entries.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageEntries = entries.slice(pageStart, page * PAGE_SIZE);
+  const firstCurrentEntryIndex = entries.findIndex(
+    (entry) => !entry.isProjected,
   );
   const feedback = message ? messages[message] : undefined;
 
   return (
     <section id="account-register" className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="font-extrabold text-slate-950">
-            Extrato da conta
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {entries.length} movimentações · saldo inicial de{" "}
-            {formatMoney(openingBalanceMinor, currency)} em{" "}
-            {formatFinancialDate(openingBalanceDate)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/transactions/new?accountId=${accountId}`}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
-          >
-            Nova movimentação
-          </Link>
-          <Link
-            href={`/transactions/new?accountId=${accountId}&type=transfer`}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
-          >
-            Transferir
-          </Link>
-        </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-slate-200 px-3 py-2">
+        <h2 className="text-sm font-extrabold text-slate-950">
+          Extrato da conta
+        </h2>
+        {entryComposer ? (
+          <AccountRegisterEntryComposer {...entryComposer} />
+        ) : null}
       </div>
 
       {feedback ? (
@@ -220,20 +220,28 @@ export function AccountRegister({
                   <th scope="col" className="w-28 px-2 py-1.5 text-right">
                     Saldo
                   </th>
-                  <th scope="col" className="w-20 px-2 py-1.5 text-right">
+                  <th scope="col" className="w-36 px-2 py-1.5 text-right">
                     Ações
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
-                {pageEntries.map((entry) => {
+              <tbody>
+                {pageEntries.map((entry, index) => {
                   const isIncome = entry.signedAmountMinor > 0;
+                  const startsCurrentPeriod =
+                    firstCurrentEntryIndex > 0 &&
+                    pageStart + index === firstCurrentEntryIndex;
                   return (
                     <tr
                       key={`${entry.entryType}-${entry.id}`}
-                      className={`${entry.isActive ? "" : "opacity-55"} hover:bg-emerald-50/40`}
+                      className={`${entry.isActive ? "" : "opacity-55"} ${startsCurrentPeriod ? "border-t-4 border-t-slate-700" : "border-t border-t-slate-200"} hover:bg-emerald-50/40`}
                     >
                       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-slate-700">
+                        {startsCurrentPeriod ? (
+                          <span className="sr-only">
+                            Lançamentos realizados até {formatFinancialDate(asOfDate)}
+                          </span>
+                        ) : null}
                         {formatFinancialDate(entry.transactionDate)}
                       </td>
                       <td className="px-2 py-1.5">
@@ -284,12 +292,27 @@ export function AccountRegister({
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         {entry.editHref ? (
-                          <Link
-                            href={entry.editHref}
-                            className="text-sm font-bold text-blue-700 hover:underline"
-                          >
-                            Editar
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={entry.editHref}
+                              className="text-sm font-bold text-blue-700 hover:underline"
+                            >
+                              Editar
+                            </Link>
+                            {entry.entryType === "transaction" ? (
+                              <form action={deleteTransaction}>
+                                <input type="hidden" name="id" value={entry.id} />
+                                <input type="hidden" name="accountId" value={accountId} />
+                                <input type="hidden" name="page" value={page} />
+                                <ConfirmSubmitButton
+                                  confirmation={`Excluir definitivamente “${entry.description}”?`}
+                                  className="text-sm font-bold text-red-700 hover:underline disabled:opacity-50"
+                                >
+                                  Excluir
+                                </ConfirmSubmitButton>
+                              </form>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-400">
                             Automático
@@ -303,13 +326,16 @@ export function AccountRegister({
             </table>
           </div>
 
-          <div className="divide-y divide-slate-100 md:hidden">
-            {pageEntries.map((entry) => {
+          <div className="md:hidden">
+            {pageEntries.map((entry, index) => {
               const isIncome = entry.signedAmountMinor > 0;
+              const startsCurrentPeriod =
+                firstCurrentEntryIndex > 0 &&
+                pageStart + index === firstCurrentEntryIndex;
               return (
                 <article
                   key={`${entry.entryType}-${entry.id}`}
-                  className={`grid gap-3 px-4 py-4 ${entry.isActive ? "" : "opacity-55"}`}
+                  className={`grid gap-3 border-t px-4 py-4 ${startsCurrentPeriod ? "border-t-4 border-t-slate-700" : "border-t-slate-100"} ${entry.isActive ? "" : "opacity-55"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -351,12 +377,27 @@ export function AccountRegister({
                         page={page}
                       />
                       {entry.editHref ? (
-                        <Link
-                          href={entry.editHref}
-                          className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700"
-                        >
-                          Editar
-                        </Link>
+                        <>
+                          <Link
+                            href={entry.editHref}
+                            className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700"
+                          >
+                            Editar
+                          </Link>
+                          {entry.entryType === "transaction" ? (
+                            <form action={deleteTransaction}>
+                              <input type="hidden" name="id" value={entry.id} />
+                              <input type="hidden" name="accountId" value={accountId} />
+                              <input type="hidden" name="page" value={page} />
+                              <ConfirmSubmitButton
+                                confirmation={`Excluir definitivamente “${entry.description}”?`}
+                                className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-red-700 disabled:opacity-50"
+                              >
+                                Excluir
+                              </ConfirmSubmitButton>
+                            </form>
+                          ) : null}
+                        </>
                       ) : null}
                     </div>
                   </div>

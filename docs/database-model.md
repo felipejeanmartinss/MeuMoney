@@ -55,7 +55,7 @@ O cliente não recebe permissão de escrita direta nessas tabelas. As funções 
 
 ## Saldos
 
-`public.account_balances` é uma view com `security_invoker`. Ela deriva `current_balance_minor` do saldo inicial, dos lançamentos e das movimentações de transferência que estejam ativos e realizados. O saldo atual não é duplicado em uma coluna mutável.
+`public.account_balances` é uma view com `security_invoker`. Ela deriva `current_balance_minor` do saldo inicial, dos lançamentos e das movimentações de transferência que estejam ativos, realizados e datados antes do dia corrente no fuso de São Paulo. O saldo atual não é duplicado em uma coluna mutável; a projeção a partir de hoje é calculada pelo domínio a partir do extrato completo.
 
 A central da conta lê lançamentos e entradas de transferência em páginas internas do servidor, combina os registros e calcula o saldo cronológico com uma função pura. Apenas a página solicitada é enviada ao navegador, preservando uma visão completa por conta sem carregar o histórico bruto no cliente.
 
