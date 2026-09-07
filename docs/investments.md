@@ -40,7 +40,8 @@ torna custo e valor da fotografia inicial, sem valorização presumida.
 
 O cadastro direto de posição continua disponível para patrimônio anterior ao
 histórico transacional. Nessa situação, o usuário pode marcar o histórico como
-incompleto e nenhuma rentabilidade total é inferida.
+incompleto; resultado e retorno total são estimados pela diferença entre valor
+atual e custo acumulado, sem estimar retorno anualizado.
 
 Transferências já realizadas em contas do tipo Investimento aparecem em uma
 fila de vínculo. Uma entrada pode originar uma aplicação de mesmo valor; uma
@@ -53,10 +54,19 @@ transferência aceita um único vínculo e fica financeiramente imutável enquan
 esse vínculo existir.
 
 A diferença sobre o custo é `valor atual - custo acumulado`. Aportes, resgates e
-rendas são somados separadamente. O resultado total
-`valor atual + resgates + rendas - aportes` só é exibido quando o usuário
-declara que o histórico contém todos os fluxos desde o início. Não é calculada
-taxa de rentabilidade ou retorno anualizado.
+rendas são somados separadamente. Quando o usuário declara que o histórico
+contém todos os fluxos desde o início, o resultado total é
+`valor atual + resgates + rendas - aportes`; o lucro ou perda realizado compara
+os resgates com o custo baixado da posição. O retorno total divide o resultado
+pela base de aportes completa. O retorno anualizado usa os aportes, resgates,
+rendas e valor final em suas datas e só aparece quando há histórico completo e
+uma solução financeira válida. Com histórico parcial, a base do retorno total
+é o custo acumulado e o resultado permanece identificado como estimado.
+
+A carteira principal lista somente posições ativas. Arquivadas permanecem
+acessíveis em uma visão separada e não compõem os totais. Cada grupo informa a
+participação de sua família — renda fixa, renda variável, previdência ou
+alternativos — no valor da carteira da mesma moeda.
 
 ## Patrimônio líquido
 

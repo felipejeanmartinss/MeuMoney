@@ -12,6 +12,7 @@ import {
   INVESTMENT_FAMILY_LABELS,
   INVESTMENT_CLASS_LABELS,
   INVESTMENT_TYPE_LABELS,
+  type InvestmentPerformance,
 } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
 import { NET_WORTH_ITEM_TYPE_LABELS } from "@/domain/net-worth";
@@ -19,7 +20,7 @@ import { listCurrentUserFinancingContracts } from "@/services/finance/financing-
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
 import { listCurrentUserNetWorth } from "@/services/finance/net-worth-service";
 import type {
-  InvestmentPositionSummary,
+  InvestmentPositionPerformanceSummary,
   FinancingContractSummary,
   NetWorthItem,
   SupportedCurrency,
@@ -52,12 +53,29 @@ function percentage(part: number, total: number) {
       })}%`;
 }
 
+function formatBasisPoints(value: number | null) {
+  return value === null
+    ? "—"
+    : `${new Intl.NumberFormat("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value / 100)}%`;
+}
+
 function PositionsView({
   positions,
+  portfolioPerformance,
+  showArchived,
 }: {
-  positions: InvestmentPositionSummary[];
+  positions: InvestmentPositionPerformanceSummary[];
+  portfolioPerformance: ({ currency: SupportedCurrency } &
+    InvestmentPerformance)[];
+  showArchived: boolean;
 }) {
   const active = positions.filter((position) => position.is_active);
+  const visible = positions.filter(
+    (position) => position.is_active !== showArchived,
+  );
   const totals = new Map<SupportedCurrency, number>();
   for (const position of active) {
     totals.set(
@@ -70,10 +88,10 @@ function PositionsView({
     {
       currency: SupportedCurrency;
       family: ReturnType<typeof getInvestmentFamily>;
-      rows: InvestmentPositionSummary[];
+      rows: InvestmentPositionPerformanceSummary[];
     }
   >();
-  for (const position of positions) {
+  for (const position of visible) {
     const family = getInvestmentFamily(position.investment_class);
     const key = `${position.currency}-${family}`;
     const group = groups.get(key) ?? {
@@ -85,78 +103,147 @@ function PositionsView({
     groups.set(key, group);
   }
 
-  if (positions.length === 0) {
+  if (visible.length === 0) {
     return (
-      <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+      <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
         <h2 className="text-xl font-extrabold text-slate-950">
-          Nenhum investimento cadastrado
+          {showArchived
+            ? "Nenhuma posição arquivada"
+            : "Nenhum investimento cadastrado"}
         </h2>
-        <p className="mx-auto mt-2 max-w-lg text-slate-600">
-          Cadastre sua primeira posição manual sem depender de cotações
-          automáticas.
-        </p>
-        <Link
-          href="/investments/new"
-          className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white"
-        >
-          Cadastrar posição
-        </Link>
+        {!showArchived ? (
+          <Link
+            href="/investments/new"
+            className="mt-5 inline-flex min-h-10 items-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white"
+          >
+            Cadastrar posição
+          </Link>
+        ) : null}
       </section>
     );
   }
 
   return (
-    <div className="grid gap-6">
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {[...totals.entries()].map(([currency, currentValue]) => {
-          const currencyPositions = active.filter(
-            (position) => position.currency === currency,
-          );
-          const accumulatedCost = currencyPositions.reduce(
-            (total, position) =>
-              total + position.accumulated_cost_minor,
-            0,
-          );
-          return (
-            <article
-              key={currency}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-            >
-              <p className="text-sm font-extrabold text-emerald-700">
-                Carteira {currency}
-              </p>
-              <p className="mt-2 text-2xl font-black text-slate-950">
-                {formatMoney(
-                  currentValue,
-                  currency,
-                  CURRENCY_LOCALES[currency],
-                )}
-              </p>
-              <p className="mt-2 text-sm text-slate-500">
-                Custo acumulado{" "}
-                {formatMoney(
-                  accumulatedCost,
-                  currency,
-                  CURRENCY_LOCALES[currency],
-                )}
-              </p>
-            </article>
-          );
-        })}
-      </section>
+    <div className="grid gap-4">
+      {!showArchived ? (
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[...totals.entries()].map(([currency, currentValue]) => {
+            const currencyPositions = active.filter(
+              (position) => position.currency === currency,
+            );
+            const accumulatedCost = currencyPositions.reduce(
+              (total, position) =>
+                total + position.accumulated_cost_minor,
+              0,
+            );
+            const performance = portfolioPerformance.find(
+              (item) => item.currency === currency,
+            );
+            return (
+              <article
+                key={currency}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-emerald-700">
+                      Carteira {currency}
+                    </p>
+                    <p className="mt-1 text-xl font-black text-slate-950">
+                      {formatMoney(
+                        currentValue,
+                        currency,
+                        CURRENCY_LOCALES[currency],
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs text-slate-500">
+                    <p>Custo acumulado</p>
+                    <p className="mt-0.5 font-bold text-slate-800">
+                      {formatMoney(
+                        accumulatedCost,
+                        currency,
+                        CURRENCY_LOCALES[currency],
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-slate-100 pt-3 text-xs">
+                  <div>
+                    <dt className="text-slate-500">Resultado</dt>
+                    <dd
+                      className={`mt-0.5 font-extrabold ${
+                        (performance?.resultMinor ?? 0) < 0
+                          ? "text-rose-700"
+                          : "text-emerald-700"
+                      }`}
+                    >
+                      {performance
+                        ? formatMoney(
+                            performance.resultMinor,
+                            currency,
+                            CURRENCY_LOCALES[currency],
+                          )
+                        : "—"}
+                      {performance?.resultIsEstimated ? (
+                        <abbr
+                          title="Resultado estimado pelo valor atual menos o custo acumulado"
+                          className="ml-0.5 no-underline"
+                        >
+                          *
+                        </abbr>
+                      ) : null}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Retorno total</dt>
+                    <dd className="mt-0.5 font-extrabold text-slate-900">
+                      {formatBasisPoints(
+                        performance?.totalReturnBasisPoints ?? null,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Anualizado</dt>
+                    <dd className="mt-0.5 font-extrabold text-slate-900">
+                      {formatBasisPoints(
+                        performance?.annualizedReturnBasisPoints ?? null,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
 
       {[...groups.values()].map((group) => (
         <section
           key={`${group.currency}-${group.family}`}
-          className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm"
+          className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="border-b border-slate-200 px-5 py-4">
-            <p className="text-xs font-extrabold uppercase tracking-[0.15em] text-emerald-700">
-              {group.currency}
+          <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-4 py-3">
+            <div>
+              <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
+                {group.currency}
+              </p>
+              <h2 className="mt-0.5 font-black text-slate-950">
+                {INVESTMENT_FAMILY_LABELS[group.family]}
+              </h2>
+            </div>
+            <p className="text-xs font-bold text-slate-600">
+              {showArchived
+                ? "Arquivadas"
+                : `${percentage(
+                    group.rows.reduce(
+                      (total, position) =>
+                        total + position.current_value_minor,
+                      0,
+                    ),
+                    totals.get(group.currency) ?? 0,
+                  )} da carteira`}
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950">
-              {INVESTMENT_FAMILY_LABELS[group.family]}
-            </h2>
           </div>
           <div className="grid divide-y divide-slate-100">
             {group.rows.map((position) => {
@@ -165,7 +252,7 @@ function PositionsView({
               return (
                 <article
                   key={position.id}
-                  className={`grid gap-4 p-5 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(7rem,auto))_auto] lg:items-center ${
+                  className={`grid gap-3 px-4 py-3 md:grid-cols-2 xl:grid-cols-[minmax(15rem,1.45fr)_repeat(6,minmax(5.8rem,auto))_auto] xl:items-center ${
                     archived ? "opacity-60" : ""
                   }`}
                 >
@@ -173,10 +260,10 @@ function PositionsView({
                     <h3 className="truncate font-extrabold text-slate-950">
                       {position.asset_name}
                     </h3>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {position.institution} · {CONTEXT_LABELS[position.context]}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-0.5 text-[0.7rem] text-slate-500">
                       {INVESTMENT_TYPE_LABELS[position.investment_type]} ·{" "}
                       {INVESTMENT_CLASS_LABELS[position.investment_class]} ·{" "}
                       {formatInvestmentQuantity(position.quantity)} unidades ·{" "}
@@ -185,7 +272,7 @@ function PositionsView({
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-500">Valor atual</p>
-                    <p className="mt-1 font-extrabold text-slate-950">
+                    <p className="mt-0.5 text-sm font-extrabold text-slate-950">
                       {formatMoney(
                         position.current_value_minor,
                         position.currency,
@@ -195,7 +282,7 @@ function PositionsView({
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-500">Custo</p>
-                    <p className="mt-1 font-bold text-slate-800">
+                    <p className="mt-0.5 text-sm font-bold text-slate-800">
                       {formatMoney(
                         position.accumulated_cost_minor,
                         position.currency,
@@ -206,26 +293,50 @@ function PositionsView({
                   <div>
                     <p className="text-xs font-bold text-slate-500">Resultado</p>
                     <p
-                      className={`mt-1 font-bold ${
-                        (position.total_result_minor ?? 0) < 0
+                      className={`mt-0.5 text-sm font-bold ${
+                        position.performance_result_minor < 0
                           ? "text-rose-700"
                           : "text-emerald-700"
                       }`}
                     >
-                      {position.total_result_minor === null
-                        ? "Histórico insuficiente"
-                        : formatMoney(
-                            position.total_result_minor,
-                            position.currency,
-                            CURRENCY_LOCALES[position.currency],
-                          )}
+                      {formatMoney(
+                        position.performance_result_minor,
+                        position.currency,
+                        CURRENCY_LOCALES[position.currency],
+                      )}
+                      {position.performance_result_is_estimated ? (
+                        <abbr
+                          title="Resultado estimado pelo valor atual menos o custo acumulado"
+                          className="ml-0.5 no-underline"
+                        >
+                          *
+                        </abbr>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500">
+                      Retorno total
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                      {formatBasisPoints(position.total_return_basis_points)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500">
+                      Anualizado
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                      {formatBasisPoints(
+                        position.annualized_return_basis_points,
+                      )}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-500">
                       Participação
                     </p>
-                    <p className="mt-1 font-bold text-slate-800">
+                    <p className="mt-0.5 text-sm font-bold text-slate-800">
                       {archived
                         ? "Arquivada"
                         : percentage(position.current_value_minor, total)}
@@ -454,7 +565,7 @@ function FinancingsView({
 export default async function InvestmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ message?: string; tab?: string }>;
+  searchParams: Promise<{ message?: string; tab?: string; view?: string }>;
 }) {
   const [investmentResult, netWorthResult, financingResult, params] = await Promise.all([
     listCurrentUserInvestmentPositions(),
@@ -463,6 +574,10 @@ export default async function InvestmentsPage({
     searchParams,
   ]);
   const activeTab = params.tab === "financing" ? "financing" : "positions";
+  const showArchived = activeTab === "positions" && params.view === "archived";
+  const archivedCount = investmentResult.positions.filter(
+    (position) => !position.is_active,
+  ).length;
   const feedback = params.message ? messages[params.message] : undefined;
   const hasError =
     investmentResult.hasError ||
@@ -470,8 +585,8 @@ export default async function InvestmentsPage({
     financingResult.hasError;
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Carteira e compromissos
@@ -479,23 +594,32 @@ export default async function InvestmentsPage({
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             Investimentos
           </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Posições e passivos de longo prazo apresentados por moeda, sem
-            rentabilidade ou conversão cambial inventada.
+          <p className="mt-1 text-sm text-slate-600">
+            Posições por moeda e classe de ativo.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {activeTab === "positions" ? (
             <Link
+              href={showArchived ? "/investments" : "/investments?view=archived"}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              {showArchived
+                ? "Ver posições ativas"
+                : `Arquivadas (${archivedCount})`}
+            </Link>
+          ) : null}
+          {activeTab === "positions" ? (
+            <Link
               href="/investments/movements"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800 hover:bg-slate-50"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
             >
               Vincular movimentações
             </Link>
           ) : null}
           <Link
             href={activeTab === "positions" ? "/investments/new" : "/investments/financing-imports/new"}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
           >
             {activeTab === "positions"
               ? "Posição sem movimentação"
@@ -506,12 +630,12 @@ export default async function InvestmentsPage({
 
       <nav
         aria-label="Seções de investimentos"
-        className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
+        className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
       >
         <Link
           href="/investments"
           aria-current={activeTab === "positions" ? "page" : undefined}
-          className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold ${
+          className={`min-h-9 rounded-lg px-4 py-2 text-sm font-extrabold ${
             activeTab === "positions"
               ? "bg-emerald-700 text-white"
               : "text-slate-600 hover:bg-slate-100"
@@ -522,7 +646,7 @@ export default async function InvestmentsPage({
         <Link
           href="/investments?tab=financing"
           aria-current={activeTab === "financing" ? "page" : undefined}
-          className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold ${
+          className={`min-h-9 rounded-lg px-4 py-2 text-sm font-extrabold ${
             activeTab === "financing"
               ? "bg-emerald-700 text-white"
               : "text-slate-600 hover:bg-slate-100"
@@ -554,7 +678,11 @@ export default async function InvestmentsPage({
       ) : null}
 
       {activeTab === "positions" ? (
-        <PositionsView positions={investmentResult.positions} />
+        <PositionsView
+          positions={investmentResult.positions}
+          portfolioPerformance={investmentResult.portfolioPerformance}
+          showArchived={showArchived}
+        />
       ) : (
         <FinancingsView
           items={netWorthResult.items}

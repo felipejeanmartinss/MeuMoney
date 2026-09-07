@@ -1,10 +1,18 @@
 import "server-only";
+import {
+  calculateInvestmentPerformance,
+  summarizeInvestmentPerformance,
+  type InvestmentPerformanceCashFlow,
+  type InvestmentPerformancePosition,
+} from "@/domain/investments";
+import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   FinancialContext,
   InvestmentAccountEventType,
   InvestmentCashFlowType,
   InvestmentClass,
+  InvestmentPositionPerformanceSummary,
   InvestmentType,
   InvestmentTransferCandidate,
   SupportedCurrency,
@@ -70,17 +78,132 @@ const positionColumns =
 
 export async function listCurrentUserInvestmentPositions() {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase
-    .from("investment_position_summary")
-    .select(
-      `${positionColumns}, contributions_minor, redemptions_minor, income_minor, unrealized_appreciation_minor, total_result_minor`,
-    )
-    .eq("user_id", user.id)
-    .order("is_active", { ascending: false })
-    .order("currency", { ascending: true })
-    .order("asset_name", { ascending: true });
+  const cashFlowsPromise = (async () => {
+    const rows: {
+      position_id: string;
+      user_id: string;
+      cash_flow_type: InvestmentCashFlowType;
+      amount_minor: number;
+      cash_flow_date: string;
+    }[] = [];
+    const pageSize = 1_000;
+    for (let start = 0; ; start += pageSize) {
+      const page = await supabase
+        .from("investment_cash_flows")
+        .select(
+          "position_id, user_id, cash_flow_type, amount_minor, cash_flow_date",
+        )
+        .eq("user_id", user.id)
+        .order("cash_flow_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(start, start + pageSize - 1);
+      if (page.error) return { data: rows, error: page.error };
+      rows.push(...(page.data ?? []));
+      if ((page.data?.length ?? 0) < pageSize) {
+        return { data: rows, error: null };
+      }
+    }
+  })();
+  const [positionsResult, cashFlowsResult] = await Promise.all([
+    supabase
+      .from("investment_position_summary")
+      .select(
+        `${positionColumns}, contributions_minor, redemptions_minor, income_minor, unrealized_appreciation_minor, total_result_minor`,
+      )
+      .eq("user_id", user.id)
+      .order("is_active", { ascending: false })
+      .order("currency", { ascending: true })
+      .order("asset_name", { ascending: true }),
+    cashFlowsPromise,
+  ]);
 
-  return { positions: data ?? [], hasError: Boolean(error) };
+  const cashFlows: InvestmentPerformanceCashFlow[] = (
+    cashFlowsResult.data ?? []
+  ).map((cashFlow) => ({
+    positionId: cashFlow.position_id,
+    userId: cashFlow.user_id,
+    type: cashFlow.cash_flow_type,
+    amountMinor: coerceMinorUnits(cashFlow.amount_minor),
+    cashFlowDate: cashFlow.cash_flow_date,
+  }));
+  const performanceInputs = new Map<string, InvestmentPerformancePosition>();
+  const cashFlowsByPosition = new Map<
+    string,
+    InvestmentPerformanceCashFlow[]
+  >();
+  for (const cashFlow of cashFlows) {
+    const rows = cashFlowsByPosition.get(cashFlow.positionId) ?? [];
+    rows.push(cashFlow);
+    cashFlowsByPosition.set(cashFlow.positionId, rows);
+  }
+  const positions: InvestmentPositionPerformanceSummary[] = (
+    positionsResult.data ?? []
+  ).map((position) => {
+    const normalized = {
+      ...position,
+      accumulated_cost_minor: coerceMinorUnits(
+        position.accumulated_cost_minor,
+      ),
+      current_value_minor: coerceMinorUnits(position.current_value_minor),
+      contributions_minor: coerceMinorUnits(position.contributions_minor),
+      redemptions_minor: coerceMinorUnits(position.redemptions_minor),
+      income_minor: coerceMinorUnits(position.income_minor),
+      unrealized_appreciation_minor: coerceMinorUnits(
+        position.unrealized_appreciation_minor,
+      ),
+      total_result_minor:
+        position.total_result_minor === null
+          ? null
+          : coerceMinorUnits(position.total_result_minor),
+    };
+    const performanceInput: InvestmentPerformancePosition = {
+      id: normalized.id,
+      userId: normalized.user_id,
+      currency: normalized.currency,
+      accumulatedCostMinor: normalized.accumulated_cost_minor,
+      currentValueMinor: normalized.current_value_minor,
+      historyIsComplete: normalized.history_is_complete,
+      isActive: normalized.is_active,
+      positionDate: normalized.position_date,
+    };
+    performanceInputs.set(normalized.id, performanceInput);
+    const performance = calculateInvestmentPerformance(
+      performanceInput,
+      cashFlowsByPosition.get(normalized.id) ?? [],
+    );
+    return {
+      ...normalized,
+      performance_result_minor: performance.resultMinor,
+      performance_result_is_estimated: performance.resultIsEstimated,
+      realized_gain_loss_minor: performance.realizedGainLossMinor,
+      performance_return_basis_minor: performance.returnBasisMinor,
+      total_return_basis_points: performance.totalReturnBasisPoints,
+      annualized_return_basis_points:
+        performance.annualizedReturnBasisPoints,
+    };
+  });
+  const portfolioPerformance = [...new Set(positions.map((row) => row.currency))]
+    .map((currency) => {
+      const currencyPositions = positions.filter(
+        (position) => position.is_active && position.currency === currency,
+      );
+      const inputs = currencyPositions.flatMap((position) => {
+        const input = performanceInputs.get(position.id);
+        return input ? [input] : [];
+      });
+      return {
+        currency,
+        ...summarizeInvestmentPerformance(inputs, cashFlows),
+      };
+    });
+
+  return {
+    positions,
+    cashFlows,
+    performanceInputs,
+    portfolioPerformance,
+    hasError: Boolean(positionsResult.error || cashFlowsResult.error),
+  };
 }
 
 export async function listCurrentUserInvestmentTransferCandidates() {

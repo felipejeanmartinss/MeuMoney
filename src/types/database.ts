@@ -557,6 +557,16 @@ export type InvestmentPositionSummary = InvestmentPosition & {
   total_result_minor: number | null;
 };
 
+export type InvestmentPositionPerformanceSummary =
+  InvestmentPositionSummary & {
+    performance_result_minor: number;
+    performance_result_is_estimated: boolean;
+    realized_gain_loss_minor: number | null;
+    performance_return_basis_minor: number;
+    total_return_basis_points: number | null;
+    annualized_return_basis_points: number | null;
+  };
+
 export type FinancingImportJob = {
   id: string;
   user_id: string;

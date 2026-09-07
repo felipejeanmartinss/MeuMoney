@@ -6,6 +6,7 @@ import {
   fillIncomeExpenseReportYear,
   type CategoryMonthlyReportEntry,
 } from "@/domain/financial-reports";
+import { summarizeInvestmentPerformance } from "@/domain/investments";
 import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
@@ -14,7 +15,7 @@ import type {
   FinancialContext,
   FinancialReportBasis,
   FinancialReportCategoryMonthly,
-  InvestmentPositionSummary,
+  InvestmentPositionPerformanceSummary,
   SupportedCurrency,
 } from "@/types/database";
 
@@ -199,29 +200,30 @@ export async function getCurrentUserAssetPerformanceReport(input: {
   state: "active" | "all";
 }) {
   const result = await listCurrentUserInvestmentPositions();
-  const positions = (result.positions as InvestmentPositionSummary[])
-    .filter(
-      (position) =>
-        position.currency === input.currency &&
-        (input.context === "all" || position.context === input.context) &&
-        (input.state === "all" || position.is_active),
-    )
-    .map((position) => ({
-      ...position,
-      accumulated_cost_minor: coerceMinorUnits(
-        position.accumulated_cost_minor,
+  const positions = result.positions.filter(
+    (position) =>
+      position.currency === input.currency &&
+      (input.context === "all" || position.context === input.context) &&
+      (input.state === "all" || position.is_active),
+  ) as InvestmentPositionPerformanceSummary[];
+  const positionIds = new Set(positions.map((position) => position.id));
+  const performanceByClass = [
+    ...new Set(positions.map((position) => position.investment_class)),
+  ].map((investmentClass) => {
+    const inputs = positions.flatMap((position) => {
+      if (position.investment_class !== investmentClass) return [];
+      const performanceInput = result.performanceInputs.get(position.id);
+      return performanceInput ? [performanceInput] : [];
+    });
+    return {
+      investmentClass,
+      ...summarizeInvestmentPerformance(
+        inputs,
+        result.cashFlows.filter((cashFlow) =>
+          positionIds.has(cashFlow.positionId),
+        ),
       ),
-      current_value_minor: coerceMinorUnits(position.current_value_minor),
-      contributions_minor: coerceMinorUnits(position.contributions_minor),
-      redemptions_minor: coerceMinorUnits(position.redemptions_minor),
-      income_minor: coerceMinorUnits(position.income_minor),
-      unrealized_appreciation_minor: coerceMinorUnits(
-        position.unrealized_appreciation_minor,
-      ),
-      total_result_minor:
-        position.total_result_minor === null
-          ? null
-          : coerceMinorUnits(position.total_result_minor),
-    }));
-  return { positions, hasError: result.hasError };
+    };
+  });
+  return { positions, performanceByClass, hasError: result.hasError };
 }
