@@ -493,6 +493,10 @@ export const investmentCashFlowIdSchema = z.uuid(
   "Movimentação de investimento inválida.",
 );
 
+export const investmentPositionSnapshotIdSchema = z.uuid(
+  "Atualização da posição inválida.",
+);
+
 export type InvestmentPositionMoneyEffect = {
   valueDeltaMinor: number;
   costDeltaMinor: number;

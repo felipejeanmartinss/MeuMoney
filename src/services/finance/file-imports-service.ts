@@ -229,7 +229,7 @@ export async function listCurrentUserImportJobs() {
   const { data, error } = await supabase
     .from("import_jobs")
     .select(
-      "id, user_id, account_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
+      "id, user_id, account_id, credit_card_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
@@ -243,7 +243,7 @@ export async function getCurrentUserImportReview(jobId: string, page = 1) {
   const jobResult = await supabase
     .from("import_jobs")
     .select(
-      "id, user_id, account_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
+      "id, user_id, account_id, credit_card_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
     )
     .eq("user_id", user.id)
     .eq("id", jobId)
@@ -447,6 +447,55 @@ export async function configureCurrentUserImport(
         message: mutationErrorMessage(
           error,
           "Não foi possível associar a conta.",
+        ),
+      }
+    : { ok: true as const };
+}
+
+export async function configureCurrentUserCreditCardPurchaseImport(
+  jobId: string,
+  creditCardId: string,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "configure_credit_card_purchase_import_job",
+    {
+      target_job_id: jobId,
+      target_credit_card_id: creditCardId,
+    },
+  );
+  return error || !data
+    ? {
+        ok: false as const,
+        message: mutationErrorMessage(
+          error,
+          "Não foi possível associar o cartão.",
+        ),
+      }
+    : { ok: true as const };
+}
+
+export async function updateCurrentUserImportCreditCardPurchaseRow(
+  rowId: string,
+  input: ImportRowMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "update_import_credit_card_purchase_row",
+    {
+      target_row_id: rowId,
+      target_transaction_date: input.transactionDate,
+      target_description: input.description,
+      target_signed_amount_minor: input.signedAmountMinor,
+      target_category_id: input.categoryId,
+    },
+  );
+  return error || !data
+    ? {
+        ok: false as const,
+        message: mutationErrorMessage(
+          error,
+          "Não foi possível corrigir esta compra.",
         ),
       }
     : { ok: true as const };

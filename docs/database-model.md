@@ -141,7 +141,7 @@ e privilégios mínimos. As views usam `security_invoker`.
 
 ## Importações de arquivo
 
-`public.import_jobs` guarda proprietário, conta associada, nome saneado, formato,
+`public.import_jobs` guarda proprietário, uma conta ou cartão associado, nome saneado, formato,
 impressão SHA-256 do arquivo, configuração do CSV, estado, contadores e
 timestamps de descarte, confirmação ou cancelamento. Não contém os bytes do
 arquivo. Para PDF, `source_adapter_id` e `source_document_type` identificam o
@@ -167,6 +167,13 @@ ativo, pertencer ao usuário e usar a moeda da conta associada ao arquivo. Uma
 assinatura específica combina usuário, conta de origem, cartão, data e valor;
 a confirmação chama `private.create_credit_card_transfer` dentro da mesma
 transação que confirma as demais linhas.
+
+Quando `import_jobs.credit_card_id` é preenchido, `account_id` permanece nulo e
+o job representa compras. A restrição `import_jobs_single_target_check` impede
+dois destinos simultâneos. A avaliação força natureza Despesa, usa o valor
+absoluto e procura duplicidades em `credit_card_purchases`. A confirmação chama
+`private.create_credit_card_purchase` para cada linha com uma parcela, de modo
+que faturas e saldos continuem derivados da estrutura canônica do cartão.
 
 `public.imported_transaction_signatures` vincula uma assinatura estável ao
 lançamento ou transferência criada. A chave única `(user_id, signature)`

@@ -415,6 +415,34 @@ export async function deleteCurrentUserInvestmentCashFlow(id: string) {
     : { ok: true as const, positionId: data };
 }
 
+export async function deleteCurrentUserInvestmentPositionSnapshot(id: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc(
+    "delete_investment_position_snapshot",
+    { target_snapshot_id: id },
+  );
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("investment_initial_snapshot_cannot_be_deleted")) {
+    return {
+      ok: false as const,
+      message: "A posição inicial não pode ser excluída.",
+    };
+  }
+  if (message.includes("investment_snapshot_has_later_cash_flows")) {
+    return {
+      ok: false as const,
+      message:
+        "Exclua primeiro os aportes, resgates ou rendas posteriores a esta atualização.",
+    };
+  }
+  return error || !data
+    ? {
+        ok: false as const,
+        message: "Não foi possível excluir a atualização da posição.",
+      }
+    : { ok: true as const, positionId: data };
+}
+
 export async function deleteCurrentUserInvestmentPosition(id: string) {
   const { supabase } = await requireUser();
   const { data, error } = await supabase.rpc("delete_investment_position", {

@@ -696,6 +696,7 @@ export type ImportJob = {
   id: string;
   user_id: string;
   account_id: string | null;
+  credit_card_id: string | null;
   file_name: string;
   file_type: ImportFileType;
   file_sha256: string;
@@ -1279,6 +1280,10 @@ export type Database = {
         Args: { target_cash_flow_id: string };
         Returns: string;
       };
+      delete_investment_position_snapshot: {
+        Args: { target_snapshot_id: string };
+        Returns: string;
+      };
       delete_investment_position: {
         Args: { target_position_id: string };
         Returns: boolean;
@@ -1491,6 +1496,13 @@ export type Database = {
         };
         Returns: boolean;
       };
+      configure_credit_card_purchase_import_job: {
+        Args: {
+          target_job_id: string;
+          target_credit_card_id: string;
+        };
+        Returns: boolean;
+      };
       update_import_staging_row: {
         Args: {
           target_row_id: string;
@@ -1518,6 +1530,16 @@ export type Database = {
           target_description: string;
           target_signed_amount_minor: number;
           target_credit_card_id: string;
+        };
+        Returns: boolean;
+      };
+      update_import_credit_card_purchase_row: {
+        Args: {
+          target_row_id: string;
+          target_transaction_date: string;
+          target_description: string;
+          target_signed_amount_minor: number;
+          target_category_id: string;
         };
         Returns: boolean;
       };

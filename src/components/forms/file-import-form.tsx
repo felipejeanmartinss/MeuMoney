@@ -12,14 +12,22 @@ const initialState: FileImportFormState = { status: "idle" };
 
 export function FileImportForm({
   accounts = [],
+  creditCards = [],
   defaultAccountId,
+  defaultCreditCardId,
 }: {
   accounts?: Array<{
     id: string;
     name: string;
     currency: SupportedCurrency;
   }>;
+  creditCards?: Array<{
+    id: string;
+    cardName: string;
+    currency: SupportedCurrency;
+  }>;
   defaultAccountId?: string;
+  defaultCreditCardId?: string;
 }) {
   const [fileType, setFileType] = useState<
     "csv" | "ofx" | "qif" | "pdf"
@@ -34,25 +42,48 @@ export function FileImportForm({
     <form action={formAction} className="grid gap-6">
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
-      {accounts.length > 0 ? (
+      {accounts.length > 0 || creditCards.length > 0 ? (
         <Field
-          label="Conta de destino"
-          error={state.fieldErrors?.accountId?.[0]}
+          label="Destino da importação"
+          error={state.fieldErrors?.target?.[0]}
         >
           <select
-            className={inputClass(Boolean(state.fieldErrors?.accountId))}
-            name="accountId"
-            defaultValue={defaultAccountId ?? ""}
+            className={inputClass(Boolean(state.fieldErrors?.target))}
+            name="target"
+            defaultValue={
+              defaultCreditCardId
+                ? `credit-card:${defaultCreditCardId}`
+                : defaultAccountId
+                  ? `account:${defaultAccountId}`
+                  : ""
+            }
           >
             <option value="">Selecionar durante a revisão</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} · {account.currency}
-              </option>
-            ))}
+            {accounts.length ? (
+              <optgroup label="Contas bancárias">
+                {accounts.map((account) => (
+                  <option key={account.id} value={`account:${account.id}`}>
+                    {account.name} · {account.currency}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {creditCards.length ? (
+              <optgroup label="Compras de cartão de crédito">
+                {creditCards.map((card) => (
+                  <option
+                    key={card.id}
+                    value={`credit-card:${card.id}`}
+                  >
+                    {card.cardName} · {card.currency}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
           <span className="text-xs font-normal text-slate-500">
-            A associação pode ser alterada na revisão antes da confirmação.
+            Ao selecionar um cartão, cada linha será revisada como uma compra
+            de uma parcela e entrará na fatura correspondente à data.
           </span>
         </Field>
       ) : null}

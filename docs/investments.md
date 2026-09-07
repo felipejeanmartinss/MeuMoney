@@ -30,6 +30,11 @@ Cada fluxo guarda os deltas exatos aplicados à posição. Ao excluí-lo, esses
 deltas são revertidos na mesma transação. Um resgate integral zera valor, custo
 e, quando a quantidade não foi informada, toda a quantidade remanescente.
 
+Atualizações manuais da posição também podem ser excluídas. A fotografia
+inicial é preservada; ao remover a atualização mais recente, quantidade, custo,
+valor e data retornam atomicamente à fotografia anterior. A reversão é
+bloqueada quando existem fluxos posteriores que dependem daquele estado.
+
 O lançamento por conta oferece o modo Investimento. Aplicações geram saída na
 conta e aporte na posição; liquidações geram entrada e resgate; JCP, dividendos,
 bonificações em dinheiro e outros rendimentos geram entrada e renda detalhada.
@@ -69,7 +74,9 @@ própria tela.
 A carteira principal lista somente posições ativas. Arquivadas permanecem
 acessíveis em uma visão separada e não compõem os totais. Cada grupo informa a
 participação de sua família — renda fixa, renda variável, previdência ou
-alternativos — no valor da carteira da mesma moeda.
+alternativos — e também de cada tipo de produto, como Tesouro Direto, ações ou
+fundos, no valor da carteira da mesma moeda. O resumo lateral repete essa
+composição para comparação rápida, e a listagem omite a data da última posição.
 
 ## Patrimônio líquido
 

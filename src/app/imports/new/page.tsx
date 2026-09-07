@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { FileImportForm } from "@/components/forms/file-import-form";
 import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
+import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
 
 export const metadata = { title: "Nova importação" };
 
 export default async function NewImportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ accountId?: string }>;
+  searchParams: Promise<{ accountId?: string; creditCardId?: string }>;
 }) {
-  const [{ accountId }, { accounts }] = await Promise.all([
+  const [{ accountId, creditCardId }, { accounts }, cardResult] = await Promise.all([
     searchParams,
     listCurrentUserAccounts(),
+    listCurrentUserTransferCreditCardDestinations(),
   ]);
   const activeAccounts = accounts
     .filter((account) => !account.archived_at)
@@ -24,6 +26,11 @@ export default async function NewImportPage({
     (account) => account.id === accountId,
   )
     ? accountId
+    : undefined;
+  const selectedCreditCardId = cardResult.destinations.some(
+    (card) => card.id === creditCardId,
+  )
+    ? creditCardId
     : undefined;
 
   return (
@@ -50,7 +57,9 @@ export default async function NewImportPage({
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <FileImportForm
           accounts={activeAccounts}
+          creditCards={cardResult.destinations}
           defaultAccountId={selectedAccountId}
+          defaultCreditCardId={selectedCreditCardId}
         />
       </section>
     </main>

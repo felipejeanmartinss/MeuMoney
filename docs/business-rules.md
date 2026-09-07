@@ -58,6 +58,7 @@
 - Transferências previstas ou inativas não afetam o saldo realizado.
 - Lançamentos manuais podem ser excluídos definitivamente pelo proprietário com uma confirmação simples na própria listagem. Movimentos de investimento são removidos pela operação própria, que também reverte a posição. Lançamentos técnicos de fatura e contas a pagar continuam protegidos; transferências sem vínculo de investimento podem ser excluídas definitivamente.
 - Novos lançamentos, transferências e movimentos de investimento podem ser registrados dentro do extrato da conta, reutilizando os mesmos campos, validações e serviços das rotas dedicadas.
+- Um novo lançamento pode encaminhar seus dados validados ao cadastro de Contas a Pagar. O lançamento é criado primeiro; a próxima ocorrência sugerida é mensal e posterior ao lançamento, enquanto frequência, término e data continuam sujeitos à confirmação explícita na etapa seguinte.
 - O saldo atual é o saldo inicial, mais receitas realizadas ativas, menos despesas realizadas ativas, mais transferências recebidas realizadas ativas e menos transferências enviadas realizadas ativas, sempre com data anterior ao dia corrente no fuso de São Paulo.
 - O saldo projetado parte do saldo atual e incorpora todos os lançamentos e transferências ativos com data de hoje ou futura, inclusive os previstos. Itens previstos vencidos continuam fora dos dois saldos até serem realizados ou remarcados.
 - O extrato pertence à conta e combina receitas, despesas e o lado correspondente de cada transferência em ordem cronológica. O saldo linha a linha usa o realizado até ontem e passa a representar a projeção a partir de hoje; uma divisória visual separa os dois períodos.
@@ -76,6 +77,7 @@
 - A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
 - Cartões e compras não são excluídos fisicamente pela interface.
+- Arquivos financeiros podem ser associados a um cartão ativo. Nesse modo, cada linha confirmada é uma compra de uma parcela, usa valor absoluto, exige categoria de Despesa e entra na fatura calculada pela data. Créditos, estornos e pagamentos não são inferidos como compras.
 
 ## Recorrências — feature/recurring-transactions
 
@@ -144,6 +146,8 @@
 - O resultado total só é calculado quando o usuário declara que todos os fluxos desde o início foram registrados.
 - Nenhuma taxa de rentabilidade, anualização ou valorização é inventada quando o histórico não sustenta o cálculo.
 - O patrimônio soma o valor atual das posições ativas como ativos, sempre por usuário e moeda.
+- A composição da carteira é calculada por moeda, família e tipo de investimento; posições arquivadas ficam fora de todos os percentuais.
+- A fotografia inicial não pode ser excluída. Excluir a fotografia mais recente restaura a posição anterior, exceto quando fluxos posteriores tornariam a reversão inconsistente.
 
 ## Importação CSV e OFX — Sprint 10
 

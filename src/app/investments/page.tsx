@@ -21,6 +21,7 @@ import { listCurrentUserNetWorth } from "@/services/finance/net-worth-service";
 import type {
   InvestmentPositionPerformanceSummary,
   FinancingContractSummary,
+  InvestmentType,
   NetWorthItem,
   SupportedCurrency,
 } from "@/types/database";
@@ -59,6 +60,53 @@ function formatBasisPoints(value: number | null) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(value / 100)}%`;
+}
+
+type InvestmentFamily = ReturnType<typeof getInvestmentFamily>;
+
+function currentValueOf(
+  positions: readonly InvestmentPositionPerformanceSummary[],
+) {
+  return positions.reduce(
+    (total, position) => total + position.current_value_minor,
+    0,
+  );
+}
+
+function groupPositionsByType(
+  positions: readonly InvestmentPositionPerformanceSummary[],
+) {
+  const groups = new Map<
+    InvestmentType,
+    InvestmentPositionPerformanceSummary[]
+  >();
+  for (const position of positions) {
+    const rows = groups.get(position.investment_type) ?? [];
+    rows.push(position);
+    groups.set(position.investment_type, rows);
+  }
+  return [...groups.entries()].sort(([left], [right]) =>
+    INVESTMENT_TYPE_LABELS[left].localeCompare(
+      INVESTMENT_TYPE_LABELS[right],
+      "pt-BR",
+    ),
+  );
+}
+
+function groupPositionsByFamily(
+  positions: readonly InvestmentPositionPerformanceSummary[],
+) {
+  const groups = new Map<
+    InvestmentFamily,
+    InvestmentPositionPerformanceSummary[]
+  >();
+  for (const position of positions) {
+    const family = getInvestmentFamily(position.investment_class);
+    const rows = groups.get(family) ?? [];
+    rows.push(position);
+    groups.set(family, rows);
+  }
+  return [...groups.entries()];
 }
 
 function PositionsView({
@@ -125,7 +173,7 @@ function PositionsView({
   return (
     <div className="grid gap-4">
       {!showArchived ? (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-3">
           {[...totals.entries()].map(([currency, currentValue]) => {
             const currencyPositions = active.filter(
               (position) => position.currency === currency,
@@ -138,9 +186,13 @@ function PositionsView({
             const performance = portfolioPerformance.find(
               (item) => item.currency === currency,
             );
+            const familyBreakdown = groupPositionsByFamily(currencyPositions);
             return (
-              <article
+              <div
                 key={currency}
+                className="grid gap-3 xl:grid-cols-[minmax(24rem,0.9fr)_minmax(0,1.6fr)]"
+              >
+              <article
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-4">
@@ -220,12 +272,55 @@ function PositionsView({
                   </div>
                 </dl>
               </article>
+              <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-black text-slate-950">
+                    Composição da carteira
+                  </h2>
+                  <span className="text-[0.68rem] font-extrabold uppercase tracking-wide text-emerald-700">
+                    {currency}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2">
+                  {familyBreakdown.map(([family, familyPositions]) => (
+                    <div key={family} className="min-w-0">
+                      <div className="flex items-center justify-between gap-2 text-xs font-extrabold text-slate-900">
+                        <span>{INVESTMENT_FAMILY_LABELS[family]}</span>
+                        <span>
+                          {percentage(
+                            currentValueOf(familyPositions),
+                            currentValue,
+                          )}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.68rem] text-slate-500">
+                        {groupPositionsByType(familyPositions).map(
+                          ([investmentType, typePositions]) => (
+                            <span key={investmentType}>
+                              {INVESTMENT_TYPE_LABELS[investmentType]}{" "}
+                              <strong className="text-slate-700">
+                                {percentage(
+                                  currentValueOf(typePositions),
+                                  currentValue,
+                                )}
+                              </strong>
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+              </div>
             );
           })}
         </section>
       ) : null}
 
-      {[...groups.values()].map((group) => (
+      {[...groups.values()].map((group) => {
+        const typeGroups = groupPositionsByType(group.rows);
+        return (
         <section
           key={`${group.currency}-${group.family}`}
           className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
@@ -243,17 +338,27 @@ function PositionsView({
               {showArchived
                 ? "Arquivadas"
                 : `${percentage(
-                    group.rows.reduce(
-                      (total, position) =>
-                        total + position.current_value_minor,
-                      0,
-                    ),
+                    currentValueOf(group.rows),
                     totals.get(group.currency) ?? 0,
                   )} da carteira`}
             </p>
           </div>
-          <div className="grid divide-y divide-slate-100">
-            {group.rows.map((position) => {
+          <div className="grid">
+            {typeGroups.map(([investmentType, typePositions]) => (
+              <div key={investmentType}>
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[0.7rem] font-extrabold text-slate-700">
+                  <span>{INVESTMENT_TYPE_LABELS[investmentType]}</span>
+                  <span>
+                    {showArchived
+                      ? `${typePositions.length} posição(ões)`
+                      : `${percentage(
+                          currentValueOf(typePositions),
+                          totals.get(group.currency) ?? 0,
+                        )} da carteira`}
+                  </span>
+                </div>
+                <div className="grid divide-y divide-slate-100">
+            {typePositions.map((position) => {
               const total = totals.get(position.currency) ?? 0;
               const archived = !position.is_active;
               return (
@@ -269,9 +374,7 @@ function PositionsView({
                     </h3>
                     <p className="min-w-0 truncate text-[0.68rem] text-slate-500">
                       {position.institution} · {CONTEXT_LABELS[position.context]} ·{" "}
-                      {INVESTMENT_TYPE_LABELS[position.investment_type]} ·{" "}
-                      {formatInvestmentQuantity(position.quantity)} un. ·{" "}
-                      {formatDate(position.position_date)}
+                      {formatInvestmentQuantity(position.quantity)} un.
                     </p>
                   </div>
                   <div>
@@ -398,9 +501,13 @@ function PositionsView({
                 </article>
               );
             })}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
-      ))}
+        );
+      })}
     </div>
   );
 }

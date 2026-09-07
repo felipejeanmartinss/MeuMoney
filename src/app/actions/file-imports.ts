@@ -9,6 +9,7 @@ import {
   importJobIdSchema,
   importRowCorrectionSchema,
   importRowIdSchema,
+  importTargetSchema,
   importTransferRowCorrectionSchema,
   qifCategoryMappingSchema,
   qifTransferAccountMappingSchema,
@@ -17,12 +18,14 @@ import {
   cancelCurrentUserImport,
   clearCurrentUserCancelledImports,
   configureCurrentUserImport,
+  configureCurrentUserCreditCardPurchaseImport,
   confirmCurrentUserImport,
   createCurrentUserImport,
   mapCurrentUserQifCategory,
   mapCurrentUserQifTransferAccount,
   setCurrentUserImportRowIgnored,
   updateCurrentUserImportCreditCardTransferRow,
+  updateCurrentUserImportCreditCardPurchaseRow,
   updateCurrentUserImportRow,
   updateCurrentUserImportTransferRow,
 } from "@/services/finance/file-imports-service";
@@ -52,15 +55,15 @@ export async function uploadFinancialFile(
   _previousState: FileImportFormState,
   formData: FormData,
 ): Promise<FileImportFormState> {
-  const rawAccountId = formData.get("accountId");
-  const accountId =
-    typeof rawAccountId === "string" && rawAccountId
-      ? importJobIdSchema.safeParse(rawAccountId)
+  const rawTarget = formData.get("target");
+  const target =
+    typeof rawTarget === "string" && rawTarget
+      ? importTargetSchema.safeParse(rawTarget)
       : null;
-  if (accountId && !accountId.success) {
+  if (target && !target.success) {
     return {
       status: "error",
-      fieldErrors: { accountId: ["Selecione uma conta válida."] },
+      fieldErrors: { target: ["Selecione uma conta ou cartão válido."] },
     };
   }
 
@@ -97,16 +100,19 @@ export async function uploadFinancialFile(
     csvConfig: csvConfig?.success ? csvConfig.data : null,
   });
   if (!result.ok) return { status: "error", message: result.message };
-  if (accountId?.success) {
-    const configuration = await configureCurrentUserImport(
-      result.id,
-      accountId.data,
-    );
+  if (target?.success) {
+    const configuration =
+      target.data.kind === "credit-card"
+        ? await configureCurrentUserCreditCardPurchaseImport(
+            result.id,
+            target.data.id,
+          )
+        : await configureCurrentUserImport(result.id, target.data.id);
     if (!configuration.ok) {
       return {
         status: "error",
         message:
-          "O arquivo foi preparado, mas a conta não pôde ser associada. Abra o histórico de importações para continuar a revisão.",
+          "O arquivo foi preparado, mas o destino não pôde ser associado. Abra o histórico de importações para continuar a revisão.",
       };
     }
   }
@@ -115,17 +121,56 @@ export async function uploadFinancialFile(
 
 export async function configureFinancialImport(formData: FormData) {
   const jobId = importJobIdSchema.safeParse(formData.get("jobId"));
-  const accountId = importJobIdSchema.safeParse(formData.get("accountId"));
-  if (!jobId.success || !accountId.success) {
+  const target = importTargetSchema.safeParse(formData.get("target"));
+  if (!jobId.success || !target.success) {
     redirect("/imports?message=configuration-error");
   }
 
-  const result = await configureCurrentUserImport(jobId.data, accountId.data);
+  const result =
+    target.data.kind === "credit-card"
+      ? await configureCurrentUserCreditCardPurchaseImport(
+          jobId.data,
+          target.data.id,
+        )
+      : await configureCurrentUserImport(jobId.data, target.data.id);
   revalidatePath(`/imports/${jobId.data}`);
   redirect(
     `/imports/${jobId.data}?message=${
-      result.ok ? "account-updated" : "configuration-error"
+      result.ok ? "target-updated" : "configuration-error"
     }`,
+  );
+}
+
+export async function correctFinancialImportCreditCardPurchaseRow(
+  formData: FormData,
+) {
+  const parsed = importRowCorrectionSchema.safeParse({
+    rowId: formData.get("rowId"),
+    transactionDate: formData.get("transactionDate"),
+    description: formData.get("description"),
+    signedAmountMinor: formData.get("signedAmountMinor"),
+    categoryId: formData.get("categoryId"),
+  });
+  const jobId = importJobIdSchema.safeParse(formData.get("jobId"));
+  const page = Math.max(1, Number(formData.get("page")) || 1);
+  if (!parsed.success || !jobId.success) {
+    redirect(
+      `/imports/${jobId.success ? jobId.data : ""}?message=row-error&page=${page}`,
+    );
+  }
+
+  const result = await updateCurrentUserImportCreditCardPurchaseRow(
+    parsed.data.rowId,
+    {
+      transactionDate: parsed.data.transactionDate,
+      description: parsed.data.description,
+      signedAmountMinor: parsed.data.signedAmountMinor,
+      categoryId: parsed.data.categoryId,
+    },
+  );
+  revalidatePath(`/imports/${jobId.data}`);
+  redirect(
+    `/imports/${jobId.data}?message=${result.ok ? "row-updated" : "row-error"}&page=${page}`,
   );
 }
 
@@ -310,6 +355,7 @@ export async function confirmFinancialImport(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/accounts");
   revalidatePath("/dashboard");
+  revalidatePath("/credit-cards");
   redirect(
     `/imports/${jobId.data}?message=${
       result.ok ? "confirmed" : "confirmation-error"
