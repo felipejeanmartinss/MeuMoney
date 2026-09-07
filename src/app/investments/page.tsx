@@ -544,9 +544,9 @@ function PositionsView({
         return (
         <section
           key={`${group.currency}-${group.family}`}
-          className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
+          className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm lg:grid lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:gap-x-5"
         >
-          <div className="grid gap-y-2 border-b border-slate-200 px-3 py-2 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:items-end lg:gap-x-5">
+          <div className="grid gap-y-2 border-b border-slate-200 px-3 py-2 lg:col-span-full lg:grid-cols-subgrid lg:items-end">
             <div>
               <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
                 {group.currency}
@@ -565,10 +565,10 @@ function PositionsView({
             />
             <span className="hidden lg:block" aria-hidden="true" />
           </div>
-          <div className="grid">
+          <div className="grid lg:contents">
             {typeGroups.map(([investmentType, typePositions]) => (
-              <div key={investmentType}>
-                <div className="grid gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:items-center lg:gap-x-5">
+              <div key={investmentType} className="grid lg:contents">
+                <div className="grid gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:col-span-full lg:grid-cols-subgrid lg:items-center">
                   <span className="text-[0.7rem] font-extrabold text-slate-700">
                     {INVESTMENT_TYPE_LABELS[investmentType]}
                   </span>
@@ -586,14 +586,14 @@ function PositionsView({
                   />
                   <span className="hidden lg:block" aria-hidden="true" />
                 </div>
-                <div className="grid divide-y divide-slate-100">
+                <div className="grid divide-y divide-slate-100 lg:contents">
             {typePositions.map((position) => {
               const total = totals.get(position.currency) ?? 0;
               const archived = !position.is_active;
               return (
                 <article
                   key={position.id}
-                  className={`grid gap-y-2 px-3 py-1.5 md:grid-cols-2 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:items-center lg:gap-x-5 ${
+                  className={`grid gap-y-2 border-b border-slate-100 px-3 py-1.5 md:grid-cols-2 lg:col-span-full lg:grid-cols-subgrid lg:items-center ${
                     archived ? "opacity-60" : ""
                   }`}
                 >
