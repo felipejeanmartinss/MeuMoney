@@ -67,6 +67,7 @@ export const transferFormSchema = z
     sourceAccountId: z.uuid("Selecione a conta de origem."),
     destinationAccountId: z.uuid("Selecione a conta de destino."),
     amountMinor: positiveMoneyInput,
+    destinationAmountMinor: positiveMoneyInput.optional(),
     transactionDate: z
       .string()
       .refine(isValidIsoDate, "Informe uma data válida."),
@@ -90,7 +91,27 @@ export const transferFormSchema = z
       message: "Origem e destino devem ser diferentes.",
       path: ["destinationAccountId"],
     },
-  );
+  )
+  .transform((value) => ({
+    ...value,
+    destinationAmountMinor:
+      value.destinationAmountMinor ?? value.amountMinor,
+  }));
+
+export function calculateTransferExchangeRate(
+  sourceAmountMinor: number,
+  destinationAmountMinor: number,
+) {
+  if (
+    !Number.isSafeInteger(sourceAmountMinor) ||
+    !Number.isSafeInteger(destinationAmountMinor) ||
+    sourceAmountMinor <= 0 ||
+    destinationAmountMinor <= 0
+  ) {
+    return null;
+  }
+  return destinationAmountMinor / sourceAmountMinor;
+}
 
 export const creditCardTransferFormSchema = z.object({
   sourceAccountId: z.uuid("Selecione a conta de origem."),

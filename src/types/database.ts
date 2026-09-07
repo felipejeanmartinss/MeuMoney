@@ -297,6 +297,8 @@ export type Transfer = {
   destination_credit_card_id: string | null;
   amount_minor: number;
   currency: SupportedCurrency;
+  destination_amount_minor: number | null;
+  destination_currency: SupportedCurrency | null;
   transaction_date: string;
   status: TransactionStatus;
   description: string | null;
@@ -1330,6 +1332,19 @@ export type Database = {
         };
         Returns: string;
       };
+      create_account_transfer: {
+        Args: {
+          source_account_id: string;
+          destination_account_id: string;
+          source_amount_minor: number;
+          destination_amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: string;
+      };
       update_transfer: {
         Args: {
           target_transfer_id: string;
@@ -1493,6 +1508,20 @@ export type Database = {
         Args: {
           target_job_id: string;
           target_account_id: string;
+        };
+        Returns: boolean;
+      };
+      update_account_transfer: {
+        Args: {
+          target_transfer_id: string;
+          source_account_id: string;
+          destination_account_id: string;
+          source_amount_minor: number;
+          destination_amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
         };
         Returns: boolean;
       };

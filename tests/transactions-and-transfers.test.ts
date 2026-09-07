@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { transactionFormSchema } from "../src/domain/transactions";
 import {
   accountTransferDestinationValue,
+  calculateTransferExchangeRate,
   creditCardTransferDestinationValue,
   creditCardTransferFormSchema,
   parseTransferDestinationTarget,
@@ -86,6 +87,40 @@ describe("Sprint 3 financial movement validation", () => {
         destinationAccountId: accountA,
       }).success,
     ).toBe(false);
+  });
+
+  it("keeps exact source and destination amounts for currency conversions", () => {
+    const conversion = transferFormSchema.safeParse({
+      sourceAccountId: accountA,
+      destinationAccountId: accountB,
+      amountMinor: "1.000,00",
+      destinationAmountMinor: "166,75",
+      transactionDate: "2026-09-07",
+      status: "completed",
+      description: "Wise BRL para EUR",
+      notes: "",
+    });
+    const sameValue = transferFormSchema.safeParse({
+      sourceAccountId: accountA,
+      destinationAccountId: accountB,
+      amountMinor: "250,00",
+      transactionDate: "2026-09-07",
+      status: "completed",
+      description: "",
+      notes: "",
+    });
+
+    expect(conversion.success).toBe(true);
+    if (conversion.success) {
+      expect(conversion.data.amountMinor).toBe(100_000);
+      expect(conversion.data.destinationAmountMinor).toBe(16_675);
+    }
+    expect(sameValue.success).toBe(true);
+    if (sameValue.success) {
+      expect(sameValue.data.destinationAmountMinor).toBe(25_000);
+    }
+    expect(calculateTransferExchangeRate(100_000, 16_675)).toBe(0.16675);
+    expect(calculateTransferExchangeRate(0, 16_675)).toBeNull();
   });
 
   it("distinguishes account transfers from transfers to credit cards", () => {

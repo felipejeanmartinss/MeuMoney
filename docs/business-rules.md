@@ -30,7 +30,7 @@
 - Nesta sprint, novas contas podem ser dos tipos conta corrente, poupança, dinheiro ou outra conta. Cartões e investimentos permanecem fora do fluxo de cadastro.
 - O saldo inicial é obrigatório, pode ser positivo, zero ou negativo e possui data de referência obrigatória.
 - Dinheiro é persistido como inteiro em unidades menores; valores de ponto flutuante não são aceitos no domínio.
-- As moedas suportadas inicialmente são BRL, USD e EUR. A moeda preferencial do perfil apenas sugere o valor inicial de novas contas; ela não converte contas existentes.
+- As moedas suportadas inicialmente são BRL, USD e EUR. A moeda preferencial do perfil sugere o valor inicial de novas contas; conversões acontecem somente por transferência explícita entre duas contas.
 - Contas ativas não podem ser excluídas. Depois de inativada, uma conta pode ser excluída definitivamente mediante confirmação explícita; a operação remove seu histórico transacional, transferências, recorrências e importações vinculadas, e apenas desvincula cartões que a utilizavam como conta de pagamento.
 - Categorias separam natureza (Receita ou Despesa) e contexto (Pessoal ou Profissional).
 - Categorias iniciais são criadas automaticamente para cada usuário e partem de uma taxonomia inspirada na orientação AUVP adaptada aos contextos do MeuMoney.
@@ -52,8 +52,9 @@
 - Somente lançamentos ativos e realizados participam do saldo atual. Lançamentos previstos e inativos permanecem no histórico sem efeito financeiro.
 - Editar conta, tipo, valor, status ou atividade não exige ajustar um saldo persistido: o saldo é recalculado a partir dos registros vigentes.
 - Transferência não é receita nem despesa e não recebe categoria.
-- A origem deve ser uma conta ativa. O destino pode ser outra conta ativa ou um cartão de crédito ativo do mesmo usuário e da mesma moeda.
+- A origem deve ser uma conta ativa. O destino pode ser outra conta ativa do mesmo usuário, inclusive em moeda diferente, ou um cartão de crédito ativo do mesmo usuário e da mesma moeda.
 - Uma transferência entre contas possui duas movimentações vinculadas: saída na origem e entrada no destino. Uma transferência para cartão possui somente a saída vinculada à conta; o destino é registrado no próprio cartão.
+- Na conversão entre moedas, o usuário informa o valor exato debitado na origem e o valor exato creditado no destino. Ambos são persistidos em unidades menores inteiras; a taxa exibida é apenas a razão derivada entre esses valores e não é usada para recalcular saldos.
 - Criar, editar, inativar ou reativar uma transferência altera seus registros vinculados na mesma transação SQL. Uma falha reverte toda a operação.
 - Transferências previstas ou inativas não afetam o saldo realizado.
 - Lançamentos manuais podem ser excluídos definitivamente pelo proprietário com uma confirmação simples na própria listagem. Movimentos de investimento são removidos pela operação própria, que também reverte a posição. Lançamentos técnicos de fatura e contas a pagar continuam protegidos; transferências sem vínculo de investimento podem ser excluídas definitivamente.
@@ -146,7 +147,7 @@
 - O resultado total só é calculado quando o usuário declara que todos os fluxos desde o início foram registrados.
 - Nenhuma taxa de rentabilidade, anualização ou valorização é inventada quando o histórico não sustenta o cálculo.
 - O patrimônio soma o valor atual das posições ativas como ativos, sempre por usuário e moeda.
-- A composição da carteira é calculada por moeda, família e tipo de investimento; posições arquivadas ficam fora de todos os percentuais.
+- A composição da carteira é calculada por moeda, família e tipo de investimento; posições arquivadas ficam fora de todos os percentuais. Cada subtotal consolida valor atual, custo, resultado e taxas de retorno a partir do histórico conjunto das posições, sem somar percentuais individuais.
 - A fotografia inicial não pode ser excluída. Excluir a fotografia mais recente restaura a posição anterior, exceto quando fluxos posteriores tornariam a reversão inconsistente.
 
 ## Importação CSV e OFX — Sprint 10
@@ -200,7 +201,7 @@
 
 ## Regras financeiras futuras
 
-Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.
+Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, cotações automáticas e avaliações automáticas de mercado serão definidos em sprints posteriores.
 
 ## Central por conta, grupos de categorias e investimentos detalhados
 

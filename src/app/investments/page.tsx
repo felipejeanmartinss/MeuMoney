@@ -11,7 +11,10 @@ import {
   getInvestmentFamily,
   INVESTMENT_FAMILY_LABELS,
   INVESTMENT_TYPE_LABELS,
+  summarizeInvestmentPerformance,
   type InvestmentPerformance,
+  type InvestmentPerformanceCashFlow,
+  type InvestmentPerformancePosition,
 } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
 import { NET_WORTH_ITEM_TYPE_LABELS } from "@/domain/net-worth";
@@ -109,14 +112,114 @@ function groupPositionsByFamily(
   return [...groups.entries()];
 }
 
+function InvestmentSubtotalMetrics({
+  positions,
+  currency,
+  portfolioCurrentValueMinor,
+  cashFlows,
+  performanceInputs,
+  showArchived,
+}: {
+  positions: readonly InvestmentPositionPerformanceSummary[];
+  currency: SupportedCurrency;
+  portfolioCurrentValueMinor: number;
+  cashFlows: readonly InvestmentPerformanceCashFlow[];
+  performanceInputs: ReadonlyMap<string, InvestmentPerformancePosition>;
+  showArchived: boolean;
+}) {
+  const inputs = positions.flatMap((position) => {
+    const input = performanceInputs.get(position.id);
+    return input ? [input] : [];
+  });
+  const currentValueMinor = currentValueOf(positions);
+  const accumulatedCostMinor = positions.reduce(
+    (total, position) => total + position.accumulated_cost_minor,
+    0,
+  );
+  const performance = summarizeInvestmentPerformance(inputs, cashFlows);
+  const metrics = [
+    {
+      label: "Valor",
+      value: formatMoney(
+        currentValueMinor,
+        currency,
+        CURRENCY_LOCALES[currency],
+      ),
+      tone: "text-slate-950",
+    },
+    {
+      label: "Custo",
+      value: formatMoney(
+        accumulatedCostMinor,
+        currency,
+        CURRENCY_LOCALES[currency],
+      ),
+      tone: "text-slate-800",
+    },
+    {
+      label: "Resultado",
+      value: `${formatMoney(
+        performance.resultMinor,
+        currency,
+        CURRENCY_LOCALES[currency],
+      )}${performance.resultIsEstimated ? " *" : ""}`,
+      tone:
+        performance.resultMinor < 0
+          ? "text-rose-700"
+          : "text-emerald-700",
+    },
+    {
+      label: "Retorno total",
+      value: formatBasisPoints(performance.totalReturnBasisPoints),
+      tone: "text-slate-800",
+    },
+    {
+      label: "Mensal",
+      value: formatBasisPoints(performance.monthlyReturnBasisPoints),
+      tone: "text-slate-800",
+    },
+    {
+      label: "Anualizado",
+      value: formatBasisPoints(performance.annualizedReturnBasisPoints),
+      tone: "text-slate-800",
+    },
+    {
+      label: showArchived ? "Posições" : "Participação",
+      value: showArchived
+        ? String(positions.length)
+        : percentage(currentValueMinor, portfolioCurrentValueMinor),
+      tone: "text-slate-800",
+    },
+  ];
+
+  return (
+    <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[0.66rem] sm:grid-cols-4 lg:grid-cols-7">
+      {metrics.map((metric) => (
+        <div key={metric.label} className="min-w-0">
+          <dt className="whitespace-nowrap font-semibold text-slate-500">
+            {metric.label}
+          </dt>
+          <dd className={`truncate font-extrabold ${metric.tone}`}>
+            {metric.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function PositionsView({
   positions,
   portfolioPerformance,
+  cashFlows,
+  performanceInputs,
   showArchived,
 }: {
   positions: InvestmentPositionPerformanceSummary[];
   portfolioPerformance: ({ currency: SupportedCurrency } &
     InvestmentPerformance)[];
+  cashFlows: InvestmentPerformanceCashFlow[];
+  performanceInputs: Map<string, InvestmentPerformancePosition>;
   showArchived: boolean;
 }) {
   const active = positions.filter((position) => position.is_active);
@@ -325,7 +428,7 @@ function PositionsView({
           key={`${group.currency}-${group.family}`}
           className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-3 py-2.5">
+          <div className="grid gap-2 border-b border-slate-200 px-3 py-2.5 lg:grid-cols-[minmax(10rem,0.8fr)_minmax(38rem,2.2fr)] lg:items-end">
             <div>
               <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
                 {group.currency}
@@ -334,28 +437,32 @@ function PositionsView({
                 {INVESTMENT_FAMILY_LABELS[group.family]}
               </h2>
             </div>
-            <p className="text-xs font-bold text-slate-600">
-              {showArchived
-                ? "Arquivadas"
-                : `${percentage(
-                    currentValueOf(group.rows),
-                    totals.get(group.currency) ?? 0,
-                  )} da carteira`}
-            </p>
+            <InvestmentSubtotalMetrics
+              positions={group.rows}
+              currency={group.currency}
+              portfolioCurrentValueMinor={totals.get(group.currency) ?? 0}
+              cashFlows={cashFlows}
+              performanceInputs={performanceInputs}
+              showArchived={showArchived}
+            />
           </div>
           <div className="grid">
             {typeGroups.map(([investmentType, typePositions]) => (
               <div key={investmentType}>
-                <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[0.7rem] font-extrabold text-slate-700">
-                  <span>{INVESTMENT_TYPE_LABELS[investmentType]}</span>
-                  <span>
-                    {showArchived
-                      ? `${typePositions.length} posição(ões)`
-                      : `${percentage(
-                          currentValueOf(typePositions),
-                          totals.get(group.currency) ?? 0,
-                        )} da carteira`}
+                <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:grid-cols-[minmax(10rem,0.8fr)_minmax(38rem,2.2fr)] lg:items-center">
+                  <span className="text-[0.7rem] font-extrabold text-slate-700">
+                    {INVESTMENT_TYPE_LABELS[investmentType]}
                   </span>
+                  <InvestmentSubtotalMetrics
+                    positions={typePositions}
+                    currency={group.currency}
+                    portfolioCurrentValueMinor={
+                      totals.get(group.currency) ?? 0
+                    }
+                    cashFlows={cashFlows}
+                    performanceInputs={performanceInputs}
+                    showArchived={showArchived}
+                  />
                 </div>
                 <div className="grid divide-y divide-slate-100">
             {typePositions.map((position) => {
@@ -802,6 +909,8 @@ export default async function InvestmentsPage({
         <PositionsView
           positions={investmentResult.positions}
           portfolioPerformance={investmentResult.portfolioPerformance}
+          cashFlows={investmentResult.cashFlows}
+          performanceInputs={investmentResult.performanceInputs}
           showArchived={showArchived}
         />
       ) : (

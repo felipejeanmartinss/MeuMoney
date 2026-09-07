@@ -6,6 +6,7 @@ export type TransferMutationInput = {
   sourceAccountId: string;
   destinationAccountId: string;
   amountMinor: number;
+  destinationAmountMinor: number;
   transactionDate: string;
   status: TransactionStatus;
   description: string | null;
@@ -14,7 +15,7 @@ export type TransferMutationInput = {
 
 export type CreditCardTransferMutationInput = Omit<
   TransferMutationInput,
-  "destinationAccountId"
+  "destinationAccountId" | "destinationAmountMinor"
 > & {
   destinationCreditCardId: string;
 };
@@ -28,7 +29,7 @@ export type TransferFilters = {
 };
 
 const transferColumns =
-  "id, user_id, source_account_id, destination_account_id, destination_credit_card_id, amount_minor, currency, transaction_date, status, description, notes, is_active, created_at, updated_at";
+  "id, user_id, source_account_id, destination_account_id, destination_credit_card_id, amount_minor, currency, destination_amount_minor, destination_currency, transaction_date, status, description, notes, is_active, created_at, updated_at";
 
 function transferErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -36,7 +37,13 @@ function transferErrorMessage(error: { message?: string } | null) {
     return "Origem e destino devem ser diferentes.";
   }
   if (message.includes("transfer_currency_mismatch")) {
-    return "As contas precisam usar a mesma moeda.";
+    return "Informe o valor exato que será recebido na moeda de destino.";
+  }
+  if (message.includes("same_currency_transfer_amount_mismatch")) {
+    return "Entre contas da mesma moeda, os valores de saída e entrada devem ser iguais.";
+  }
+  if (message.includes("transfer_currency_conversion_amount_required")) {
+    return "Informe o valor convertido que entrará na conta de destino.";
   }
   if (message.includes("invalid_transfer_account")) {
     return "Uma das contas não está disponível.";
@@ -146,10 +153,11 @@ export async function getCurrentUserTransfer(id: string) {
 
 export async function createCurrentUserTransfer(input: TransferMutationInput) {
   const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("create_transfer", {
+  const { error } = await supabase.rpc("create_account_transfer", {
     source_account_id: input.sourceAccountId,
     destination_account_id: input.destinationAccountId,
-    amount_minor: input.amountMinor,
+    source_amount_minor: input.amountMinor,
+    destination_amount_minor: input.destinationAmountMinor,
     transaction_date: input.transactionDate,
     transfer_status: input.status,
     transfer_description: input.description,
@@ -166,11 +174,12 @@ export async function updateCurrentUserTransfer(
   input: TransferMutationInput,
 ) {
   const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("update_transfer", {
+  const { error } = await supabase.rpc("update_account_transfer", {
     target_transfer_id: id,
     source_account_id: input.sourceAccountId,
     destination_account_id: input.destinationAccountId,
-    amount_minor: input.amountMinor,
+    source_amount_minor: input.amountMinor,
+    destination_amount_minor: input.destinationAmountMinor,
     transaction_date: input.transactionDate,
     transfer_status: input.status,
     transfer_description: input.description,

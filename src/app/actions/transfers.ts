@@ -23,6 +23,8 @@ const transferInputFrom = (formData: FormData) => ({
   sourceAccountId: formData.get("sourceAccountId"),
   destinationAccountId: formData.get("destinationAccountId"),
   amountMinor: formData.get("amountMinor"),
+  destinationAmountMinor:
+    formData.get("destinationAmountMinor") ?? formData.get("amountMinor"),
   transactionDate: formData.get("transactionDate"),
   status: formData.get("status"),
   description: formData.get("description") ?? "",
