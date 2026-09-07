@@ -42,6 +42,12 @@ O saldo atual é derivado de todas as parcelas de compras ativas nos estados `pe
 
 ## Segurança e atomicidade
 
+Compras também podem ser importadas por CSV, OFX, QIF ou PDF usando o staging de
+importações. Cada linha confirmada vira uma compra de uma parcela e reutiliza a
+mesma função que gera a fatura e a parcela do cadastro manual. Categoria de
+Despesa, propriedade do cartão, atividade, valor, data e duplicidade são
+validados antes da confirmação atômica.
+
 Todas as tabelas usam RLS por `auth.uid() = user_id`. O cliente autenticado recebe escrita direta apenas nos cartões próprios. Compra, regeneração de parcelas, cancelamento, fechamento, pagamento e estorno usam RPCs `security definer` com `search_path` vazio e validações explícitas de propriedade.
 
 Para validar RLS em um Supabase local:

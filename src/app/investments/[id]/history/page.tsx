@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteInvestmentCashFlow } from "@/app/actions/investments";
+import {
+  deleteInvestmentCashFlow,
+  deleteInvestmentPositionSnapshot,
+} from "@/app/actions/investments";
 import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
@@ -23,6 +26,13 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   "flow-deleted": { text: "Movimento excluído e efeito na posição revertido." },
   "flow-delete-error": {
     text: "Não foi possível excluir este movimento.",
+    error: true,
+  },
+  "snapshot-deleted": {
+    text: "Atualização excluída. A posição atual foi recalculada quando necessário.",
+  },
+  "snapshot-delete-error": {
+    text: "Não foi possível excluir a atualização. Verifique se existem movimentos posteriores.",
     error: true,
   },
 };
@@ -236,11 +246,37 @@ export default async function InvestmentHistoryPage({
                     </dd>
                   </div>
                 </dl>
-                <span className="text-xs font-semibold text-slate-500">
-                  {index === historyResult.snapshots.length - 1
-                    ? "Posição inicial"
-                    : "Atualização"}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-500">
+                    {index === historyResult.snapshots.length - 1
+                      ? "Posição inicial"
+                      : "Atualização"}
+                  </span>
+                  {index !== historyResult.snapshots.length - 1 ? (
+                    <form action={deleteInvestmentPositionSnapshot}>
+                      <input
+                        type="hidden"
+                        name="snapshotId"
+                        value={snapshot.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="positionId"
+                        value={position.id}
+                      />
+                      <ConfirmSubmitButton
+                        confirmation={
+                          index === 0
+                            ? "Excluir esta atualização? A posição atual voltará aos valores da atualização anterior."
+                            : "Excluir esta atualização do histórico?"
+                        }
+                        className="rounded-lg px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Excluir
+                      </ConfirmSubmitButton>
+                    </form>
+                  ) : null}
+                </div>
               </div>
             </li>
           ))}

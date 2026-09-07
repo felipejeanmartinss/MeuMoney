@@ -8,6 +8,7 @@ import {
   investmentCashFlowFormSchema,
   investmentPositionFormSchema,
   investmentPositionIdSchema,
+  investmentPositionSnapshotIdSchema,
   investmentTransferLinkFormSchema,
 } from "@/domain/investments";
 import {
@@ -16,6 +17,7 @@ import {
   createCurrentUserInvestmentPosition,
   deleteCurrentUserInvestmentCashFlow,
   deleteCurrentUserInvestmentPosition,
+  deleteCurrentUserInvestmentPositionSnapshot,
   linkCurrentUserInvestmentTransferEntry,
   setCurrentUserInvestmentPositionArchived,
   updateCurrentUserInvestmentPosition,
@@ -177,6 +179,30 @@ export async function deleteInvestmentCashFlow(formData: FormData) {
   }
   redirect(
     `/investments/${result.ok ? result.positionId : String(formData.get("positionId") ?? "")}/history?message=${result.ok ? "flow-deleted" : "flow-delete-error"}`,
+  );
+}
+
+export async function deleteInvestmentPositionSnapshot(formData: FormData) {
+  const snapshotId = investmentPositionSnapshotIdSchema.safeParse(
+    formData.get("snapshotId"),
+  );
+  const positionId = investmentPositionIdSchema.safeParse(
+    formData.get("positionId"),
+  );
+  if (!snapshotId.success || !positionId.success) {
+    redirect("/investments?message=snapshot-delete-error");
+  }
+
+  const result = await deleteCurrentUserInvestmentPositionSnapshot(
+    snapshotId.data,
+  );
+  revalidatePath("/investments");
+  revalidatePath(`/investments/${positionId.data}/history`);
+  revalidatePath("/net-worth");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  redirect(
+    `/investments/${positionId.data}/history?message=${result.ok ? "snapshot-deleted" : "snapshot-delete-error"}`,
   );
 }
 

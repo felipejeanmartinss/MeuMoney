@@ -59,12 +59,20 @@ export default async function CreditCardPage({
               Ver faturas
             </Link>
             {card.is_active ? (
-              <Link
-                href={`/credit-cards/${card.id}/purchases/new`}
-                className="inline-flex min-h-11 items-center rounded-xl bg-blue-700 px-4 font-semibold text-white"
-              >
-                Nova compra
-              </Link>
+              <>
+                <Link
+                  href={`/imports/new?creditCardId=${card.id}`}
+                  className="inline-flex min-h-11 items-center rounded-xl border border-blue-700 px-4 font-semibold text-blue-700"
+                >
+                  Importar compras
+                </Link>
+                <Link
+                  href={`/credit-cards/${card.id}/purchases/new`}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-blue-700 px-4 font-semibold text-white"
+                >
+                  Nova compra
+                </Link>
+              </>
             ) : null}
           </div>
         </div>

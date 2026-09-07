@@ -30,6 +30,11 @@ Cada fluxo guarda os deltas exatos aplicados à posição. Ao excluí-lo, esses
 deltas são revertidos na mesma transação. Um resgate integral zera valor, custo
 e, quando a quantidade não foi informada, toda a quantidade remanescente.
 
+Atualizações manuais da posição também podem ser excluídas. A fotografia
+inicial é preservada; ao remover a atualização mais recente, quantidade, custo,
+valor e data retornam atomicamente à fotografia anterior. A reversão é
+bloqueada quando existem fluxos posteriores que dependem daquele estado.
+
 O lançamento por conta oferece o modo Investimento. Aplicações geram saída na
 conta e aporte na posição; liquidações geram entrada e resgate; JCP, dividendos,
 bonificações em dinheiro e outros rendimentos geram entrada e renda detalhada.
@@ -40,7 +45,8 @@ torna custo e valor da fotografia inicial, sem valorização presumida.
 
 O cadastro direto de posição continua disponível para patrimônio anterior ao
 histórico transacional. Nessa situação, o usuário pode marcar o histórico como
-incompleto e nenhuma rentabilidade total é inferida.
+incompleto; resultado e retorno total são estimados pela diferença entre valor
+atual e custo acumulado, sem estimar retornos mensal ou anualizado.
 
 Transferências já realizadas em contas do tipo Investimento aparecem em uma
 fila de vínculo. Uma entrada pode originar uma aplicação de mesmo valor; uma
@@ -53,10 +59,30 @@ transferência aceita um único vínculo e fica financeiramente imutável enquan
 esse vínculo existir.
 
 A diferença sobre o custo é `valor atual - custo acumulado`. Aportes, resgates e
-rendas são somados separadamente. O resultado total
-`valor atual + resgates + rendas - aportes` só é exibido quando o usuário
-declara que o histórico contém todos os fluxos desde o início. Não é calculada
-taxa de rentabilidade ou retorno anualizado.
+rendas são somados separadamente. Quando o usuário declara que o histórico
+contém todos os fluxos desde o início, o resultado total é
+`valor atual + resgates + rendas - aportes`; o lucro ou perda realizado compara
+os resgates com o custo baixado da posição. O retorno total divide o resultado
+pela base de aportes completa. O retorno anualizado usa os aportes, resgates,
+rendas e valor final em suas datas e só aparece quando há histórico completo e
+uma solução financeira válida. O retorno mensal é a taxa efetiva mensal
+equivalente ao retorno anualizado, permitindo comparar investimentos em uma
+referência comum. Com histórico parcial, a base do retorno total é o custo
+acumulado e o resultado permanece identificado por um asterisco, explicado na
+própria tela.
+
+A tela de posições mostra o retorno total e o retorno do último mês-calendário
+concluído. Esse retorno mensal compara a última fotografia anterior ao início
+do mês com a última fotografia registrada dentro dele, ajustando aportes,
+resgates e rendas do período; sem as duas referências, a taxa fica vazia. Os
+subtotais consolidam resultados e bases financeiras, sem somar percentuais.
+
+A carteira principal lista somente posições ativas. Arquivadas permanecem
+acessíveis em uma visão separada e não compõem os totais. Cada grupo informa a
+participação de sua família — renda fixa, renda variável, previdência ou
+alternativos — e também de cada tipo de produto, como Tesouro Direto, ações ou
+fundos, no valor da carteira da mesma moeda. O resumo lateral repete essa
+composição para comparação rápida, e a listagem omite a data da última posição.
 
 ## Patrimônio líquido
 

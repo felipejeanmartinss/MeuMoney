@@ -167,8 +167,8 @@ function NavLink({
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={`group flex min-h-11 items-center gap-3 rounded-xl font-semibold transition ${
-        compact ? "px-3 text-sm" : "px-3.5 text-[0.94rem]"
+      className={`group flex min-h-10 items-center gap-2.5 rounded-xl font-semibold transition ${
+        compact ? "px-2.5 text-xs" : "px-3 text-sm"
       } ${
         active
           ? "bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-100"
@@ -176,13 +176,13 @@ function NavLink({
       }`}
     >
       <span
-        className={`grid size-8 shrink-0 place-items-center rounded-lg ${
+        className={`grid size-7 shrink-0 place-items-center rounded-lg ${
           active
             ? "bg-emerald-700 text-white"
             : "bg-slate-100 text-slate-500 group-hover:text-slate-800"
         }`}
       >
-        <NavigationGlyph name={item.icon} className="size-[1.1rem]" />
+        <NavigationGlyph name={item.icon} className="size-4" />
       </span>
       <span className="truncate">{item.label}</span>
     </Link>
@@ -207,8 +207,8 @@ export function DesktopNavigation() {
   )?.label;
 
   return (
-    <div className="grid content-start gap-6">
-      <nav aria-label="Navegação principal" className="grid gap-1.5">
+    <div className="grid content-start gap-4">
+      <nav aria-label="Navegação principal" className="grid gap-1">
         {MAIN_NAVIGATION.map((item) => (
           <NavLink
             key={item.href}
@@ -220,7 +220,7 @@ export function DesktopNavigation() {
       </nav>
       {secondary.length ? (
         <nav aria-label={`Opções de ${sectionLabel}`} className="grid gap-1">
-          <p className="mb-2 px-3 text-[0.68rem] font-extrabold uppercase tracking-[0.18em] text-slate-400">
+          <p className="mb-1 px-2.5 text-[0.64rem] font-extrabold uppercase tracking-[0.16em] text-slate-400">
             {sectionLabel}
           </p>
           {secondary.map((item) => (

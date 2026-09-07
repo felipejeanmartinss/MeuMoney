@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
 import { accountRegisterReconciliationSchema } from "@/domain/account-register";
 import { accountIdSchema } from "@/domain/accounts";
+import { nextRecurrenceDate } from "@/domain/recurring-transactions";
 import {
   transactionFormSchema,
   transactionIdSchema,
@@ -50,6 +51,23 @@ export async function createTransaction(
   const result = await createCurrentUserTransaction(parsed.data);
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
+  if (formData.get("createRecurring") === "true") {
+    const query = new URLSearchParams({
+      accountId: parsed.data.accountId,
+      categoryId: parsed.data.categoryId,
+      transactionType: parsed.data.transactionType,
+      description: parsed.data.description,
+      amountMinor: String(parsed.data.amountMinor),
+      startDate: parsed.data.transactionDate,
+      nextOccurrence: nextRecurrenceDate({
+        startDate: parsed.data.transactionDate,
+        currentOccurrence: parsed.data.transactionDate,
+        frequency: "monthly",
+      }),
+    });
+    if (parsed.data.notes) query.set("notes", parsed.data.notes);
+    redirect(`/recurring-transactions/new?${query.toString()}`);
+  }
   if (formData.get("returnAccountId") === parsed.data.accountId) {
     revalidatePath(`/accounts/${parsed.data.accountId}`);
     redirect(

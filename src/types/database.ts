@@ -297,6 +297,8 @@ export type Transfer = {
   destination_credit_card_id: string | null;
   amount_minor: number;
   currency: SupportedCurrency;
+  destination_amount_minor: number | null;
+  destination_currency: SupportedCurrency | null;
   transaction_date: string;
   status: TransactionStatus;
   description: string | null;
@@ -557,6 +559,20 @@ export type InvestmentPositionSummary = InvestmentPosition & {
   total_result_minor: number | null;
 };
 
+export type InvestmentPositionPerformanceSummary =
+  InvestmentPositionSummary & {
+    performance_result_minor: number;
+    performance_result_is_estimated: boolean;
+    realized_gain_loss_minor: number | null;
+    performance_return_basis_minor: number;
+    total_return_basis_points: number | null;
+    monthly_return_basis_points: number | null;
+    annualized_return_basis_points: number | null;
+    previous_month_result_minor: number | null;
+    previous_month_return_basis_minor: number | null;
+    previous_month_return_basis_points: number | null;
+  };
+
 export type FinancingImportJob = {
   id: string;
   user_id: string;
@@ -685,6 +701,7 @@ export type ImportJob = {
   id: string;
   user_id: string;
   account_id: string | null;
+  credit_card_id: string | null;
   file_name: string;
   file_type: ImportFileType;
   file_sha256: string;
@@ -1268,6 +1285,10 @@ export type Database = {
         Args: { target_cash_flow_id: string };
         Returns: string;
       };
+      delete_investment_position_snapshot: {
+        Args: { target_snapshot_id: string };
+        Returns: string;
+      };
       delete_investment_position: {
         Args: { target_position_id: string };
         Returns: boolean;
@@ -1307,6 +1328,19 @@ export type Database = {
           source_account_id: string;
           destination_account_id: string;
           amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: string;
+      };
+      create_account_transfer: {
+        Args: {
+          source_account_id: string;
+          destination_account_id: string;
+          source_amount_minor: number;
+          destination_amount_minor: number;
           transaction_date: string;
           transfer_status: TransactionStatus;
           transfer_description?: string | null;
@@ -1480,6 +1514,27 @@ export type Database = {
         };
         Returns: boolean;
       };
+      update_account_transfer: {
+        Args: {
+          target_transfer_id: string;
+          source_account_id: string;
+          destination_account_id: string;
+          source_amount_minor: number;
+          destination_amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description?: string | null;
+          transfer_notes?: string | null;
+        };
+        Returns: boolean;
+      };
+      configure_credit_card_purchase_import_job: {
+        Args: {
+          target_job_id: string;
+          target_credit_card_id: string;
+        };
+        Returns: boolean;
+      };
       update_import_staging_row: {
         Args: {
           target_row_id: string;
@@ -1507,6 +1562,16 @@ export type Database = {
           target_description: string;
           target_signed_amount_minor: number;
           target_credit_card_id: string;
+        };
+        Returns: boolean;
+      };
+      update_import_credit_card_purchase_row: {
+        Args: {
+          target_row_id: string;
+          target_transaction_date: string;
+          target_description: string;
+          target_signed_amount_minor: number;
+          target_category_id: string;
         };
         Returns: boolean;
       };

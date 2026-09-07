@@ -123,7 +123,7 @@ export async function getCurrentUserAccountHub(id: string) {
     supabase
       .from("transfers")
       .select(
-        "id, user_id, source_account_id, destination_account_id, destination_credit_card_id, amount_minor, currency, transaction_date, status, description, notes, is_active, created_at, updated_at",
+        "id, user_id, source_account_id, destination_account_id, destination_credit_card_id, amount_minor, currency, destination_amount_minor, destination_currency, transaction_date, status, description, notes, is_active, created_at, updated_at",
       )
       .eq("user_id", user.id)
       .or(`source_account_id.eq.${id},destination_account_id.eq.${id}`),

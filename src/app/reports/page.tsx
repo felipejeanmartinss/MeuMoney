@@ -511,7 +511,7 @@ async function AssetPerformanceReport({
     <>
       <ReportHeading
         title="Performance de ativos"
-        description="Posição atual e fluxos informados. O retorno só aparece quando o histórico foi declarado completo."
+        description="Valor, resultado e retorno das posições por classe de ativo."
       />
       <form
         method="get"
@@ -533,16 +533,18 @@ async function AssetPerformanceReport({
         </label>
         <ApplyFiltersButton />
       </form>
-      <p className="border-t border-amber-100 bg-amber-50 px-4 py-2.5 text-xs leading-5 text-amber-950">
-        Rentabilidade anualizada não é estimada. Sem histórico completo, o
-        relatório mostra custo e valor, mas mantém resultado e retorno em
-        branco.
-      </p>
       {result.hasError ? <ReportError /> : null}
       <AssetPerformanceMatrix
         positions={result.positions}
+        performanceByClass={result.performanceByClass}
         currency={filters.currency}
       />
+      <p className="border-t border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-950">
+        * Histórico parcial: resultado e retorno total usam valor atual menos
+        custo acumulado. Os retornos mensal e anualizado aparecem somente com
+        histórico completo; o mensal é a taxa efetiva equivalente à anual,
+        calculada pelos fluxos datados.
+      </p>
     </>
   );
 }

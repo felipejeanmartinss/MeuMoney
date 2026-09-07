@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import {
+  correctFinancialImportCreditCardPurchaseRow,
   correctFinancialImportClassification,
   toggleFinancialImportRow,
 } from "@/app/actions/file-imports";
@@ -60,6 +61,7 @@ export function ImportStagingRowForm({
   accounts,
   creditCards,
   page,
+  isCreditCardPurchaseImport = false,
 }: {
   jobId: string;
   row: ImportStagingRow;
@@ -78,6 +80,7 @@ export function ImportStagingRowForm({
   accounts: Pick<Account, "id" | "name" | "type" | "currency">[];
   creditCards: CategorySelectionCreditCard[];
   page: number;
+  isCreditCardPurchaseImport?: boolean;
 }) {
   const initialAmount =
     row.signed_amount_minor === null
@@ -94,7 +97,9 @@ export function ImportStagingRowForm({
     ),
   ];
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  const transactionType = expectedType(amount);
+  const transactionType = isCreditCardPurchaseImport
+    ? "expense"
+    : expectedType(amount);
   const presentation = statusPresentation[row.status];
   const editable = !["imported"].includes(row.status);
   const isTransfer = row.record_kind === "transfer";
@@ -104,7 +109,9 @@ export function ImportStagingRowForm({
       : isTransfer && row.transfer_account_id
       ? `transfer:${row.transfer_account_id}`
       : row.category_id
-        ? `category:${row.category_id}`
+        ? isCreditCardPurchaseImport
+          ? row.category_id
+          : `category:${row.category_id}`
         : "",
   );
   const handleCategoryCreated = useCallback(
@@ -113,13 +120,23 @@ export function ImportStagingRowForm({
         ...current.filter((item) => item.id !== category.id),
         category,
       ]);
-      setClassification(`category:${category.id}`);
+      setClassification(
+        isCreditCardPurchaseImport
+          ? category.id
+          : `category:${category.id}`,
+      );
       setQuickCreateOpen(false);
     },
-    [setClassification, setCreatedCategories, setQuickCreateOpen],
+    [
+      isCreditCardPurchaseImport,
+      setClassification,
+      setCreatedCategories,
+      setQuickCreateOpen,
+    ],
   );
   function changeAmount(nextAmount: string) {
     setAmount(nextAmount);
+    if (isCreditCardPurchaseImport) return;
     if (
       classification.startsWith("credit-card:") &&
       expectedType(nextAmount) === "income"
@@ -195,7 +212,9 @@ export function ImportStagingRowForm({
 
       {row.status === "duplicate" ? (
         <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-sm text-violet-900">
-          {isTransfer
+          {isCreditCardPurchaseImport
+            ? "Uma compra com o mesmo cartão, data, valor e descrição já existe."
+            : isTransfer
             ? "Uma transferência com as mesmas contas, data e valor já existe."
             : "Uma movimentação com a mesma conta, data, valor e descrição já existe. Edite a linha se ela realmente for diferente."}
         </p>
@@ -210,7 +229,11 @@ export function ImportStagingRowForm({
 
       {editable && row.status !== "ignored" ? (
         <form
-          action={correctFinancialImportClassification}
+          action={
+            isCreditCardPurchaseImport
+              ? correctFinancialImportCreditCardPurchaseRow
+              : correctFinancialImportClassification
+          }
           className="mt-4 grid gap-4 lg:grid-cols-12"
         >
           <input type="hidden" name="jobId" value={jobId} />
@@ -237,7 +260,7 @@ export function ImportStagingRowForm({
             />
           </label>
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
-            Valor com sinal
+            {isCreditCardPurchaseImport ? "Valor da compra" : "Valor com sinal"}
             <input
               className={inputClass()}
               name="signedAmountMinor"
@@ -249,16 +272,20 @@ export function ImportStagingRowForm({
             />
           </label>
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-3">
-            Categoria ou transferência
+            {isCreditCardPurchaseImport ? "Categoria" : "Categoria ou transferência"}
             <CategoryCombobox
-              name="classification"
+              name={
+                isCreditCardPurchaseImport ? "categoryId" : "classification"
+              }
               categories={categoryOptions}
               transactionType={transactionType}
               value={classification}
               onValueChange={setClassification}
-              transferAccounts={accounts}
+              transferAccounts={isCreditCardPurchaseImport ? [] : accounts}
               transferCreditCards={
-                transactionType === "expense" ? creditCards : []
+                !isCreditCardPurchaseImport && transactionType === "expense"
+                  ? creditCards
+                  : []
               }
               sourceAccountId={row.account_id}
               prefixCategoryValue
@@ -276,11 +303,13 @@ export function ImportStagingRowForm({
               Salvar
             </button>
           </div>
-          <p className="text-xs text-slate-500 lg:col-span-12">
-            Transferências entre contas e pagamentos para cartões ficam fora
-            das receitas e despesas. No cartão, o valor reduz o saldo da conta
-            de origem e abate o saldo do cartão sem duplicar o consumo.
-          </p>
+          {!isCreditCardPurchaseImport ? (
+            <p className="text-xs text-slate-500 lg:col-span-12">
+              Transferências entre contas e pagamentos para cartões ficam fora
+              das receitas e despesas. No cartão, o valor reduz o saldo da conta
+              de origem e abate o saldo do cartão sem duplicar o consumo.
+            </p>
+          ) : null}
         </form>
       ) : (
         <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">

@@ -7,15 +7,13 @@ export const metadata = { title: "Nova transferência" };
 export default async function NewTransferPage() {
   const { accounts, creditCards, hasError } = await getTransferFormOptions();
   const today = new Date().toISOString().slice(0, 10);
-  const hasCompatiblePair = accounts.some(
-    (source, index) =>
-      accounts
-        .slice(index + 1)
-        .some((destination) => destination.currency === source.currency) ||
+  const hasCompatiblePair =
+    accounts.length >= 2 ||
+    accounts.some((source) =>
       creditCards.some(
         (destination) => destination.currency === source.currency,
       ),
-  );
+    );
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -45,9 +43,9 @@ export default async function NewTransferPage() {
 
       {!hasError && !hasCompatiblePair ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
-          <h2 className="font-bold">Não há um destino compatível</h2>
+          <h2 className="font-bold">Não há um destino disponível</h2>
           <p className="mt-2 text-sm leading-6">
-            Cadastre ou reative outra conta ou cartão da mesma moeda.
+            Cadastre ou reative outra conta, ou um cartão da mesma moeda.
           </p>
           <Link
             href="/accounts/new"
