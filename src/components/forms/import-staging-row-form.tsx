@@ -288,7 +288,7 @@ export function ImportStagingRowForm({
                   : []
               }
               sourceAccountId={row.account_id}
-              prefixCategoryValue
+              prefixCategoryValue={!isCreditCardPurchaseImport}
             />
             <button
               type="button"

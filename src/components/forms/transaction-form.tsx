@@ -302,19 +302,19 @@ export function TransactionForm({
         />
       </Field>
 
-        {!values.id ? (
-          <label
-            className={`flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 ${compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm"} font-semibold text-slate-700`}
-          >
-            <input
-              type="checkbox"
-              name="createRecurring"
-              value="true"
-              className="size-4 accent-emerald-700"
-            />
-            Tornar recorrente em Contas a Pagar
-          </label>
-        ) : null}
+        <label
+          className={`flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 ${compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm"} font-semibold text-slate-700`}
+        >
+          <input
+            type="checkbox"
+            name="createRecurring"
+            value="true"
+            className="size-4 accent-emerald-700"
+          />
+          {values.id
+            ? "Criar recorrência em Contas a Pagar"
+            : "Tornar recorrente em Contas a Pagar"}
+        </label>
 
         <SubmitButton pending={pending} compact={compact}>
           {values.id ? "Salvar alterações" : "Criar lançamento"}

@@ -34,7 +34,7 @@ export async function listCurrentUserAccounts() {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("account_balances")
-    .select("id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor")
+    .select("id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor, projected_balance_minor")
     .eq("user_id", user.id)
     .order("archived_at", { ascending: true, nullsFirst: true })
     .order("name", { ascending: true });
@@ -113,7 +113,7 @@ export async function getCurrentUserAccountHub(id: string) {
     supabase
       .from("account_balances")
       .select(
-        "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor",
+        "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor, projected_balance_minor",
       )
       .eq("user_id", user.id)
       .eq("id", id)
