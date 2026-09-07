@@ -243,7 +243,7 @@ function InvestmentSubtotalMetrics({
   );
   const metrics = [
     {
-      label: "Valor",
+      label: "Valor atual",
       value: formatMoney(
         currentValueMinor,
         currency,
@@ -292,7 +292,7 @@ function InvestmentSubtotalMetrics({
   ];
 
   return (
-    <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[0.66rem] sm:grid-cols-3 lg:grid-cols-6">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[0.66rem] sm:grid-cols-3 lg:col-span-6 lg:grid-cols-subgrid lg:gap-x-5">
       {metrics.map((metric) => (
         <div key={metric.label} className="min-w-0">
           <dt className="whitespace-nowrap font-semibold text-slate-500">
@@ -546,7 +546,7 @@ function PositionsView({
           key={`${group.currency}-${group.family}`}
           className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="grid gap-2 border-b border-slate-200 px-3 py-2 lg:grid-cols-[minmax(10rem,0.7fr)_minmax(34rem,2.3fr)] lg:items-end">
+          <div className="grid gap-y-2 border-b border-slate-200 px-3 py-2 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:items-end lg:gap-x-5">
             <div>
               <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
                 {group.currency}
@@ -563,11 +563,12 @@ function PositionsView({
               performanceInputs={performanceInputs}
               showArchived={showArchived}
             />
+            <span className="hidden lg:block" aria-hidden="true" />
           </div>
           <div className="grid">
             {typeGroups.map(([investmentType, typePositions]) => (
               <div key={investmentType}>
-                <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:grid-cols-[minmax(10rem,0.7fr)_minmax(34rem,2.3fr)] lg:items-center">
+                <div className="grid gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:items-center lg:gap-x-5">
                   <span className="text-[0.7rem] font-extrabold text-slate-700">
                     {INVESTMENT_TYPE_LABELS[investmentType]}
                   </span>
@@ -583,6 +584,7 @@ function PositionsView({
                     performanceInputs={performanceInputs}
                     showArchived={showArchived}
                   />
+                  <span className="hidden lg:block" aria-hidden="true" />
                 </div>
                 <div className="grid divide-y divide-slate-100">
             {typePositions.map((position) => {
@@ -591,7 +593,7 @@ function PositionsView({
               return (
                 <article
                   key={position.id}
-                  className={`grid gap-2 px-3 py-1.5 md:grid-cols-2 lg:grid-cols-[minmax(17rem,1.9fr)_repeat(6,minmax(5rem,auto))_auto] lg:items-center ${
+                  className={`grid gap-y-2 px-3 py-1.5 md:grid-cols-2 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:items-center lg:gap-x-5 ${
                     archived ? "opacity-60" : ""
                   }`}
                 >
@@ -971,7 +973,7 @@ export default async function InvestmentsPage({
             className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
           >
             {activeTab === "positions"
-              ? "Posição sem movimentação"
+              ? "Nova posição"
               : "Importar financiamento"}
           </Link>
         </div>
