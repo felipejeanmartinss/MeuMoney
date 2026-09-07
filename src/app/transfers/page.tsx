@@ -203,6 +203,11 @@ export default async function TransfersPage({
             : transfer.destination_credit_card_id
               ? creditCardById.get(transfer.destination_credit_card_id)
               : undefined;
+          const isCurrencyConversion = Boolean(
+            transfer.destination_account_id &&
+              transfer.destination_currency &&
+              transfer.destination_currency !== transfer.currency,
+          );
           return (
             <article
               key={transfer.id}
@@ -235,13 +240,24 @@ export default async function TransfersPage({
                     {formatFinancialDate(transfer.transaction_date)}
                   </p>
                 </div>
-                <p className="shrink-0 text-xl font-extrabold text-blue-800">
-                  {formatFinancialAmount(
-                    transfer.amount_minor,
-                    transfer.currency,
-                    CURRENCY_LOCALES[transfer.currency],
-                  )}
-                </p>
+                <div className="shrink-0 text-right">
+                  <p className="text-xl font-extrabold text-blue-800">
+                    {formatFinancialAmount(
+                      transfer.amount_minor,
+                      transfer.currency,
+                      CURRENCY_LOCALES[transfer.currency],
+                    )}
+                  </p>
+                  {isCurrencyConversion && transfer.destination_currency ? (
+                    <p className="mt-1 text-sm font-bold text-emerald-700">
+                      → {formatFinancialAmount(
+                        transfer.destination_amount_minor ?? 0,
+                        transfer.destination_currency,
+                        CURRENCY_LOCALES[transfer.destination_currency],
+                      )}
+                    </p>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                 <Link

@@ -493,6 +493,10 @@ export const investmentCashFlowIdSchema = z.uuid(
   "Movimentação de investimento inválida.",
 );
 
+export const investmentPositionSnapshotIdSchema = z.uuid(
+  "Atualização da posição inválida.",
+);
+
 export type InvestmentPositionMoneyEffect = {
   valueDeltaMinor: number;
   costDeltaMinor: number;
@@ -564,6 +568,27 @@ export type InvestmentAggregationCashFlow = {
   amountMinor: number;
 };
 
+export type InvestmentPerformancePosition = InvestmentAggregationPosition & {
+  positionDate: string;
+};
+
+export type InvestmentPerformanceCashFlow = InvestmentAggregationCashFlow & {
+  cashFlowDate: string;
+};
+
+export type InvestmentPerformanceSnapshot = {
+  positionId: string;
+  userId: string;
+  currentValueMinor: number;
+  positionDate: string;
+};
+
+export type InvestmentPeriodPerformance = {
+  resultMinor: number;
+  returnBasisMinor: number;
+  returnBasisPoints: number;
+};
+
 export type InvestmentBreakdown = {
   contributionsMinor: number;
   redemptionsMinor: number;
@@ -571,6 +596,243 @@ export type InvestmentBreakdown = {
   unrealizedAppreciationMinor: number;
   totalResultMinor: number | null;
 };
+
+export type InvestmentPerformance = {
+  resultMinor: number;
+  resultIsEstimated: boolean;
+  realizedGainLossMinor: number | null;
+  returnBasisMinor: number;
+  totalReturnBasisPoints: number | null;
+  monthlyReturnBasisPoints: number | null;
+  annualizedReturnBasisPoints: number | null;
+};
+
+type DatedPerformanceAmount = {
+  date: string;
+  amountMinor: number;
+};
+
+function calculateReturnBasisPoints(resultMinor: number, basisMinor: number) {
+  if (basisMinor <= 0) return null;
+  const result = assertMinorUnits(resultMinor);
+  const basis = assertMinorUnits(basisMinor);
+  const scaled = (BigInt(result) * 10_000n) / BigInt(basis);
+  const value = Number(scaled);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+function previousCalendarMonth(referenceDate: string) {
+  if (!isValidIsoDate(referenceDate)) {
+    throw new Error("Investment performance reference date must be valid.");
+  }
+  const [year, month] = referenceDate.split("-").map(Number);
+  const start = new Date(Date.UTC(year, month - 2, 1));
+  const end = new Date(Date.UTC(year, month - 1, 0));
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+export function calculatePreviousMonthInvestmentPerformance(
+  position: Pick<InvestmentPerformancePosition, "id" | "userId">,
+  cashFlows: readonly InvestmentPerformanceCashFlow[],
+  snapshots: readonly InvestmentPerformanceSnapshot[],
+  referenceDate: string,
+): InvestmentPeriodPerformance | null {
+  const { startDate, endDate } = previousCalendarMonth(referenceDate);
+  const matchingSnapshots = snapshots.filter(
+    (snapshot) =>
+      snapshot.userId === position.userId &&
+      snapshot.positionId === position.id,
+  );
+  const latestSnapshot = (
+    candidates: readonly InvestmentPerformanceSnapshot[],
+  ) =>
+    candidates.reduce<InvestmentPerformanceSnapshot | null>(
+      (latest, snapshot) =>
+        !latest || snapshot.positionDate >= latest.positionDate
+          ? snapshot
+          : latest,
+      null,
+    );
+  const openingSnapshot = latestSnapshot(
+    matchingSnapshots.filter((snapshot) => snapshot.positionDate < startDate),
+  );
+  const closingSnapshot = latestSnapshot(
+    matchingSnapshots.filter(
+      (snapshot) =>
+        snapshot.positionDate >= startDate && snapshot.positionDate <= endDate,
+    ),
+  );
+  if (!openingSnapshot || !closingSnapshot) return null;
+
+  let contributionsMinor = 0;
+  let redemptionsMinor = 0;
+  let incomeMinor = 0;
+  for (const cashFlow of cashFlows) {
+    if (
+      cashFlow.userId !== position.userId ||
+      cashFlow.positionId !== position.id ||
+      cashFlow.cashFlowDate < startDate ||
+      cashFlow.cashFlowDate > endDate
+    ) {
+      continue;
+    }
+    const amount = assertMinorUnits(cashFlow.amountMinor);
+    if (amount <= 0) throw new Error("Investment cash flows must be positive.");
+    if (cashFlow.type === "contribution") {
+      contributionsMinor = assertMinorUnits(contributionsMinor + amount);
+    } else if (cashFlow.type === "redemption") {
+      redemptionsMinor = assertMinorUnits(redemptionsMinor + amount);
+    } else {
+      incomeMinor = assertMinorUnits(incomeMinor + amount);
+    }
+  }
+
+  const openingValueMinor = assertMinorUnits(openingSnapshot.currentValueMinor);
+  const closingValueMinor = assertMinorUnits(closingSnapshot.currentValueMinor);
+  const resultMinor = assertMinorUnits(
+    closingValueMinor +
+      redemptionsMinor +
+      incomeMinor -
+      openingValueMinor -
+      contributionsMinor,
+  );
+  const returnBasisMinor = assertMinorUnits(
+    openingValueMinor + contributionsMinor,
+  );
+  const returnBasisPoints = calculateReturnBasisPoints(
+    resultMinor,
+    returnBasisMinor,
+  );
+  return returnBasisPoints === null
+    ? null
+    : { resultMinor, returnBasisMinor, returnBasisPoints };
+}
+
+export function summarizeInvestmentPeriodPerformance(
+  performances: readonly (InvestmentPeriodPerformance | null)[],
+): InvestmentPeriodPerformance | null {
+  if (
+    performances.length === 0 ||
+    performances.some((performance) => performance === null)
+  ) {
+    return null;
+  }
+  const complete = performances as readonly InvestmentPeriodPerformance[];
+  const resultMinor = complete.reduce(
+    (total, performance) => assertMinorUnits(total + performance.resultMinor),
+    0,
+  );
+  const returnBasisMinor = complete.reduce(
+    (total, performance) =>
+      assertMinorUnits(total + performance.returnBasisMinor),
+    0,
+  );
+  const returnBasisPoints = calculateReturnBasisPoints(
+    resultMinor,
+    returnBasisMinor,
+  );
+  return returnBasisPoints === null
+    ? null
+    : { resultMinor, returnBasisMinor, returnBasisPoints };
+}
+
+function utcDay(date: string) {
+  if (!isValidIsoDate(date)) return null;
+  const [year, month, day] = date.split("-").map(Number);
+  return Date.UTC(year, month - 1, day) / 86_400_000;
+}
+
+function calculateAnnualizedReturnBasisPoints(
+  datedAmounts: readonly DatedPerformanceAmount[],
+) {
+  const normalized = datedAmounts.flatMap((entry) => {
+    const day = utcDay(entry.date);
+    const amountMinor = assertMinorUnits(entry.amountMinor);
+    return day === null || amountMinor === 0 ? [] : [{ day, amountMinor }];
+  });
+  if (normalized.length < 2) return null;
+  if (
+    !normalized.some((entry) => entry.amountMinor < 0) ||
+    !normalized.some((entry) => entry.amountMinor > 0)
+  ) {
+    return null;
+  }
+
+  const firstDay = Math.min(...normalized.map((entry) => entry.day));
+  const lastDay = Math.max(...normalized.map((entry) => entry.day));
+  if (firstDay === lastDay) return null;
+
+  const netPresentValue = (rate: number) =>
+    normalized.reduce(
+      (total, entry) =>
+        total +
+        entry.amountMinor /
+          (1 + rate) ** ((entry.day - firstDay) / 365),
+      0,
+    );
+
+  let lower = -0.9999;
+  let upper = 1;
+  let lowerValue = netPresentValue(lower);
+  let upperValue = netPresentValue(upper);
+  for (
+    let attempt = 0;
+    attempt < 32 && Math.sign(lowerValue) === Math.sign(upperValue);
+    attempt += 1
+  ) {
+    upper = upper * 2 + 1;
+    upperValue = netPresentValue(upper);
+  }
+  if (
+    !Number.isFinite(lowerValue) ||
+    !Number.isFinite(upperValue) ||
+    Math.sign(lowerValue) === Math.sign(upperValue)
+  ) {
+    return null;
+  }
+
+  for (let iteration = 0; iteration < 120; iteration += 1) {
+    const midpoint = (lower + upper) / 2;
+    const midpointValue = netPresentValue(midpoint);
+    if (!Number.isFinite(midpointValue)) return null;
+    if (Math.abs(midpointValue) < 0.0001) {
+      lower = midpoint;
+      upper = midpoint;
+      break;
+    }
+    if (Math.sign(midpointValue) === Math.sign(lowerValue)) {
+      lower = midpoint;
+      lowerValue = midpointValue;
+    } else {
+      upper = midpoint;
+      upperValue = midpointValue;
+    }
+  }
+
+  const basisPoints = Math.round(((lower + upper) / 2) * 10_000);
+  return Number.isSafeInteger(basisPoints) ? basisPoints : null;
+}
+
+function calculateMonthlyEquivalentBasisPoints(
+  annualizedReturnBasisPoints: number | null,
+) {
+  if (
+    annualizedReturnBasisPoints === null ||
+    annualizedReturnBasisPoints <= -10_000
+  ) {
+    return null;
+  }
+  const annualRate = annualizedReturnBasisPoints / 10_000;
+  const monthlyBasisPoints = Math.round(
+    ((1 + annualRate) ** (1 / 12) - 1) * 10_000,
+  );
+  return Number.isSafeInteger(monthlyBasisPoints)
+    ? monthlyBasisPoints
+    : null;
+}
 
 export function calculateInvestmentBreakdown(
   position: InvestmentAggregationPosition,
@@ -624,6 +886,139 @@ export function calculateInvestmentBreakdown(
     ...totals,
     unrealizedAppreciationMinor,
     totalResultMinor,
+  };
+}
+
+export function calculateInvestmentPerformance(
+  position: InvestmentPerformancePosition,
+  cashFlows: readonly InvestmentPerformanceCashFlow[],
+): InvestmentPerformance {
+  const matchingCashFlows = cashFlows.filter(
+    (cashFlow) =>
+      cashFlow.userId === position.userId &&
+      cashFlow.positionId === position.id,
+  );
+  const breakdown = calculateInvestmentBreakdown(position, matchingCashFlows);
+  const resultIsEstimated = !position.historyIsComplete;
+  const resultMinor = resultIsEstimated
+    ? breakdown.unrealizedAppreciationMinor
+    : assertMinorUnits(breakdown.totalResultMinor ?? 0);
+  const returnBasisMinor = assertMinorUnits(
+    resultIsEstimated
+      ? position.accumulatedCostMinor
+      : breakdown.contributionsMinor,
+  );
+  const redeemedCostMinor = assertMinorUnits(
+    breakdown.contributionsMinor - position.accumulatedCostMinor,
+  );
+  const realizedGainLossMinor =
+    position.historyIsComplete && redeemedCostMinor >= 0
+      ? assertMinorUnits(breakdown.redemptionsMinor - redeemedCostMinor)
+      : null;
+  const datedAmounts: DatedPerformanceAmount[] = matchingCashFlows.map(
+    (cashFlow) => ({
+      date: cashFlow.cashFlowDate,
+      amountMinor:
+        cashFlow.type === "contribution"
+          ? -assertMinorUnits(cashFlow.amountMinor)
+          : assertMinorUnits(cashFlow.amountMinor),
+    }),
+  );
+  if (position.currentValueMinor > 0) {
+    datedAmounts.push({
+      date: position.positionDate,
+      amountMinor: assertMinorUnits(position.currentValueMinor),
+    });
+  }
+  const annualizedReturnBasisPoints = position.historyIsComplete
+    ? calculateAnnualizedReturnBasisPoints(datedAmounts)
+    : null;
+
+  return {
+    resultMinor,
+    resultIsEstimated,
+    realizedGainLossMinor,
+    returnBasisMinor,
+    totalReturnBasisPoints: calculateReturnBasisPoints(
+      resultMinor,
+      returnBasisMinor,
+    ),
+    monthlyReturnBasisPoints: calculateMonthlyEquivalentBasisPoints(
+      annualizedReturnBasisPoints,
+    ),
+    annualizedReturnBasisPoints,
+  };
+}
+
+export function summarizeInvestmentPerformance(
+  positions: readonly InvestmentPerformancePosition[],
+  cashFlows: readonly InvestmentPerformanceCashFlow[],
+): InvestmentPerformance {
+  const performances = positions.map((position) =>
+    calculateInvestmentPerformance(position, cashFlows),
+  );
+  const resultMinor = performances.reduce(
+    (total, performance) =>
+      assertMinorUnits(total + performance.resultMinor),
+    0,
+  );
+  const returnBasisMinor = performances.reduce(
+    (total, performance) =>
+      assertMinorUnits(total + performance.returnBasisMinor),
+    0,
+  );
+  const complete = positions.every((position) => position.historyIsComplete);
+  const realizedGainLossMinor = performances.every(
+    (performance) => performance.realizedGainLossMinor !== null,
+  )
+    ? performances.reduce(
+        (total, performance) =>
+          assertMinorUnits(
+            total + (performance.realizedGainLossMinor ?? 0),
+          ),
+        0,
+      )
+    : null;
+  const positionIds = new Set(positions.map((position) => position.id));
+  const userIds = new Set(positions.map((position) => position.userId));
+  const datedAmounts: DatedPerformanceAmount[] = cashFlows.flatMap(
+    (cashFlow) =>
+      positionIds.has(cashFlow.positionId) && userIds.has(cashFlow.userId)
+        ? [
+            {
+              date: cashFlow.cashFlowDate,
+              amountMinor:
+                cashFlow.type === "contribution"
+                  ? -assertMinorUnits(cashFlow.amountMinor)
+                  : assertMinorUnits(cashFlow.amountMinor),
+            },
+          ]
+        : [],
+  );
+  for (const position of positions) {
+    if (position.currentValueMinor <= 0) continue;
+    datedAmounts.push({
+      date: position.positionDate,
+      amountMinor: assertMinorUnits(position.currentValueMinor),
+    });
+  }
+  const annualizedReturnBasisPoints = complete
+    ? calculateAnnualizedReturnBasisPoints(datedAmounts)
+    : null;
+
+  return {
+    resultMinor,
+    resultIsEstimated: !complete,
+    realizedGainLossMinor,
+    returnBasisMinor,
+    totalReturnBasisPoints: calculateReturnBasisPoints(
+      resultMinor,
+      returnBasisMinor,
+    ),
+    monthlyReturnBasisPoints: calculateMonthlyEquivalentBasisPoints(
+      annualizedReturnBasisPoints,
+    ),
+    annualizedReturnBasisPoints,
   };
 }
 

@@ -13,9 +13,9 @@ import { getCurrentUserImportReview } from "@/services/finance/file-imports-serv
 export const metadata = { title: "Revisar importação" };
 
 const messages: Record<string, string> = {
-  uploaded: "Arquivo lido. Agora associe a conta e revise as categorias.",
-  "account-updated":
-    "Conta associada e duplicidades recalculadas com sucesso.",
+  uploaded: "Arquivo lido. Agora associe o destino e revise as categorias.",
+  "target-updated":
+    "Destino associado e duplicidades recalculadas com sucesso.",
   "row-updated": "Linha atualizada e validada novamente.",
   "row-ignored":
     "Linha ignorada. Ela não será importada nem bloqueará a confirmação.",
@@ -62,6 +62,7 @@ export default async function ImportReviewPage({
   }
 
   const isFinished = job.status === "completed" || job.status === "cancelled";
+  const isCreditCardPurchaseImport = Boolean(job.credit_card_id);
 
   return (
     <main className="mx-auto grid max-w-6xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
@@ -129,10 +130,14 @@ export default async function ImportReviewPage({
             única transação. Os dados de staging foram descartados.
           </p>
           <Link
-            href="/transactions"
+            href={
+              job.credit_card_id
+                ? `/credit-cards/${job.credit_card_id}`
+                : "/transactions"
+            }
             className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-emerald-800 px-4 text-sm font-semibold text-white"
           >
-            Ver movimentações
+            {job.credit_card_id ? "Ver compras do cartão" : "Ver movimentações"}
           </Link>
         </section>
       ) : null}
@@ -158,21 +163,41 @@ export default async function ImportReviewPage({
             >
               <input type="hidden" name="jobId" value={job.id} />
               <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-                {job.file_type === "qif"
+                {job.file_type === "qif" && !isCreditCardPurchaseImport
                   ? "Conta representada pelo arquivo"
-                  : "Conta de destino"}
+                  : "Destino da importação"}
                 <select
                   className={inputClass()}
-                  name="accountId"
-                  defaultValue={job.account_id ?? ""}
+                  name="target"
+                  defaultValue={
+                    job.credit_card_id
+                      ? `credit-card:${job.credit_card_id}`
+                      : job.account_id
+                        ? `account:${job.account_id}`
+                        : ""
+                  }
                   required
                 >
-                  <option value="">Selecione uma conta</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} · {account.currency}
-                    </option>
-                  ))}
+                  <option value="">Selecione uma conta ou cartão</option>
+                  <optgroup label="Contas bancárias">
+                    {accounts.map((account) => (
+                      <option key={account.id} value={`account:${account.id}`}>
+                        {account.name} · {account.currency}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {creditCards.length ? (
+                    <optgroup label="Compras de cartão de crédito">
+                      {creditCards.map((card) => (
+                        <option
+                          key={card.id}
+                          value={`credit-card:${card.id}`}
+                        >
+                          {card.cardName} · {card.currency}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
                 </select>
               </label>
               <button className="min-h-12 rounded-xl border border-blue-200 px-4 font-semibold text-blue-700 hover:bg-blue-50">
@@ -202,7 +227,7 @@ export default async function ImportReviewPage({
             </dl>
           </section>
 
-          {job.file_type === "qif" ? (
+          {job.file_type === "qif" && !isCreditCardPurchaseImport ? (
             <QifMappingPanel
               jobId={job.id}
               rows={rows}
@@ -219,8 +244,10 @@ export default async function ImportReviewPage({
                 Prévia e correções
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                Valor positivo gera receita; valor negativo gera despesa.
-                {job.file_type === "qif"
+                {isCreditCardPurchaseImport
+                  ? "Cada linha será criada como uma compra de uma parcela na fatura correspondente."
+                  : "Valor positivo gera receita; valor negativo gera despesa."}
+                {!isCreditCardPurchaseImport && job.file_type === "qif"
                   ? " Referências entre colchetes são transferências e precisam da conta correspondente."
                   : " Corrija os dados e associe uma categoria compatível."}
               </p>
@@ -235,6 +262,7 @@ export default async function ImportReviewPage({
                 accounts={accounts}
                 creditCards={creditCards}
                 page={pagination.page}
+                isCreditCardPurchaseImport={isCreditCardPurchaseImport}
               />
             ))}
             {pagination.totalPages > 1 ? (

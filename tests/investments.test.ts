@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateInvestmentBreakdown,
+  calculateInvestmentPerformance,
   calculateInvestmentPositionMoneyEffect,
+  calculatePreviousMonthInvestmentPerformance,
   formatInvestmentQuantity,
   inferInvestmentTransferEvent,
   investmentAccountEntryFormSchema,
@@ -11,6 +13,8 @@ import {
   investmentTransferLinkFormSchema,
   normalizeInvestmentQuantity,
   summarizeInvestmentsByCurrency,
+  summarizeInvestmentPeriodPerformance,
+  summarizeInvestmentPerformance,
 } from "../src/domain/investments";
 
 const basePosition = {
@@ -316,6 +320,216 @@ describe("investment rules", () => {
     );
 
     expect(result.totalResultMinor).toBe(35_000);
+  });
+
+  it("uses current value minus accumulated cost when history is partial", () => {
+    const performance = calculateInvestmentPerformance(
+      { ...basePosition, positionDate: "2026-09-06" },
+      [],
+    );
+
+    expect(performance).toEqual({
+      resultMinor: 20_000,
+      resultIsEstimated: true,
+      realizedGainLossMinor: null,
+      returnBasisMinor: 100_000,
+      totalReturnBasisPoints: 2_000,
+      monthlyReturnBasisPoints: null,
+      annualizedReturnBasisPoints: null,
+    });
+  });
+
+  it("separates realized profit and annualizes a complete history", () => {
+    const performance = calculateInvestmentPerformance(
+      {
+        ...basePosition,
+        accumulatedCostMinor: 100_000,
+        currentValueMinor: 110_000,
+        historyIsComplete: true,
+        positionDate: "2026-01-01",
+      },
+      [
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "contribution",
+          amountMinor: 100_000,
+          cashFlowDate: "2025-01-01",
+        },
+      ],
+    );
+
+    expect(performance).toEqual({
+      resultMinor: 10_000,
+      resultIsEstimated: false,
+      realizedGainLossMinor: 0,
+      returnBasisMinor: 100_000,
+      totalReturnBasisPoints: 1_000,
+      monthlyReturnBasisPoints: 80,
+      annualizedReturnBasisPoints: 1_000,
+    });
+  });
+
+  it("calculates the previous completed month from snapshots and cash flows", () => {
+    const performance = calculatePreviousMonthInvestmentPerformance(
+      { id: "position-a", userId: "user-a" },
+      [
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "contribution",
+          amountMinor: 20_000,
+          cashFlowDate: "2026-08-10",
+        },
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "income",
+          amountMinor: 1_000,
+          cashFlowDate: "2026-08-20",
+        },
+      ],
+      [
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          currentValueMinor: 100_000,
+          positionDate: "2026-07-31",
+        },
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          currentValueMinor: 125_000,
+          positionDate: "2026-08-31",
+        },
+      ],
+      "2026-09-07",
+    );
+
+    expect(performance).toEqual({
+      resultMinor: 6_000,
+      returnBasisMinor: 120_000,
+      returnBasisPoints: 500,
+    });
+  });
+
+  it("leaves the previous month empty without opening and closing snapshots", () => {
+    expect(
+      calculatePreviousMonthInvestmentPerformance(
+        { id: "position-a", userId: "user-a" },
+        [],
+        [
+          {
+            positionId: "position-a",
+            userId: "user-a",
+            currentValueMinor: 125_000,
+            positionDate: "2026-08-31",
+          },
+        ],
+        "2026-09-07",
+      ),
+    ).toBeNull();
+  });
+
+  it("consolidates previous-month returns from their financial bases", () => {
+    expect(
+      summarizeInvestmentPeriodPerformance([
+        { resultMinor: 1_000, returnBasisMinor: 10_000, returnBasisPoints: 1_000 },
+        { resultMinor: -500, returnBasisMinor: 10_000, returnBasisPoints: -500 },
+      ]),
+    ).toEqual({
+      resultMinor: 500,
+      returnBasisMinor: 20_000,
+      returnBasisPoints: 250,
+    });
+    expect(
+      summarizeInvestmentPeriodPerformance([
+        { resultMinor: 1_000, returnBasisMinor: 10_000, returnBasisPoints: 1_000 },
+        null,
+      ]),
+    ).toBeNull();
+  });
+
+  it("calculates realized profit from redemption minus disposed cost", () => {
+    const performance = calculateInvestmentPerformance(
+      {
+        ...basePosition,
+        accumulatedCostMinor: 60_000,
+        currentValueMinor: 70_000,
+        historyIsComplete: true,
+        positionDate: "2026-06-01",
+      },
+      [
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "contribution",
+          amountMinor: 100_000,
+          cashFlowDate: "2025-01-01",
+        },
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "redemption",
+          amountMinor: 50_000,
+          cashFlowDate: "2026-05-01",
+        },
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "income",
+          amountMinor: 5_000,
+          cashFlowDate: "2026-05-01",
+        },
+      ],
+    );
+
+    expect(performance).toMatchObject({
+      resultMinor: 25_000,
+      realizedGainLossMinor: 10_000,
+      totalReturnBasisPoints: 2_500,
+    });
+    expect(performance.annualizedReturnBasisPoints).not.toBeNull();
+  });
+
+  it("consolidates portfolio return without annualizing partial histories", () => {
+    const complete = {
+      ...basePosition,
+      id: "position-complete",
+      accumulatedCostMinor: 100_000,
+      currentValueMinor: 110_000,
+      historyIsComplete: true,
+      positionDate: "2026-01-01",
+    };
+    const partial = {
+      ...basePosition,
+      id: "position-partial",
+      accumulatedCostMinor: 50_000,
+      currentValueMinor: 55_000,
+      positionDate: "2026-01-01",
+    };
+    const performance = summarizeInvestmentPerformance(
+      [complete, partial],
+      [
+        {
+          positionId: "position-complete",
+          userId: "user-a",
+          type: "contribution",
+          amountMinor: 100_000,
+          cashFlowDate: "2025-01-01",
+        },
+      ],
+    );
+
+    expect(performance).toMatchObject({
+      resultMinor: 15_000,
+      resultIsEstimated: true,
+      realizedGainLossMinor: null,
+      returnBasisMinor: 150_000,
+      totalReturnBasisPoints: 1_000,
+      monthlyReturnBasisPoints: null,
+      annualizedReturnBasisPoints: null,
+    });
   });
 
   it("consolidates only active positions owned by the user and keeps currencies separate", () => {

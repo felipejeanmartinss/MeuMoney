@@ -86,6 +86,9 @@ export default async function EditTransferPage({
               destinationCreditCardId:
                 transfer.destination_credit_card_id ?? undefined,
               amountMinor: minorUnitsToInput(transfer.amount_minor),
+              destinationAmountMinor: minorUnitsToInput(
+                transfer.destination_amount_minor ?? transfer.amount_minor,
+              ),
               transactionDate: transfer.transaction_date,
               status: transfer.status,
               description: transfer.description ?? "",

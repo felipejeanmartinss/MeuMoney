@@ -135,6 +135,21 @@ export const importFileTypeSchema = z.enum(IMPORT_FILE_TYPES, {
 export const importJobIdSchema = z.uuid("Importação inválida.");
 export const importRowIdSchema = z.uuid("Linha de importação inválida.");
 
+export const importTargetSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^(account|credit-card):[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "Selecione uma conta ou cartão válido.",
+  )
+  .transform((value) => {
+    const [kind, id] = value.split(":") as [
+      "account" | "credit-card",
+      string,
+    ];
+    return { kind, id };
+  });
+
 const signedAmountInput = z
   .string()
   .trim()

@@ -30,7 +30,7 @@
 - Nesta sprint, novas contas podem ser dos tipos conta corrente, poupança, dinheiro ou outra conta. Cartões e investimentos permanecem fora do fluxo de cadastro.
 - O saldo inicial é obrigatório, pode ser positivo, zero ou negativo e possui data de referência obrigatória.
 - Dinheiro é persistido como inteiro em unidades menores; valores de ponto flutuante não são aceitos no domínio.
-- As moedas suportadas inicialmente são BRL, USD e EUR. A moeda preferencial do perfil apenas sugere o valor inicial de novas contas; ela não converte contas existentes.
+- As moedas suportadas inicialmente são BRL, USD e EUR. A moeda preferencial do perfil sugere o valor inicial de novas contas; conversões acontecem somente por transferência explícita entre duas contas.
 - Contas ativas não podem ser excluídas. Depois de inativada, uma conta pode ser excluída definitivamente mediante confirmação explícita; a operação remove seu histórico transacional, transferências, recorrências e importações vinculadas, e apenas desvincula cartões que a utilizavam como conta de pagamento.
 - Categorias separam natureza (Receita ou Despesa) e contexto (Pessoal ou Profissional).
 - Categorias iniciais são criadas automaticamente para cada usuário e partem de uma taxonomia inspirada na orientação AUVP adaptada aos contextos do MeuMoney.
@@ -52,12 +52,14 @@
 - Somente lançamentos ativos e realizados participam do saldo atual. Lançamentos previstos e inativos permanecem no histórico sem efeito financeiro.
 - Editar conta, tipo, valor, status ou atividade não exige ajustar um saldo persistido: o saldo é recalculado a partir dos registros vigentes.
 - Transferência não é receita nem despesa e não recebe categoria.
-- A origem deve ser uma conta ativa. O destino pode ser outra conta ativa ou um cartão de crédito ativo do mesmo usuário e da mesma moeda.
+- A origem deve ser uma conta ativa. O destino pode ser outra conta ativa do mesmo usuário, inclusive em moeda diferente, ou um cartão de crédito ativo do mesmo usuário e da mesma moeda.
 - Uma transferência entre contas possui duas movimentações vinculadas: saída na origem e entrada no destino. Uma transferência para cartão possui somente a saída vinculada à conta; o destino é registrado no próprio cartão.
+- Na conversão entre moedas, o usuário informa o valor exato debitado na origem e o valor exato creditado no destino. Ambos são persistidos em unidades menores inteiras; a taxa exibida é apenas a razão derivada entre esses valores e não é usada para recalcular saldos.
 - Criar, editar, inativar ou reativar uma transferência altera seus registros vinculados na mesma transação SQL. Uma falha reverte toda a operação.
 - Transferências previstas ou inativas não afetam o saldo realizado.
 - Lançamentos manuais podem ser excluídos definitivamente pelo proprietário com uma confirmação simples na própria listagem. Movimentos de investimento são removidos pela operação própria, que também reverte a posição. Lançamentos técnicos de fatura e contas a pagar continuam protegidos; transferências sem vínculo de investimento podem ser excluídas definitivamente.
 - Novos lançamentos, transferências e movimentos de investimento podem ser registrados dentro do extrato da conta, reutilizando os mesmos campos, validações e serviços das rotas dedicadas.
+- Um novo lançamento pode encaminhar seus dados validados ao cadastro de Contas a Pagar. O lançamento é criado primeiro; a próxima ocorrência sugerida é mensal e posterior ao lançamento, enquanto frequência, término e data continuam sujeitos à confirmação explícita na etapa seguinte.
 - O saldo atual é o saldo inicial, mais receitas realizadas ativas, menos despesas realizadas ativas, mais transferências recebidas realizadas ativas e menos transferências enviadas realizadas ativas, sempre com data anterior ao dia corrente no fuso de São Paulo.
 - O saldo projetado parte do saldo atual e incorpora todos os lançamentos e transferências ativos com data de hoje ou futura, inclusive os previstos. Itens previstos vencidos continuam fora dos dois saldos até serem realizados ou remarcados.
 - O extrato pertence à conta e combina receitas, despesas e o lado correspondente de cada transferência em ordem cronológica. O saldo linha a linha usa o realizado até ontem e passa a representar a projeção a partir de hoje; uma divisória visual separa os dois períodos.
@@ -76,6 +78,7 @@
 - A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
 - Cartões e compras não são excluídos fisicamente pela interface.
+- Arquivos financeiros podem ser associados a um cartão ativo. Nesse modo, cada linha confirmada é uma compra de uma parcela, usa valor absoluto, exige categoria de Despesa e entra na fatura calculada pela data. Créditos, estornos e pagamentos não são inferidos como compras.
 
 ## Recorrências — feature/recurring-transactions
 
@@ -144,6 +147,8 @@
 - O resultado total só é calculado quando o usuário declara que todos os fluxos desde o início foram registrados.
 - Nenhuma taxa de rentabilidade, anualização ou valorização é inventada quando o histórico não sustenta o cálculo.
 - O patrimônio soma o valor atual das posições ativas como ativos, sempre por usuário e moeda.
+- A composição da carteira é calculada por moeda, família e tipo de investimento; posições arquivadas ficam fora de todos os percentuais. Cada subtotal consolida valor atual, custo, resultado e taxas de retorno a partir do histórico conjunto das posições, sem somar percentuais individuais.
+- A fotografia inicial não pode ser excluída. Excluir a fotografia mais recente restaura a posição anterior, exceto quando fluxos posteriores tornariam a reversão inconsistente.
 
 ## Importação CSV e OFX — Sprint 10
 
@@ -196,7 +201,7 @@
 
 ## Regras financeiras futuras
 
-Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, conversão monetária, cotações e avaliações automáticas de mercado serão definidos em sprints posteriores.
+Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, antecipação, cotações automáticas e avaliações automáticas de mercado serão definidos em sprints posteriores.
 
 ## Central por conta, grupos de categorias e investimentos detalhados
 
@@ -250,4 +255,6 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - Uma subcategoria de despesa pode ser marcada pelo usuário como fixa. O relatório de despesas fixas considera somente lançamentos reais dessas subcategorias, segundo o regime selecionado; a marcação não cria lançamento nem recorrência.
 - As matrizes consolidam categoria principal e usam o mesmo botão de abertura para categorias com ou sem subcategorias; valores diretos aparecem como `Sem subcategoria`. Os valores permanecem em centavos inteiros, são exibidos sem repetir o símbolo monetário e ordenados de forma crescente dentro de cada seção.
 - Comparativos exibem o segundo período menos o primeiro; a variação percentual fica vazia quando o primeiro período é zero.
-- Performance de ativos usa somente aportes, resgates, rendimentos, custo e valor registrados. Resultado e retorno ficam vazios quando o histórico da posição não é completo, e nenhuma taxa anualizada é inventada.
+- Performance de ativos usa somente aportes, resgates, rendimentos, custo e valor registrados. Com histórico completo, o resultado total é `valor atual + resgates + rendimentos - aportes`, o lucro ou perda realizado compara resgates com o custo baixado, e o retorno anualizado é calculado pelos fluxos datados; o retorno mensal é a taxa efetiva equivalente à taxa anualizada. Com histórico parcial, resultado e retorno total usam `valor atual - custo acumulado`, ficam identificados por `*` e os retornos mensal e anualizado permanecem vazios.
+- Na página de posições, “mês anterior” é o último mês-calendário concluído: compara a fotografia anterior ao começo do mês com a última fotografia registrada nele e neutraliza aportes, resgates e rendas do período. Sem as duas fotografias, a taxa não é exibida.
+- A visão principal da carteira exibe apenas posições ativas. Posições arquivadas ficam em uma lista própria, acessível pelo botão superior, e não participam dos totais nem da participação percentual por classe.

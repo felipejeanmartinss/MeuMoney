@@ -5,7 +5,7 @@
 1. O usuário envia um arquivo de até 5 MB.
 2. O servidor lê o conteúdo em memória, calcula SHA-256 e descarta os bytes.
 3. O parser normaliza no máximo 5.000 movimentações em staging.
-4. O usuário associa conta e categorias, corrige dados ou ignora linhas. Todas as linhas ignoradas mantêm seu estado durante as revisões seguintes, deixam de exigir revisão e não participam da confirmação; ao reincluir uma linha, ela é avaliada novamente.
+4. O usuário associa uma conta bancária ou um cartão de crédito, corrige categorias ou ignora linhas. Todas as linhas ignoradas mantêm seu estado durante as revisões seguintes, deixam de exigir revisão e não participam da confirmação; ao reincluir uma linha, ela é avaliada novamente.
 5. O banco recalcula assinaturas e duplicidades a cada alteração.
 6. A confirmação explícita cria todos os lançamentos em uma transação.
 7. O staging é apagado ao confirmar ou cancelar.
@@ -93,6 +93,21 @@ contra duplicidades no histórico, em jobs anteriores e dentro do mesmo upload.
 Transferências usam uma assinatura própria, independente da direção em que as
 duas contas aparecem.
 
+## Compras de cartão de crédito
+
+O mesmo envio e a mesma revisão podem usar um cartão ativo como destino. Nesse
+modo, todas as linhas selecionadas são compras e exigem categoria de Despesa.
+O sinal vindo do emissor não muda a natureza: o valor final é absoluto e
+positivo. Créditos, estornos, pagamentos e totais do arquivo devem ser
+ignorados pelo usuário quando não representarem compras.
+
+Cada linha confirmada cria uma compra de uma parcela pela rotina canônica do
+cartão. A data da linha define a fatura conforme o dia de fechamento já
+cadastrado. A confirmação continua atômica: se uma compra falhar, nenhuma das
+linhas daquele job é gravada. Duplicidades consideram cartão, data, valor e
+descrição normalizada, tanto dentro do arquivo quanto em compras ativas já
+existentes.
+
 ## Privacidade e descarte
 
 - os bytes originais não são persistidos;
@@ -110,6 +125,7 @@ duas contas aparecem.
 - mudanças de layout do emissor exigem nova fixture e versão do adaptador;
 - o QIF apenas sugere categorias por nome; a decisão continua explícita;
 - transferências são reconhecidas somente pela sintaxe QIF `[Conta]`;
-- compras de cartão não são inferidas do arquivo;
+- cada linha importada para cartão representa uma compra de uma parcela;
+- créditos, estornos e pagamentos do extrato do cartão não são inferidos;
 - lançamentos QIF divididos ainda não são suportados;
 - duplicidades com data, valor ou descrição diferentes exigem revisão humana.

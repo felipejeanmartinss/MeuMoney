@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { RecurringTransactionForm } from "@/components/forms/recurring-transaction-form";
 import { getRecurringTransactionFormOptions } from "@/services/finance/recurring-transactions-service";
+import { minorUnitsToInput } from "@/domain/money";
 import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Nova conta a pagar" };
@@ -8,9 +9,19 @@ export const metadata = { title: "Nova conta a pagar" };
 export default async function NewRecurringTransactionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ accountId?: string }>;
+  searchParams: Promise<{
+    accountId?: string;
+    categoryId?: string;
+    transactionType?: string;
+    description?: string;
+    amountMinor?: string;
+    startDate?: string;
+    nextOccurrence?: string;
+    notes?: string;
+  }>;
 }) {
-  const { accountId } = await searchParams;
+  const query = await searchParams;
+  const { accountId } = query;
   const { accounts, categories, groups, hasError } =
     await getRecurringTransactionFormOptions(
       accountId ? { accountId } : undefined,
@@ -21,6 +32,29 @@ export default async function NewRecurringTransactionPage({
   )
     ? accountId
     : undefined;
+  const selectedCategory = categories.find(
+    (category) => category.id === query.categoryId,
+  );
+  const transactionType =
+    query.transactionType === "income" || query.transactionType === "expense"
+      ? query.transactionType
+      : selectedCategory?.kind;
+  const selectedCategoryId =
+    selectedCategory && selectedCategory.kind === transactionType
+      ? selectedCategory.id
+      : undefined;
+  const parsedAmount = Number(query.amountMinor);
+  const amountMinor = Number.isSafeInteger(parsedAmount) && parsedAmount > 0
+    ? minorUnitsToInput(parsedAmount)
+    : "0,00";
+  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(query.startDate ?? "")
+    ? query.startDate!
+    : today;
+  const nextOccurrence = /^\d{4}-\d{2}-\d{2}$/.test(
+    query.nextOccurrence ?? "",
+  )
+    ? query.nextOccurrence!
+    : startDate;
 
   return (
     <main className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -51,10 +85,14 @@ export default async function NewRecurringTransactionPage({
             groups={groups}
             values={{
               accountId: selectedAccountId,
-              amountMinor: "0,00",
+              categoryId: selectedCategoryId,
+              transactionType,
+              description: query.description?.slice(0, 180),
+              amountMinor,
               frequency: "monthly",
-              startDate: today,
-              nextOccurrence: today,
+              startDate,
+              nextOccurrence,
+              notes: query.notes?.slice(0, 1000),
             }}
           />
         </section>

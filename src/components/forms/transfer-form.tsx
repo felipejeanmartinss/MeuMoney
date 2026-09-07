@@ -13,11 +13,12 @@ import {
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import {
   accountTransferDestinationValue,
+  calculateTransferExchangeRate,
   creditCardTransferDestinationValue,
   parseTransferDestinationTarget,
   type CreditCardTransferDestination,
 } from "@/domain/transfers";
-import { formatMoney } from "@/domain/money";
+import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import type {
   FinancialContext,
@@ -39,6 +40,7 @@ type TransferFormValues = {
   destinationCreditCardId?: string;
   destinationTarget?: string;
   amountMinor?: string;
+  destinationAmountMinor?: string;
   transactionDate?: string;
   status?: TransactionStatus;
   description?: string;
@@ -72,10 +74,17 @@ export function TransferForm({
         : ""),
   );
   const [amountInput, setAmountInput] = useState(values.amountMinor ?? "0,00");
+  const [destinationAmountInput, setDestinationAmountInput] = useState(
+    values.destinationAmountMinor ?? values.amountMinor ?? "0,00",
+  );
   const source = accounts.find((account) => account.id === sourceId);
   const parsedDestination = parseTransferDestinationTarget(destinationTarget);
   const destinationAccountId =
     parsedDestination?.kind === "account" ? parsedDestination.id : "";
+  const selectedDestinationAccount =
+    parsedDestination?.kind === "account"
+      ? accounts.find((account) => account.id === parsedDestination.id)
+      : undefined;
   const selectedCreditCard =
     parsedDestination?.kind === "credit_card"
       ? creditCards.find(
@@ -83,9 +92,7 @@ export function TransferForm({
         )
       : undefined;
   const destinationOptions = accounts.filter(
-    (account) =>
-      account.id !== sourceId &&
-      (!source || account.currency === source.currency),
+    (account) => account.id !== sourceId,
   );
   const creditCardOptions = creditCards.filter(
     (destination) => !source || destination.currency === source.currency,
@@ -111,12 +118,33 @@ export function TransferForm({
   function changeSource(id: string) {
     setSourceId(id);
     const nextSource = accounts.find((account) => account.id === id);
+    if (!destinationTarget || destinationAccountId === id) {
+      setDestinationTarget("");
+      return;
+    }
+    const destination = parseTransferDestinationTarget(destinationTarget);
     if (
-      !destinationTarget ||
-      destinationAccountId === id ||
+      destination?.kind === "credit_card" &&
       destinationCurrency(destinationTarget) !== nextSource?.currency
     ) {
       setDestinationTarget("");
+    }
+  }
+
+  const isCurrencyConversion = Boolean(
+    source &&
+      selectedDestinationAccount &&
+      source.currency !== selectedDestinationAccount.currency,
+  );
+  let exchangeRate: number | null = null;
+  if (isCurrencyConversion) {
+    try {
+      exchangeRate = calculateTransferExchangeRate(
+        parseMoneyInputToMinor(amountInput),
+        parseMoneyInputToMinor(destinationAmountInput),
+      );
+    } catch {
+      exchangeRate = null;
     }
   }
 
@@ -179,7 +207,7 @@ export function TransferForm({
           >
             <option value="" disabled>
               {sourceId
-                ? "Selecione uma conta ou cartão da mesma moeda"
+                ? "Selecione uma conta ou cartão"
                 : "Escolha primeiro a origem"}
             </option>
             {destinationOptions.length > 0 ? (
@@ -217,8 +245,22 @@ export function TransferForm({
         </Field>
       </div>
 
-      <div className={`grid sm:grid-cols-3 ${compact ? "gap-3" : "gap-5"}`}>
-        <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]} compact={compact}>
+      <div
+        className={`grid ${
+          isCurrencyConversion
+            ? "sm:grid-cols-2 lg:grid-cols-4"
+            : "sm:grid-cols-3"
+        } ${compact ? "gap-3" : "gap-5"}`}
+      >
+        <Field
+          label={
+            isCurrencyConversion && source
+              ? `Valor de saída (${source.currency})`
+              : "Valor"
+          }
+          error={state.fieldErrors?.amountMinor?.[0]}
+          compact={compact}
+        >
           <input
             className={inputClass(Boolean(state.fieldErrors?.amountMinor), compact)}
             name="amountMinor"
@@ -229,6 +271,35 @@ export function TransferForm({
             required
           />
         </Field>
+
+        {isCurrencyConversion && selectedDestinationAccount ? (
+          <Field
+            label={`Valor de entrada (${selectedDestinationAccount.currency})`}
+            error={state.fieldErrors?.destinationAmountMinor?.[0]}
+            compact={compact}
+          >
+            <input
+              className={inputClass(
+                Boolean(state.fieldErrors?.destinationAmountMinor),
+                compact,
+              )}
+              name="destinationAmountMinor"
+              value={destinationAmountInput}
+              onChange={(event) =>
+                setDestinationAmountInput(event.target.value)
+              }
+              inputMode="decimal"
+              placeholder="0,00"
+              required
+            />
+          </Field>
+        ) : (
+          <input
+            type="hidden"
+            name="destinationAmountMinor"
+            value={amountInput}
+          />
+        )}
 
         <Field label="Data" error={state.fieldErrors?.transactionDate?.[0]} compact={compact}>
           <input
@@ -267,6 +338,29 @@ export function TransferForm({
         </p>
       ) : null}
 
+      {isCurrencyConversion && source && selectedDestinationAccount ? (
+        <p
+          className={`${
+            compact
+              ? "rounded-md px-3 py-2 text-xs"
+              : "rounded-xl px-4 py-3 text-sm"
+          } border border-emerald-200 bg-emerald-50 text-emerald-950`}
+        >
+          Conversão entre contas: sai em {source.currency} e entra em{" "}
+          {selectedDestinationAccount.currency}.
+          {exchangeRate !== null ? (
+            <span className="ml-1 font-bold">
+              Taxa implícita: 1 {source.currency} ={" "}
+              {exchangeRate.toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6,
+              })}{" "}
+              {selectedDestinationAccount.currency}.
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+
       <Field
         label="Descrição opcional"
         error={state.fieldErrors?.description?.[0]}
@@ -296,6 +390,8 @@ export function TransferForm({
           ? "Salvar alterações"
           : selectedCreditCard
             ? "Transferir para o cartão"
+            : isCurrencyConversion
+              ? "Converter e transferir"
             : "Criar transferência"}
       </SubmitButton>
     </form>
