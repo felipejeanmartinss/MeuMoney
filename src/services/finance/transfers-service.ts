@@ -31,8 +31,21 @@ export type TransferFilters = {
 const transferColumns =
   "id, user_id, source_account_id, destination_account_id, destination_credit_card_id, amount_minor, currency, destination_amount_minor, destination_currency, transaction_date, status, description, notes, is_active, created_at, updated_at";
 
-function transferErrorMessage(error: { message?: string } | null) {
+function transferErrorMessage(
+  error: { code?: string; message?: string } | null,
+) {
   const message = error?.message?.toLowerCase() ?? "";
+  if (
+    error?.code === "PGRST202" ||
+    error?.code === "42883" ||
+    (message.includes("schema cache") &&
+      (message.includes("create_account_transfer") ||
+        message.includes("update_account_transfer") ||
+        message.includes("destination_amount_minor") ||
+        message.includes("destination_currency")))
+  ) {
+    return "A conversão entre moedas ainda não está disponível neste ambiente. Tente novamente em instantes.";
+  }
   if (message.includes("transfer_accounts_must_differ")) {
     return "Origem e destino devem ser diferentes.";
   }
