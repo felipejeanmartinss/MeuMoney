@@ -568,6 +568,9 @@ export type InvestmentPositionPerformanceSummary =
     total_return_basis_points: number | null;
     monthly_return_basis_points: number | null;
     annualized_return_basis_points: number | null;
+    previous_month_result_minor: number | null;
+    previous_month_return_basis_minor: number | null;
+    previous_month_return_basis_points: number | null;
   };
 
 export type FinancingImportJob = {

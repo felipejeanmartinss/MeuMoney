@@ -3,6 +3,7 @@ import {
   calculateInvestmentBreakdown,
   calculateInvestmentPerformance,
   calculateInvestmentPositionMoneyEffect,
+  calculatePreviousMonthInvestmentPerformance,
   formatInvestmentQuantity,
   inferInvestmentTransferEvent,
   investmentAccountEntryFormSchema,
@@ -12,6 +13,7 @@ import {
   investmentTransferLinkFormSchema,
   normalizeInvestmentQuantity,
   summarizeInvestmentsByCurrency,
+  summarizeInvestmentPeriodPerformance,
   summarizeInvestmentPerformance,
 } from "../src/domain/investments";
 
@@ -366,6 +368,86 @@ describe("investment rules", () => {
       monthlyReturnBasisPoints: 80,
       annualizedReturnBasisPoints: 1_000,
     });
+  });
+
+  it("calculates the previous completed month from snapshots and cash flows", () => {
+    const performance = calculatePreviousMonthInvestmentPerformance(
+      { id: "position-a", userId: "user-a" },
+      [
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "contribution",
+          amountMinor: 20_000,
+          cashFlowDate: "2026-08-10",
+        },
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          type: "income",
+          amountMinor: 1_000,
+          cashFlowDate: "2026-08-20",
+        },
+      ],
+      [
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          currentValueMinor: 100_000,
+          positionDate: "2026-07-31",
+        },
+        {
+          positionId: "position-a",
+          userId: "user-a",
+          currentValueMinor: 125_000,
+          positionDate: "2026-08-31",
+        },
+      ],
+      "2026-09-07",
+    );
+
+    expect(performance).toEqual({
+      resultMinor: 6_000,
+      returnBasisMinor: 120_000,
+      returnBasisPoints: 500,
+    });
+  });
+
+  it("leaves the previous month empty without opening and closing snapshots", () => {
+    expect(
+      calculatePreviousMonthInvestmentPerformance(
+        { id: "position-a", userId: "user-a" },
+        [],
+        [
+          {
+            positionId: "position-a",
+            userId: "user-a",
+            currentValueMinor: 125_000,
+            positionDate: "2026-08-31",
+          },
+        ],
+        "2026-09-07",
+      ),
+    ).toBeNull();
+  });
+
+  it("consolidates previous-month returns from their financial bases", () => {
+    expect(
+      summarizeInvestmentPeriodPerformance([
+        { resultMinor: 1_000, returnBasisMinor: 10_000, returnBasisPoints: 1_000 },
+        { resultMinor: -500, returnBasisMinor: 10_000, returnBasisPoints: -500 },
+      ]),
+    ).toEqual({
+      resultMinor: 500,
+      returnBasisMinor: 20_000,
+      returnBasisPoints: 250,
+    });
+    expect(
+      summarizeInvestmentPeriodPerformance([
+        { resultMinor: 1_000, returnBasisMinor: 10_000, returnBasisPoints: 1_000 },
+        null,
+      ]),
+    ).toBeNull();
   });
 
   it("calculates realized profit from redemption minus disposed cost", () => {

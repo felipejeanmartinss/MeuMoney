@@ -1,12 +1,16 @@
 import "server-only";
 import {
   calculateInvestmentPerformance,
+  calculatePreviousMonthInvestmentPerformance,
+  summarizeInvestmentPeriodPerformance,
   summarizeInvestmentPerformance,
   type InvestmentPerformanceCashFlow,
   type InvestmentPerformancePosition,
+  type InvestmentPerformanceSnapshot,
 } from "@/domain/investments";
 import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
+import { currentIsoDate } from "@/utils/dates";
 import type {
   FinancialContext,
   InvestmentAccountEventType,
@@ -78,6 +82,7 @@ const positionColumns =
 
 export async function listCurrentUserInvestmentPositions() {
   const { supabase, user } = await requireUser();
+  const referenceDate = currentIsoDate();
   const cashFlowsPromise = (async () => {
     const rows: {
       position_id: string;
@@ -104,7 +109,31 @@ export async function listCurrentUserInvestmentPositions() {
       }
     }
   })();
-  const [positionsResult, cashFlowsResult] = await Promise.all([
+  const snapshotsPromise = (async () => {
+    const rows: {
+      id: string;
+      position_id: string;
+      user_id: string;
+      current_value_minor: number;
+      position_date: string;
+    }[] = [];
+    const pageSize = 1_000;
+    for (let start = 0; ; start += pageSize) {
+      const page = await supabase
+        .from("investment_position_snapshots")
+        .select("id, position_id, user_id, current_value_minor, position_date")
+        .eq("user_id", user.id)
+        .order("position_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(start, start + pageSize - 1);
+      if (page.error) return { data: rows, error: page.error };
+      rows.push(...(page.data ?? []));
+      if ((page.data?.length ?? 0) < pageSize) {
+        return { data: rows, error: null };
+      }
+    }
+  })();
+  const [positionsResult, cashFlowsResult, snapshotsResult] = await Promise.all([
     supabase
       .from("investment_position_summary")
       .select(
@@ -115,6 +144,7 @@ export async function listCurrentUserInvestmentPositions() {
       .order("currency", { ascending: true })
       .order("asset_name", { ascending: true }),
     cashFlowsPromise,
+    snapshotsPromise,
   ]);
 
   const cashFlows: InvestmentPerformanceCashFlow[] = (
@@ -125,6 +155,14 @@ export async function listCurrentUserInvestmentPositions() {
     type: cashFlow.cash_flow_type,
     amountMinor: coerceMinorUnits(cashFlow.amount_minor),
     cashFlowDate: cashFlow.cash_flow_date,
+  }));
+  const snapshots: InvestmentPerformanceSnapshot[] = (
+    snapshotsResult.data ?? []
+  ).map((snapshot) => ({
+    positionId: snapshot.position_id,
+    userId: snapshot.user_id,
+    currentValueMinor: coerceMinorUnits(snapshot.current_value_minor),
+    positionDate: snapshot.position_date,
   }));
   const performanceInputs = new Map<string, InvestmentPerformancePosition>();
   const cashFlowsByPosition = new Map<
@@ -171,6 +209,13 @@ export async function listCurrentUserInvestmentPositions() {
       performanceInput,
       cashFlowsByPosition.get(normalized.id) ?? [],
     );
+    const previousMonthPerformance =
+      calculatePreviousMonthInvestmentPerformance(
+        performanceInput,
+        cashFlowsByPosition.get(normalized.id) ?? [],
+        snapshots,
+        referenceDate,
+      );
     return {
       ...normalized,
       performance_result_minor: performance.resultMinor,
@@ -181,6 +226,12 @@ export async function listCurrentUserInvestmentPositions() {
       monthly_return_basis_points: performance.monthlyReturnBasisPoints,
       annualized_return_basis_points:
         performance.annualizedReturnBasisPoints,
+      previous_month_result_minor:
+        previousMonthPerformance?.resultMinor ?? null,
+      previous_month_return_basis_minor:
+        previousMonthPerformance?.returnBasisMinor ?? null,
+      previous_month_return_basis_points:
+        previousMonthPerformance?.returnBasisPoints ?? null,
     };
   });
   const portfolioPerformance = [...new Set(positions.map((row) => row.currency))]
@@ -195,6 +246,21 @@ export async function listCurrentUserInvestmentPositions() {
       return {
         currency,
         ...summarizeInvestmentPerformance(inputs, cashFlows),
+        previousMonthPerformance: summarizeInvestmentPeriodPerformance(
+          currencyPositions.map((position) =>
+            position.previous_month_result_minor === null ||
+            position.previous_month_return_basis_minor === null ||
+            position.previous_month_return_basis_points === null
+              ? null
+              : {
+                  resultMinor: position.previous_month_result_minor,
+                  returnBasisMinor:
+                    position.previous_month_return_basis_minor,
+                  returnBasisPoints:
+                    position.previous_month_return_basis_points,
+                },
+          ),
+        ),
       };
     });
 
@@ -203,7 +269,9 @@ export async function listCurrentUserInvestmentPositions() {
     cashFlows,
     performanceInputs,
     portfolioPerformance,
-    hasError: Boolean(positionsResult.error || cashFlowsResult.error),
+    hasError: Boolean(
+      positionsResult.error || cashFlowsResult.error || snapshotsResult.error,
+    ),
   };
 }
 

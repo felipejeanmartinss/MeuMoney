@@ -71,6 +71,12 @@ referência comum. Com histórico parcial, a base do retorno total é o custo
 acumulado e o resultado permanece identificado por um asterisco, explicado na
 própria tela.
 
+A tela de posições mostra o retorno total e o retorno do último mês-calendário
+concluído. Esse retorno mensal compara a última fotografia anterior ao início
+do mês com a última fotografia registrada dentro dele, ajustando aportes,
+resgates e rendas do período; sem as duas referências, a taxa fica vazia. Os
+subtotais consolidam resultados e bases financeiras, sem somar percentuais.
+
 A carteira principal lista somente posições ativas. Arquivadas permanecem
 acessíveis em uma visão separada e não compõem os totais. Cada grupo informa a
 participação de sua família — renda fixa, renda variável, previdência ou

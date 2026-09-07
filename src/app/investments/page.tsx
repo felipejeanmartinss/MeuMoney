@@ -11,9 +11,11 @@ import {
   getInvestmentFamily,
   INVESTMENT_FAMILY_LABELS,
   INVESTMENT_TYPE_LABELS,
+  summarizeInvestmentPeriodPerformance,
   summarizeInvestmentPerformance,
   type InvestmentPerformance,
   type InvestmentPerformanceCashFlow,
+  type InvestmentPeriodPerformance,
   type InvestmentPerformancePosition,
 } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
@@ -30,6 +32,8 @@ import type {
 } from "@/types/database";
 
 export const metadata = { title: "Investimentos" };
+
+const INVESTMENT_PAGE_SIZE = 18;
 
 const messages: Record<string, string> = {
   created: "Posição de investimento cadastrada com sucesso.",
@@ -112,6 +116,103 @@ function groupPositionsByFamily(
   return [...groups.entries()];
 }
 
+function periodPerformanceOf(
+  position: InvestmentPositionPerformanceSummary,
+): InvestmentPeriodPerformance | null {
+  return position.previous_month_result_minor === null ||
+    position.previous_month_return_basis_minor === null ||
+    position.previous_month_return_basis_points === null
+    ? null
+    : {
+        resultMinor: position.previous_month_result_minor,
+        returnBasisMinor: position.previous_month_return_basis_minor,
+        returnBasisPoints: position.previous_month_return_basis_points,
+      };
+}
+
+function InvestmentPagination({
+  currentPage,
+  pageCount,
+  totalRows,
+  showArchived,
+}: {
+  currentPage: number;
+  pageCount: number;
+  totalRows: number;
+  showArchived: boolean;
+}) {
+  if (pageCount <= 1) return null;
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams();
+    if (showArchived) params.set("view", "archived");
+    if (page > 1) params.set("page", String(page));
+    const query = params.toString();
+    return `/investments${query ? `?${query}` : ""}#investment-positions`;
+  };
+  const pageNumbers = [...new Set([
+    1,
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    pageCount,
+  ])].filter((page) => page >= 1 && page <= pageCount);
+  const firstRow = (currentPage - 1) * INVESTMENT_PAGE_SIZE + 1;
+  const lastRow = Math.min(currentPage * INVESTMENT_PAGE_SIZE, totalRows);
+
+  return (
+    <nav
+      aria-label="Paginação das posições"
+      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm"
+    >
+      <span className="font-semibold text-slate-500">
+        {firstRow}–{lastRow} de {totalRows} posições
+      </span>
+      <div className="flex items-center gap-1">
+        <Link
+          href={pageHref(Math.max(1, currentPage - 1))}
+          aria-disabled={currentPage === 1}
+          className={`rounded-md border px-2.5 py-1.5 font-bold ${
+            currentPage === 1
+              ? "pointer-events-none border-slate-100 text-slate-300"
+              : "border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Anterior
+        </Link>
+        {pageNumbers.map((page, index) => (
+          <span key={page} className="contents">
+            {index > 0 && page - pageNumbers[index - 1] > 1 ? (
+              <span className="px-1 text-slate-400">…</span>
+            ) : null}
+            <Link
+              href={pageHref(page)}
+              aria-current={page === currentPage ? "page" : undefined}
+              className={`min-w-8 rounded-md px-2 py-1.5 text-center font-bold ${
+                page === currentPage
+                  ? "bg-emerald-700 text-white"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              {page}
+            </Link>
+          </span>
+        ))}
+        <Link
+          href={pageHref(Math.min(pageCount, currentPage + 1))}
+          aria-disabled={currentPage === pageCount}
+          className={`rounded-md border px-2.5 py-1.5 font-bold ${
+            currentPage === pageCount
+              ? "pointer-events-none border-slate-100 text-slate-300"
+              : "border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Próxima
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
 function InvestmentSubtotalMetrics({
   positions,
   currency,
@@ -137,6 +238,9 @@ function InvestmentSubtotalMetrics({
     0,
   );
   const performance = summarizeInvestmentPerformance(inputs, cashFlows);
+  const previousMonthPerformance = summarizeInvestmentPeriodPerformance(
+    positions.map(periodPerformanceOf),
+  );
   const metrics = [
     {
       label: "Valor",
@@ -174,13 +278,8 @@ function InvestmentSubtotalMetrics({
       tone: "text-slate-800",
     },
     {
-      label: "Mensal",
-      value: formatBasisPoints(performance.monthlyReturnBasisPoints),
-      tone: "text-slate-800",
-    },
-    {
-      label: "Anualizado",
-      value: formatBasisPoints(performance.annualizedReturnBasisPoints),
+      label: "Mês anterior",
+      value: formatBasisPoints(previousMonthPerformance?.returnBasisPoints ?? null),
       tone: "text-slate-800",
     },
     {
@@ -193,7 +292,7 @@ function InvestmentSubtotalMetrics({
   ];
 
   return (
-    <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[0.66rem] sm:grid-cols-4 lg:grid-cols-7">
+    <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[0.66rem] sm:grid-cols-3 lg:grid-cols-6">
       {metrics.map((metric) => (
         <div key={metric.label} className="min-w-0">
           <dt className="whitespace-nowrap font-semibold text-slate-500">
@@ -214,13 +313,17 @@ function PositionsView({
   cashFlows,
   performanceInputs,
   showArchived,
+  requestedPage,
 }: {
   positions: InvestmentPositionPerformanceSummary[];
   portfolioPerformance: ({ currency: SupportedCurrency } &
-    InvestmentPerformance)[];
+    InvestmentPerformance & {
+      previousMonthPerformance: InvestmentPeriodPerformance | null;
+    })[];
   cashFlows: InvestmentPerformanceCashFlow[];
   performanceInputs: Map<string, InvestmentPerformancePosition>;
   showArchived: boolean;
+  requestedPage?: string;
 }) {
   const active = positions.filter((position) => position.is_active);
   const visible = positions.filter(
@@ -252,6 +355,24 @@ function PositionsView({
     group.rows.push(position);
     groups.set(key, group);
   }
+  const orderedPositions = [...groups.values()].flatMap((group) =>
+    groupPositionsByType(group.rows).flatMap(([, rows]) => rows),
+  );
+  const pageCount = Math.max(
+    1,
+    Math.ceil(orderedPositions.length / INVESTMENT_PAGE_SIZE),
+  );
+  const parsedPage = Number.parseInt(requestedPage ?? "1", 10);
+  const currentPage = Math.min(
+    pageCount,
+    Math.max(1, Number.isFinite(parsedPage) ? parsedPage : 1),
+  );
+  const firstPositionIndex = (currentPage - 1) * INVESTMENT_PAGE_SIZE;
+  const pagePositionIds = new Set(
+    orderedPositions
+      .slice(firstPositionIndex, firstPositionIndex + INVESTMENT_PAGE_SIZE)
+      .map((position) => position.id),
+  );
 
   if (visible.length === 0) {
     return (
@@ -274,7 +395,7 @@ function PositionsView({
   }
 
   return (
-    <div className="grid gap-4">
+    <div id="investment-positions" className="grid gap-3 scroll-mt-4">
       {!showArchived ? (
         <section className="grid gap-3">
           {[...totals.entries()].map(([currency, currentValue]) => {
@@ -322,7 +443,7 @@ function PositionsView({
                     </p>
                   </div>
                 </div>
-                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs sm:grid-cols-4">
+                <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs">
                   <div>
                     <dt className="text-slate-500">Resultado</dt>
                     <dd
@@ -358,18 +479,11 @@ function PositionsView({
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Retorno mensal</dt>
+                    <dt className="text-slate-500">Mês anterior</dt>
                     <dd className="mt-0.5 font-extrabold text-slate-900">
                       {formatBasisPoints(
-                        performance?.monthlyReturnBasisPoints ?? null,
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Anualizado</dt>
-                    <dd className="mt-0.5 font-extrabold text-slate-900">
-                      {formatBasisPoints(
-                        performance?.annualizedReturnBasisPoints ?? null,
+                        performance?.previousMonthPerformance
+                          ?.returnBasisPoints ?? null,
                       )}
                     </dd>
                   </div>
@@ -422,13 +536,17 @@ function PositionsView({
       ) : null}
 
       {[...groups.values()].map((group) => {
-        const typeGroups = groupPositionsByType(group.rows);
+        const pageRows = group.rows.filter((position) =>
+          pagePositionIds.has(position.id),
+        );
+        if (pageRows.length === 0) return null;
+        const typeGroups = groupPositionsByType(pageRows);
         return (
         <section
           key={`${group.currency}-${group.family}`}
           className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="grid gap-2 border-b border-slate-200 px-3 py-2.5 lg:grid-cols-[minmax(10rem,0.8fr)_minmax(38rem,2.2fr)] lg:items-end">
+          <div className="grid gap-2 border-b border-slate-200 px-3 py-2 lg:grid-cols-[minmax(10rem,0.7fr)_minmax(34rem,2.3fr)] lg:items-end">
             <div>
               <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
                 {group.currency}
@@ -449,12 +567,14 @@ function PositionsView({
           <div className="grid">
             {typeGroups.map(([investmentType, typePositions]) => (
               <div key={investmentType}>
-                <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:grid-cols-[minmax(10rem,0.8fr)_minmax(38rem,2.2fr)] lg:items-center">
+                <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:grid-cols-[minmax(10rem,0.7fr)_minmax(34rem,2.3fr)] lg:items-center">
                   <span className="text-[0.7rem] font-extrabold text-slate-700">
                     {INVESTMENT_TYPE_LABELS[investmentType]}
                   </span>
                   <InvestmentSubtotalMetrics
-                    positions={typePositions}
+                    positions={group.rows.filter(
+                      (position) => position.investment_type === investmentType,
+                    )}
                     currency={group.currency}
                     portfolioCurrentValueMinor={
                       totals.get(group.currency) ?? 0
@@ -471,7 +591,7 @@ function PositionsView({
               return (
                 <article
                   key={position.id}
-                  className={`grid gap-2 px-3 py-2 md:grid-cols-2 lg:grid-cols-[minmax(17rem,1.7fr)_repeat(7,minmax(4.9rem,auto))_auto] lg:items-center ${
+                  className={`grid gap-2 px-3 py-1.5 md:grid-cols-2 lg:grid-cols-[minmax(17rem,1.9fr)_repeat(6,minmax(5rem,auto))_auto] lg:items-center ${
                     archived ? "opacity-60" : ""
                   }`}
                 >
@@ -538,21 +658,11 @@ function PositionsView({
                   </div>
                   <div>
                     <p className="text-[0.68rem] font-bold text-slate-500">
-                      Retorno mensal
+                      Mês anterior
                     </p>
                     <p className="text-xs font-bold text-slate-800">
                       {formatBasisPoints(
-                        position.monthly_return_basis_points,
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">
-                      Anualizado
-                    </p>
-                    <p className="text-xs font-bold text-slate-800">
-                      {formatBasisPoints(
-                        position.annualized_return_basis_points,
+                        position.previous_month_return_basis_points,
                       )}
                     </p>
                   </div>
@@ -615,6 +725,12 @@ function PositionsView({
         </section>
         );
       })}
+      <InvestmentPagination
+        currentPage={currentPage}
+        pageCount={pageCount}
+        totalRows={visible.length}
+        showArchived={showArchived}
+      />
     </div>
   );
 }
@@ -793,7 +909,12 @@ function FinancingsView({
 export default async function InvestmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ message?: string; tab?: string; view?: string }>;
+  searchParams: Promise<{
+    message?: string;
+    tab?: string;
+    view?: string;
+    page?: string;
+  }>;
 }) {
   const [investmentResult, netWorthResult, financingResult, params] = await Promise.all([
     listCurrentUserInvestmentPositions(),
@@ -912,6 +1033,7 @@ export default async function InvestmentsPage({
           cashFlows={investmentResult.cashFlows}
           performanceInputs={investmentResult.performanceInputs}
           showArchived={showArchived}
+          requestedPage={params.page}
         />
       ) : (
         <FinancingsView

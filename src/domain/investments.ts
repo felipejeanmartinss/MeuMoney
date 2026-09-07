@@ -576,6 +576,19 @@ export type InvestmentPerformanceCashFlow = InvestmentAggregationCashFlow & {
   cashFlowDate: string;
 };
 
+export type InvestmentPerformanceSnapshot = {
+  positionId: string;
+  userId: string;
+  currentValueMinor: number;
+  positionDate: string;
+};
+
+export type InvestmentPeriodPerformance = {
+  resultMinor: number;
+  returnBasisMinor: number;
+  returnBasisPoints: number;
+};
+
 export type InvestmentBreakdown = {
   contributionsMinor: number;
   redemptionsMinor: number;
@@ -606,6 +619,124 @@ function calculateReturnBasisPoints(resultMinor: number, basisMinor: number) {
   const scaled = (BigInt(result) * 10_000n) / BigInt(basis);
   const value = Number(scaled);
   return Number.isSafeInteger(value) ? value : null;
+}
+
+function previousCalendarMonth(referenceDate: string) {
+  if (!isValidIsoDate(referenceDate)) {
+    throw new Error("Investment performance reference date must be valid.");
+  }
+  const [year, month] = referenceDate.split("-").map(Number);
+  const start = new Date(Date.UTC(year, month - 2, 1));
+  const end = new Date(Date.UTC(year, month - 1, 0));
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+export function calculatePreviousMonthInvestmentPerformance(
+  position: Pick<InvestmentPerformancePosition, "id" | "userId">,
+  cashFlows: readonly InvestmentPerformanceCashFlow[],
+  snapshots: readonly InvestmentPerformanceSnapshot[],
+  referenceDate: string,
+): InvestmentPeriodPerformance | null {
+  const { startDate, endDate } = previousCalendarMonth(referenceDate);
+  const matchingSnapshots = snapshots.filter(
+    (snapshot) =>
+      snapshot.userId === position.userId &&
+      snapshot.positionId === position.id,
+  );
+  const latestSnapshot = (
+    candidates: readonly InvestmentPerformanceSnapshot[],
+  ) =>
+    candidates.reduce<InvestmentPerformanceSnapshot | null>(
+      (latest, snapshot) =>
+        !latest || snapshot.positionDate >= latest.positionDate
+          ? snapshot
+          : latest,
+      null,
+    );
+  const openingSnapshot = latestSnapshot(
+    matchingSnapshots.filter((snapshot) => snapshot.positionDate < startDate),
+  );
+  const closingSnapshot = latestSnapshot(
+    matchingSnapshots.filter(
+      (snapshot) =>
+        snapshot.positionDate >= startDate && snapshot.positionDate <= endDate,
+    ),
+  );
+  if (!openingSnapshot || !closingSnapshot) return null;
+
+  let contributionsMinor = 0;
+  let redemptionsMinor = 0;
+  let incomeMinor = 0;
+  for (const cashFlow of cashFlows) {
+    if (
+      cashFlow.userId !== position.userId ||
+      cashFlow.positionId !== position.id ||
+      cashFlow.cashFlowDate < startDate ||
+      cashFlow.cashFlowDate > endDate
+    ) {
+      continue;
+    }
+    const amount = assertMinorUnits(cashFlow.amountMinor);
+    if (amount <= 0) throw new Error("Investment cash flows must be positive.");
+    if (cashFlow.type === "contribution") {
+      contributionsMinor = assertMinorUnits(contributionsMinor + amount);
+    } else if (cashFlow.type === "redemption") {
+      redemptionsMinor = assertMinorUnits(redemptionsMinor + amount);
+    } else {
+      incomeMinor = assertMinorUnits(incomeMinor + amount);
+    }
+  }
+
+  const openingValueMinor = assertMinorUnits(openingSnapshot.currentValueMinor);
+  const closingValueMinor = assertMinorUnits(closingSnapshot.currentValueMinor);
+  const resultMinor = assertMinorUnits(
+    closingValueMinor +
+      redemptionsMinor +
+      incomeMinor -
+      openingValueMinor -
+      contributionsMinor,
+  );
+  const returnBasisMinor = assertMinorUnits(
+    openingValueMinor + contributionsMinor,
+  );
+  const returnBasisPoints = calculateReturnBasisPoints(
+    resultMinor,
+    returnBasisMinor,
+  );
+  return returnBasisPoints === null
+    ? null
+    : { resultMinor, returnBasisMinor, returnBasisPoints };
+}
+
+export function summarizeInvestmentPeriodPerformance(
+  performances: readonly (InvestmentPeriodPerformance | null)[],
+): InvestmentPeriodPerformance | null {
+  if (
+    performances.length === 0 ||
+    performances.some((performance) => performance === null)
+  ) {
+    return null;
+  }
+  const complete = performances as readonly InvestmentPeriodPerformance[];
+  const resultMinor = complete.reduce(
+    (total, performance) => assertMinorUnits(total + performance.resultMinor),
+    0,
+  );
+  const returnBasisMinor = complete.reduce(
+    (total, performance) =>
+      assertMinorUnits(total + performance.returnBasisMinor),
+    0,
+  );
+  const returnBasisPoints = calculateReturnBasisPoints(
+    resultMinor,
+    returnBasisMinor,
+  );
+  return returnBasisPoints === null
+    ? null
+    : { resultMinor, returnBasisMinor, returnBasisPoints };
 }
 
 function utcDay(date: string) {
