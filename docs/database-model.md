@@ -55,7 +55,7 @@ O cliente não recebe permissão de escrita direta nessas tabelas. As funções 
 
 ## Saldos
 
-`public.account_balances` é uma view com `security_invoker`. Ela deriva `current_balance_minor` do saldo inicial, dos lançamentos e das movimentações de transferência que estejam ativos, realizados e datados antes do dia corrente no fuso de São Paulo. O saldo atual não é duplicado em uma coluna mutável; a projeção a partir de hoje é calculada pelo domínio a partir do extrato completo.
+`public.account_balances` é uma view com `security_invoker`. Ela deriva `current_balance_minor` do saldo inicial e dos lançamentos e transferências ativos, realizados e datados antes do dia corrente no fuso de São Paulo. A coluna `projected_balance_minor` acrescenta todos os movimentos ativos de hoje em diante, inclusive previstos. Nenhum dos dois saldos é duplicado em coluna mutável; o domínio do extrato aplica a mesma regra para o saldo linha a linha.
 
 A central da conta lê lançamentos e entradas de transferência em páginas internas do servidor, combina os registros e calcula o saldo cronológico com uma função pura. Apenas a página solicitada é enviada ao navegador, preservando uma visão completa por conta sem carregar o histórico bruto no cliente.
 
@@ -310,6 +310,13 @@ grupo, categoria ou subcategoria e contexto financeiro. Rendimentos de
 investimentos entram somente quando ligados a um fluxo do tipo `income`;
 aportes e resgates continuam fora de receitas e despesas. O acesso é revogado
 de `anon` e concedido explicitamente a `authenticated`.
+
+Os serviços de relatório consolidam a view na moeda preferencial ou selecionada
+pelo usuário. As taxas são derivadas dos valores de origem e destino de
+transferências cambiais ativas e concluídas do próprio usuário, com seleção
+histórica por data e possibilidade de uma moeda intermediária. O índice parcial
+`transfers_user_conversion_date_idx` atende essa leitura sem expor uma tabela de
+cotações externa.
 
 `categories.is_fixed_expense` é uma preferência do usuário permitida apenas em
 subcategorias de despesa. Uma restrição no banco mantém essa regra, um índice

@@ -326,6 +326,7 @@ export type TransferEntry = {
 
 export type AccountBalance = Account & {
   current_balance_minor: number;
+  projected_balance_minor: number;
 };
 
 export type MonthlyBudget = {

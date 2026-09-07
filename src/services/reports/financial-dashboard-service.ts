@@ -33,7 +33,7 @@ const recurrenceColumns =
 const invoiceColumns =
   "id, user_id, credit_card_id, credit_card_name, currency, reference_month, due_date, status, effective_status, total_amount_minor, outstanding_amount_minor";
 const accountColumns =
-  "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor";
+  "id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at, current_balance_minor, projected_balance_minor";
 const budgetProgressColumns =
   "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed, category_kind";
 const netWorthColumns =

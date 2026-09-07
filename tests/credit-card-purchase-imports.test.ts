@@ -10,6 +10,10 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const stagingForm = readFileSync(
+  resolve("src", "components", "forms", "import-staging-row-form.tsx"),
+  "utf8",
+);
 
 describe("credit-card purchase imports", () => {
   it("keeps account and card targets mutually exclusive", () => {
@@ -47,5 +51,14 @@ describe("credit-card purchase imports", () => {
     expect(migration).toContain("set search_path = ''");
     expect(migration).toContain("from public, anon, authenticated");
     expect(migration).toContain("to authenticated");
+  });
+
+  it("submits a raw category UUID in the card-purchase correction flow", () => {
+    expect(stagingForm).toContain(
+      "prefixCategoryValue={!isCreditCardPurchaseImport}",
+    );
+    expect(stagingForm).toContain(
+      'isCreditCardPurchaseImport ? "categoryId" : "classification"',
+    );
   });
 });

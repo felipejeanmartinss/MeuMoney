@@ -60,6 +60,45 @@ function CurrencyTotals({
   );
 }
 
+function AccountBalanceTotals({ accounts }: { accounts: AccountBalance[] }) {
+  const activeAccounts = accounts.filter((account) => !account.archived_at);
+  const current = totalsByCurrency(
+    activeAccounts.map((account) => ({
+      currency: account.currency,
+      value: account.current_balance_minor,
+    })),
+  );
+  const projected = totalsByCurrency(
+    activeAccounts.map((account) => ({
+      currency: account.currency,
+      value: account.projected_balance_minor,
+    })),
+  );
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      <div>
+        <p className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
+          Atual
+        </p>
+        <CurrencyTotals totals={current} emptyLabel="Nenhuma conta" />
+      </div>
+      <div>
+        <p className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
+          Projetado
+        </p>
+        <CurrencyTotals totals={projected} emptyLabel="Nenhuma projeção" />
+      </div>
+      <span
+        aria-hidden="true"
+        className="text-sm text-slate-400 transition group-open:rotate-90"
+      >
+        ▸
+      </span>
+    </div>
+  );
+}
+
 function AccountStatusAction({ account }: { account: AccountBalance }) {
   const archived = Boolean(account.archived_at);
   return (
@@ -85,24 +124,18 @@ function AccountGroup({
   description: string;
   accounts: AccountBalance[];
 }) {
-  const totals = totalsByCurrency(
-    accounts
-      .filter((account) => !account.archived_at)
-      .map((account) => ({
-        currency: account.currency,
-        value: account.current_balance_minor,
-      })),
-  );
-
   return (
-    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <details
+      open
+      className="group min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <summary className="flex cursor-pointer list-none flex-col gap-3 border-b border-slate-200 px-5 py-4 marker:hidden sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold text-slate-950">{title}</h2>
           <p className="mt-1 text-sm text-slate-600">{description}</p>
         </div>
-        <CurrencyTotals totals={totals} emptyLabel="Nenhuma conta" />
-      </div>
+        <AccountBalanceTotals accounts={accounts} />
+      </summary>
 
       {accounts.length === 0 ? (
         <p className="px-5 py-8 text-sm text-slate-500">
@@ -117,7 +150,8 @@ function AccountGroup({
                   <th className="px-5 py-3 font-bold">Conta</th>
                   <th className="px-4 py-3 font-bold">Tipo</th>
                   <th className="px-4 py-3 font-bold">Atualização</th>
-                  <th className="px-4 py-3 text-right font-bold">Saldo</th>
+                  <th className="px-4 py-3 text-right font-bold">Saldo atual</th>
+                  <th className="px-4 py-3 text-right font-bold">Projetado</th>
                   <th className="px-5 py-3 text-right font-bold">Situação</th>
                 </tr>
               </thead>
@@ -150,6 +184,18 @@ function AccountGroup({
                     >
                       {formatMoney(
                         account.current_balance_minor,
+                        account.currency,
+                      )}
+                    </td>
+                    <td
+                      className={`px-4 py-4 text-right font-extrabold ${
+                        account.projected_balance_minor < 0
+                          ? "text-rose-700"
+                          : "text-slate-950"
+                      }`}
+                    >
+                      {formatMoney(
+                        account.projected_balance_minor,
                         account.currency,
                       )}
                     </td>
@@ -201,15 +247,32 @@ function AccountGroup({
                     {account.archived_at ? "Inativa" : "Ativa"}
                   </span>
                 </div>
-                <p
-                  className={`text-xl font-extrabold ${
-                    account.current_balance_minor < 0
-                      ? "text-rose-700"
-                      : "text-slate-950"
-                  }`}
-                >
-                  {formatMoney(account.current_balance_minor, account.currency)}
-                </p>
+                <dl className="grid grid-cols-2 gap-3">
+                  <div>
+                    <dt className="text-xs font-bold text-slate-500">Atual</dt>
+                    <dd
+                      className={`mt-0.5 text-lg font-extrabold ${
+                        account.current_balance_minor < 0
+                          ? "text-rose-700"
+                          : "text-slate-950"
+                      }`}
+                    >
+                      {formatMoney(account.current_balance_minor, account.currency)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-bold text-slate-500">Projetado</dt>
+                    <dd
+                      className={`mt-0.5 text-lg font-extrabold ${
+                        account.projected_balance_minor < 0
+                          ? "text-rose-700"
+                          : "text-slate-950"
+                      }`}
+                    >
+                      {formatMoney(account.projected_balance_minor, account.currency)}
+                    </dd>
+                  </div>
+                </dl>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-slate-500">
                     Atualizada em {formatDate(account.updated_at)}
@@ -229,7 +292,7 @@ function AccountGroup({
           </div>
         </>
       )}
-    </section>
+    </details>
   );
 }
 
@@ -248,8 +311,8 @@ function CardsGroup({
   );
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <details open className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <summary className="flex cursor-pointer list-none flex-col gap-3 border-b border-slate-200 px-5 py-4 marker:hidden sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold text-slate-950">
             Cartões de crédito
@@ -258,8 +321,11 @@ function CardsGroup({
             Compras ativas menos transferências já realizadas para cada cartão.
           </p>
         </div>
-        <CurrencyTotals totals={totals} emptyLabel="Nenhum cartão" />
-      </div>
+        <div className="flex items-center gap-3">
+          <CurrencyTotals totals={totals} emptyLabel="Nenhum cartão" />
+          <span aria-hidden="true" className="text-sm text-slate-400 transition group-open:rotate-90">▸</span>
+        </div>
+      </summary>
       {cards.length === 0 ? (
         <p className="px-5 py-8 text-sm text-slate-500">
           Nenhum cartão cadastrado.
@@ -295,7 +361,7 @@ function CardsGroup({
           ))}
         </div>
       )}
-    </section>
+    </details>
   );
 }
 
