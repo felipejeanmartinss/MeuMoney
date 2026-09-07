@@ -33,8 +33,6 @@ import type {
 
 export const metadata = { title: "Investimentos" };
 
-const INVESTMENT_PAGE_SIZE = 18;
-
 const messages: Record<string, string> = {
   created: "Posição de investimento cadastrada com sucesso.",
   updated: "Posição e fotografia histórica atualizadas com sucesso.",
@@ -116,6 +114,107 @@ function groupPositionsByFamily(
   return [...groups.entries()];
 }
 
+const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
+  treasury: "bg-blue-700",
+  cdb: "bg-blue-500",
+  lci_lca: "bg-sky-500",
+  debenture: "bg-cyan-600",
+  other_fixed_income: "bg-cyan-400",
+  stock: "bg-emerald-700",
+  fii: "bg-emerald-500",
+  etf: "bg-lime-600",
+  variable_fund: "bg-lime-400",
+  pension: "bg-amber-500",
+  crypto: "bg-violet-600",
+};
+
+const INVESTMENT_MATRIX_GRID =
+  "grid gap-x-5 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(6.5rem,1fr))_auto]";
+
+function InvestmentCompositionChart({
+  positions,
+  total,
+  currency,
+}: {
+  positions: readonly InvestmentPositionPerformanceSummary[];
+  total: number;
+  currency: SupportedCurrency;
+}) {
+  const families = groupPositionsByFamily(positions);
+  const segments = families.flatMap(([family, familyPositions]) =>
+    groupPositionsByType(familyPositions).flatMap(
+      ([investmentType, typePositions]) => {
+        const value = currentValueOf(typePositions);
+        return value > 0
+          ? [{ family, investmentType, value }]
+          : [];
+      },
+    ),
+  );
+
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-black text-slate-950">
+          Composição da carteira
+        </h2>
+        <span className="text-[0.68rem] font-extrabold uppercase tracking-wide text-emerald-700">
+          {currency}
+        </span>
+      </div>
+      <div
+        role="img"
+        aria-label={`Composição percentual da carteira em ${currency}`}
+        className="mt-4 flex h-5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200"
+      >
+        {segments.map((segment) => (
+          <span
+            key={`${segment.family}:${segment.investmentType}`}
+            title={`${INVESTMENT_TYPE_LABELS[segment.investmentType]}: ${percentage(segment.value, total)}`}
+            className={`${INVESTMENT_TYPE_COLORS[segment.investmentType]} min-w-px border-r border-white/80 last:border-r-0`}
+            style={{
+              width: total === 0 ? "0%" : `${(segment.value / total) * 100}%`,
+            }}
+          />
+        ))}
+      </div>
+      <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        {families.map(([family, familyPositions]) => (
+          <div key={family} className="min-w-0">
+            <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-900">
+              <span>{INVESTMENT_FAMILY_LABELS[family]}</span>
+              <span>{percentage(currentValueOf(familyPositions), total)}</span>
+            </div>
+            <ul className="mt-1.5 grid gap-1 text-[0.68rem] text-slate-600">
+              {groupPositionsByType(familyPositions).map(
+                ([investmentType, typePositions]) => (
+                  <li
+                    key={investmentType}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={`size-2.5 shrink-0 rounded-sm ${INVESTMENT_TYPE_COLORS[investmentType]}`}
+                      />
+                      <span className="truncate">
+                        {INVESTMENT_TYPE_LABELS[investmentType]}
+                      </span>
+                    </span>
+                    <strong className="shrink-0 text-slate-800">
+                      {percentage(currentValueOf(typePositions), total)}
+                    </strong>
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function periodPerformanceOf(
   position: InvestmentPositionPerformanceSummary,
 ): InvestmentPeriodPerformance | null {
@@ -128,89 +227,6 @@ function periodPerformanceOf(
         returnBasisMinor: position.previous_month_return_basis_minor,
         returnBasisPoints: position.previous_month_return_basis_points,
       };
-}
-
-function InvestmentPagination({
-  currentPage,
-  pageCount,
-  totalRows,
-  showArchived,
-}: {
-  currentPage: number;
-  pageCount: number;
-  totalRows: number;
-  showArchived: boolean;
-}) {
-  if (pageCount <= 1) return null;
-  const pageHref = (page: number) => {
-    const params = new URLSearchParams();
-    if (showArchived) params.set("view", "archived");
-    if (page > 1) params.set("page", String(page));
-    const query = params.toString();
-    return `/investments${query ? `?${query}` : ""}#investment-positions`;
-  };
-  const pageNumbers = [...new Set([
-    1,
-    currentPage - 1,
-    currentPage,
-    currentPage + 1,
-    pageCount,
-  ])].filter((page) => page >= 1 && page <= pageCount);
-  const firstRow = (currentPage - 1) * INVESTMENT_PAGE_SIZE + 1;
-  const lastRow = Math.min(currentPage * INVESTMENT_PAGE_SIZE, totalRows);
-
-  return (
-    <nav
-      aria-label="Paginação das posições"
-      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm"
-    >
-      <span className="font-semibold text-slate-500">
-        {firstRow}–{lastRow} de {totalRows} posições
-      </span>
-      <div className="flex items-center gap-1">
-        <Link
-          href={pageHref(Math.max(1, currentPage - 1))}
-          aria-disabled={currentPage === 1}
-          className={`rounded-md border px-2.5 py-1.5 font-bold ${
-            currentPage === 1
-              ? "pointer-events-none border-slate-100 text-slate-300"
-              : "border-slate-300 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Anterior
-        </Link>
-        {pageNumbers.map((page, index) => (
-          <span key={page} className="contents">
-            {index > 0 && page - pageNumbers[index - 1] > 1 ? (
-              <span className="px-1 text-slate-400">…</span>
-            ) : null}
-            <Link
-              href={pageHref(page)}
-              aria-current={page === currentPage ? "page" : undefined}
-              className={`min-w-8 rounded-md px-2 py-1.5 text-center font-bold ${
-                page === currentPage
-                  ? "bg-emerald-700 text-white"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              {page}
-            </Link>
-          </span>
-        ))}
-        <Link
-          href={pageHref(Math.min(pageCount, currentPage + 1))}
-          aria-disabled={currentPage === pageCount}
-          className={`rounded-md border px-2.5 py-1.5 font-bold ${
-            currentPage === pageCount
-              ? "pointer-events-none border-slate-100 text-slate-300"
-              : "border-slate-300 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Próxima
-        </Link>
-      </div>
-    </nav>
-  );
 }
 
 function InvestmentSubtotalMetrics({
@@ -295,7 +311,7 @@ function InvestmentSubtotalMetrics({
     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[0.66rem] sm:grid-cols-3 lg:col-span-6 lg:grid-cols-subgrid lg:gap-x-5">
       {metrics.map((metric) => (
         <div key={metric.label} className="min-w-0">
-          <dt className="whitespace-nowrap font-semibold text-slate-500">
+          <dt className="whitespace-nowrap font-semibold text-slate-500 lg:sr-only">
             {metric.label}
           </dt>
           <dd className={`truncate font-extrabold ${metric.tone}`}>
@@ -313,7 +329,6 @@ function PositionsView({
   cashFlows,
   performanceInputs,
   showArchived,
-  requestedPage,
 }: {
   positions: InvestmentPositionPerformanceSummary[];
   portfolioPerformance: ({ currency: SupportedCurrency } &
@@ -323,7 +338,6 @@ function PositionsView({
   cashFlows: InvestmentPerformanceCashFlow[];
   performanceInputs: Map<string, InvestmentPerformancePosition>;
   showArchived: boolean;
-  requestedPage?: string;
 }) {
   const active = positions.filter((position) => position.is_active);
   const visible = positions.filter(
@@ -355,25 +369,6 @@ function PositionsView({
     group.rows.push(position);
     groups.set(key, group);
   }
-  const orderedPositions = [...groups.values()].flatMap((group) =>
-    groupPositionsByType(group.rows).flatMap(([, rows]) => rows),
-  );
-  const pageCount = Math.max(
-    1,
-    Math.ceil(orderedPositions.length / INVESTMENT_PAGE_SIZE),
-  );
-  const parsedPage = Number.parseInt(requestedPage ?? "1", 10);
-  const currentPage = Math.min(
-    pageCount,
-    Math.max(1, Number.isFinite(parsedPage) ? parsedPage : 1),
-  );
-  const firstPositionIndex = (currentPage - 1) * INVESTMENT_PAGE_SIZE;
-  const pagePositionIds = new Set(
-    orderedPositions
-      .slice(firstPositionIndex, firstPositionIndex + INVESTMENT_PAGE_SIZE)
-      .map((position) => position.id),
-  );
-
   if (visible.length === 0) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
@@ -410,7 +405,6 @@ function PositionsView({
             const performance = portfolioPerformance.find(
               (item) => item.currency === currency,
             );
-            const familyBreakdown = groupPositionsByFamily(currencyPositions);
             return (
               <div
                 key={currency}
@@ -489,46 +483,11 @@ function PositionsView({
                   </div>
                 </dl>
               </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-black text-slate-950">
-                    Composição da carteira
-                  </h2>
-                  <span className="text-[0.68rem] font-extrabold uppercase tracking-wide text-emerald-700">
-                    {currency}
-                  </span>
-                </div>
-                <div className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2">
-                  {familyBreakdown.map(([family, familyPositions]) => (
-                    <div key={family} className="min-w-0">
-                      <div className="flex items-center justify-between gap-2 text-xs font-extrabold text-slate-900">
-                        <span>{INVESTMENT_FAMILY_LABELS[family]}</span>
-                        <span>
-                          {percentage(
-                            currentValueOf(familyPositions),
-                            currentValue,
-                          )}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.68rem] text-slate-500">
-                        {groupPositionsByType(familyPositions).map(
-                          ([investmentType, typePositions]) => (
-                            <span key={investmentType}>
-                              {INVESTMENT_TYPE_LABELS[investmentType]}{" "}
-                              <strong className="text-slate-700">
-                                {percentage(
-                                  currentValueOf(typePositions),
-                                  currentValue,
-                                )}
-                              </strong>
-                            </span>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
+              <InvestmentCompositionChart
+                positions={currencyPositions}
+                total={currentValue}
+                currency={currency}
+              />
               </div>
             );
           })}
@@ -536,203 +495,163 @@ function PositionsView({
       ) : null}
 
       {[...groups.values()].map((group) => {
-        const pageRows = group.rows.filter((position) =>
-          pagePositionIds.has(position.id),
-        );
-        if (pageRows.length === 0) return null;
-        const typeGroups = groupPositionsByType(pageRows);
+        const typeGroups = groupPositionsByType(group.rows);
         return (
-        <section
-          key={`${group.currency}-${group.family}`}
-          className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm lg:grid lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(5.5rem,1fr))_auto] lg:gap-x-5"
-        >
-          <div className="grid gap-y-2 border-b border-slate-200 px-3 py-2 lg:col-span-full lg:grid-cols-subgrid lg:items-end">
-            <div>
-              <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
-                {group.currency}
-              </p>
-              <h2 className="mt-0.5 font-black text-slate-950">
-                {INVESTMENT_FAMILY_LABELS[group.family]}
-              </h2>
+          <section
+            key={`${group.currency}-${group.family}`}
+            className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
+          >
+            <div
+              className={`${INVESTMENT_MATRIX_GRID} sticky top-0 z-10 hidden items-center border-b border-slate-300 bg-slate-100/95 px-3 py-1.5 text-[0.66rem] font-bold text-slate-600 backdrop-blur lg:grid`}
+            >
+              <span>Ativo</span>
+              <span>Valor atual</span>
+              <span>Custo</span>
+              <span>Resultado</span>
+              <span>Retorno total</span>
+              <span>Mês anterior</span>
+              <span>Participação</span>
+              <span className="text-right">Detalhes</span>
             </div>
-            <InvestmentSubtotalMetrics
-              positions={group.rows}
-              currency={group.currency}
-              portfolioCurrentValueMinor={totals.get(group.currency) ?? 0}
-              cashFlows={cashFlows}
-              performanceInputs={performanceInputs}
-              showArchived={showArchived}
-            />
-            <span className="hidden lg:block" aria-hidden="true" />
-          </div>
-          <div className="grid lg:contents">
-            {typeGroups.map(([investmentType, typePositions]) => (
-              <div key={investmentType} className="grid lg:contents">
-                <div className="grid gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 lg:col-span-full lg:grid-cols-subgrid lg:items-center">
-                  <span className="text-[0.7rem] font-extrabold text-slate-700">
-                    {INVESTMENT_TYPE_LABELS[investmentType]}
-                  </span>
-                  <InvestmentSubtotalMetrics
-                    positions={group.rows.filter(
-                      (position) => position.investment_type === investmentType,
-                    )}
-                    currency={group.currency}
-                    portfolioCurrentValueMinor={
-                      totals.get(group.currency) ?? 0
-                    }
-                    cashFlows={cashFlows}
-                    performanceInputs={performanceInputs}
-                    showArchived={showArchived}
-                  />
-                  <span className="hidden lg:block" aria-hidden="true" />
+
+            <details open>
+              <summary
+                className={`${INVESTMENT_MATRIX_GRID} cursor-pointer list-none items-center gap-y-2 border-b border-slate-200 px-3 py-2 marker:hidden lg:grid`}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="text-slate-400">▾</span>
+                  <div>
+                    <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
+                      {group.currency}
+                    </p>
+                    <h2 className="font-black text-slate-950">
+                      {INVESTMENT_FAMILY_LABELS[group.family]}
+                    </h2>
+                  </div>
                 </div>
-                <div className="grid divide-y divide-slate-100 lg:contents">
-            {typePositions.map((position) => {
-              const total = totals.get(position.currency) ?? 0;
-              const archived = !position.is_active;
-              return (
-                <article
-                  key={position.id}
-                  className={`grid gap-y-2 border-b border-slate-100 px-3 py-1.5 md:grid-cols-2 lg:col-span-full lg:grid-cols-subgrid lg:items-center ${
-                    archived ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="flex min-w-0 items-baseline gap-2 overflow-hidden whitespace-nowrap">
-                    <h3 className="max-w-[45%] shrink-0 truncate text-sm font-extrabold text-slate-950">
-                      {position.asset_name}
-                    </h3>
-                    <p className="min-w-0 truncate text-[0.68rem] text-slate-500">
-                      {position.institution} · {CONTEXT_LABELS[position.context]} ·{" "}
-                      {formatInvestmentQuantity(position.quantity)} un.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">Valor atual</p>
-                    <p className="text-xs font-extrabold text-slate-950">
-                      {formatMoney(
-                        position.current_value_minor,
-                        position.currency,
-                        CURRENCY_LOCALES[position.currency],
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">Custo</p>
-                    <p className="text-xs font-bold text-slate-800">
-                      {formatMoney(
-                        position.accumulated_cost_minor,
-                        position.currency,
-                        CURRENCY_LOCALES[position.currency],
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">Resultado</p>
-                    <p
-                      className={`text-xs font-bold ${
-                        position.performance_result_minor < 0
-                          ? "text-rose-700"
-                          : "text-emerald-700"
-                      }`}
-                    >
-                      {formatMoney(
-                        position.performance_result_minor,
-                        position.currency,
-                        CURRENCY_LOCALES[position.currency],
-                      )}
-                      {position.performance_result_is_estimated ? (
-                        <abbr
-                          title="Resultado estimado pelo valor atual menos o custo acumulado"
-                          className="ml-0.5 no-underline"
+                <InvestmentSubtotalMetrics
+                  positions={group.rows}
+                  currency={group.currency}
+                  portfolioCurrentValueMinor={totals.get(group.currency) ?? 0}
+                  cashFlows={cashFlows}
+                  performanceInputs={performanceInputs}
+                  showArchived={showArchived}
+                />
+                <span className="hidden lg:block" aria-hidden="true" />
+              </summary>
+
+              {typeGroups.map(([investmentType, typePositions]) => (
+                <details key={investmentType} open>
+                  <summary
+                    className={`${INVESTMENT_MATRIX_GRID} cursor-pointer list-none items-center gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 marker:hidden lg:grid`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2 text-[0.7rem] font-extrabold text-slate-700">
+                      <span aria-hidden="true" className="text-slate-400">▾</span>
+                      {INVESTMENT_TYPE_LABELS[investmentType]}
+                    </span>
+                    <InvestmentSubtotalMetrics
+                      positions={typePositions}
+                      currency={group.currency}
+                      portfolioCurrentValueMinor={totals.get(group.currency) ?? 0}
+                      cashFlows={cashFlows}
+                      performanceInputs={performanceInputs}
+                      showArchived={showArchived}
+                    />
+                    <span className="hidden lg:block" aria-hidden="true" />
+                  </summary>
+
+                  <div className="divide-y divide-slate-100">
+                    {typePositions.map((position) => {
+                      const total = totals.get(position.currency) ?? 0;
+                      const archived = !position.is_active;
+                      return (
+                        <details
+                          key={position.id}
+                          className={archived ? "opacity-60" : undefined}
                         >
-                          *
-                        </abbr>
-                      ) : null}
-                    </p>
+                          <summary
+                            className={`${INVESTMENT_MATRIX_GRID} cursor-pointer list-none items-center gap-y-2 px-3 py-1.5 marker:hidden lg:grid`}
+                          >
+                            <h3 className="min-w-0 truncate text-sm font-extrabold text-slate-950">
+                              {position.asset_name}
+                            </h3>
+                            <div>
+                              <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Valor atual</p>
+                              <p className="text-xs font-extrabold text-slate-950">
+                                {formatMoney(position.current_value_minor, position.currency, CURRENCY_LOCALES[position.currency])}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Custo</p>
+                              <p className="text-xs font-bold text-slate-800">
+                                {formatMoney(position.accumulated_cost_minor, position.currency, CURRENCY_LOCALES[position.currency])}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Resultado</p>
+                              <p className={`text-xs font-bold ${position.performance_result_minor < 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                {formatMoney(position.performance_result_minor, position.currency, CURRENCY_LOCALES[position.currency])}
+                                {position.performance_result_is_estimated ? (
+                                  <abbr title="Resultado estimado pelo valor atual menos o custo acumulado" className="ml-0.5 no-underline">*</abbr>
+                                ) : null}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Retorno total</p>
+                              <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.total_return_basis_points)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Mês anterior</p>
+                              <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.previous_month_return_basis_points)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Participação</p>
+                              <p className="text-xs font-bold text-slate-800">
+                                {archived ? "Arquivada" : percentage(position.current_value_minor, total)}
+                              </p>
+                            </div>
+                            <span aria-hidden="true" className="text-right text-slate-400">▾</span>
+                          </summary>
+
+                          <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                            <p>
+                              {position.institution} · {CONTEXT_LABELS[position.context]} · {formatInvestmentQuantity(position.quantity)} un.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <Link href={`/investments/${position.id}/edit`} className="rounded-lg px-3 py-2 font-bold text-slate-800 hover:bg-white">
+                                Atualizar
+                              </Link>
+                              <Link href={`/investments/${position.id}/history`} className="rounded-lg px-3 py-2 font-bold text-slate-800 hover:bg-white">
+                                Histórico
+                              </Link>
+                              <form action={toggleInvestmentPositionStatus}>
+                                <input type="hidden" name="id" value={position.id} />
+                                <input type="hidden" name="archive" value={archived ? "false" : "true"} />
+                                <button className="rounded-lg px-3 py-2 font-bold text-slate-800 hover:bg-white">
+                                  {archived ? "Reativar" : "Arquivar"}
+                                </button>
+                              </form>
+                              <form action={deleteInvestmentPosition}>
+                                <input type="hidden" name="id" value={position.id} />
+                                <ConfirmSubmitButton
+                                  confirmation={`Excluir definitivamente a posição “${position.asset_name}” e seus movimentos? Transferências originais serão preservadas.`}
+                                  className="rounded-lg px-3 py-2 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  Excluir
+                                </ConfirmSubmitButton>
+                              </form>
+                            </div>
+                          </div>
+                        </details>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">
-                      Retorno total
-                    </p>
-                    <p className="text-xs font-bold text-slate-800">
-                      {formatBasisPoints(position.total_return_basis_points)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">
-                      Mês anterior
-                    </p>
-                    <p className="text-xs font-bold text-slate-800">
-                      {formatBasisPoints(
-                        position.previous_month_return_basis_points,
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] font-bold text-slate-500">
-                      Participação
-                    </p>
-                    <p className="text-xs font-bold text-slate-800">
-                      {archived
-                        ? "Arquivada"
-                        : percentage(position.current_value_minor, total)}
-                    </p>
-                  </div>
-                  <details className="relative z-20">
-                    <summary className="flex min-h-8 cursor-pointer list-none items-center rounded-lg border border-slate-300 px-2.5 text-xs font-bold">
-                      Ações
-                    </summary>
-                    <div className="z-30 mt-2 grid min-w-40 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl lg:absolute lg:right-0">
-                      <Link
-                        href={`/investments/${position.id}/edit`}
-                        className="rounded-lg px-3 py-2 text-sm font-bold hover:bg-slate-100"
-                      >
-                        Atualizar
-                      </Link>
-                      <Link
-                        href={`/investments/${position.id}/history`}
-                        className="rounded-lg px-3 py-2 text-sm font-bold hover:bg-slate-100"
-                      >
-                        Histórico
-                      </Link>
-                      <form action={toggleInvestmentPositionStatus}>
-                        <input type="hidden" name="id" value={position.id} />
-                        <input
-                          type="hidden"
-                          name="archive"
-                          value={archived ? "false" : "true"}
-                        />
-                        <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-slate-100">
-                          {archived ? "Reativar" : "Arquivar"}
-                        </button>
-                      </form>
-                      <form action={deleteInvestmentPosition}>
-                        <input type="hidden" name="id" value={position.id} />
-                        <ConfirmSubmitButton
-                          confirmation={`Excluir definitivamente a posição “${position.asset_name}” e seus movimentos? Transferências originais serão preservadas.`}
-                          className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          Excluir
-                        </ConfirmSubmitButton>
-                      </form>
-                    </div>
-                  </details>
-                </article>
-              );
-            })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+                </details>
+              ))}
+            </details>
+          </section>
         );
       })}
-      <InvestmentPagination
-        currentPage={currentPage}
-        pageCount={pageCount}
-        totalRows={visible.length}
-        showArchived={showArchived}
-      />
     </div>
   );
 }
@@ -915,7 +834,6 @@ export default async function InvestmentsPage({
     message?: string;
     tab?: string;
     view?: string;
-    page?: string;
   }>;
 }) {
   const [investmentResult, netWorthResult, financingResult, params] = await Promise.all([
@@ -1035,7 +953,6 @@ export default async function InvestmentsPage({
           cashFlows={investmentResult.cashFlows}
           performanceInputs={investmentResult.performanceInputs}
           showArchived={showArchived}
-          requestedPage={params.page}
         />
       ) : (
         <FinancingsView

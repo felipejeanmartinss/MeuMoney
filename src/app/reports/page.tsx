@@ -17,6 +17,7 @@ import {
 } from "@/domain/financial-reports";
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
 import { formatMoney } from "@/domain/money";
+import { getCurrentProfile } from "@/services/auth/server-auth";
 import {
   getCurrentUserAssetPerformanceReport,
   getCurrentUserFixedExpenseReport,
@@ -139,7 +140,7 @@ function CommonReportFields({
         </label>
       ) : null}
       <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-        Moeda
+        Moeda de referência
         <select name="currency" defaultValue={currency} className={inputClass}>
           {SUPPORTED_CURRENCIES.map((item) => (
             <option key={item} value={item}>
@@ -194,7 +195,10 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const raw = await searchParams;
+  const [raw, profileResult] = await Promise.all([
+    searchParams,
+    getCurrentProfile(),
+  ]);
   const value = (key: string) =>
     typeof raw[key] === "string" ? raw[key] : undefined;
   const report =
@@ -202,14 +206,15 @@ export default async function ReportsPage({
     "income-expense";
   const common = financialReportFilterSchema.safeParse({
     year: value("year") ?? currentYear(),
-    currency: value("currency") ?? "BRL",
+    currency:
+      value("currency") ?? profileResult.profile?.preferred_currency ?? "BRL",
     basis: value("basis") ?? "competence",
   });
   const filters = common.success
     ? common.data
     : {
         year: currentYear(),
-        currency: "BRL" as const,
+        currency: profileResult.profile?.preferred_currency ?? "BRL",
         basis: "competence" as const,
       };
   const context =
@@ -228,9 +233,7 @@ export default async function ReportsPage({
           Central de relatórios
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-600 sm:text-base">
-          Escolha um relatório, ajuste os parâmetros e analise os valores em
-          matrizes compactas. Gráficos podem ser adicionados depois, sem mudar a
-          regra financeira.
+          Matrizes consolidadas na moeda de referência do perfil.
         </p>
       </header>
 
@@ -323,6 +326,10 @@ async function IncomeExpenseReport({
         {reportBasisDescription(filters.basis)}
       </p>
       {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice
+        currency={filters.currency}
+        missingCurrencies={result.missingCurrencies}
+      />
       <div className="grid grid-cols-3 border-t border-slate-200 bg-white">
         <SummaryCell
           label="Receitas"
@@ -386,6 +393,10 @@ async function FixedExpensesReport({
         <ApplyFiltersButton />
       </form>
       {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice
+        currency={filters.currency}
+        missingCurrencies={result.missingCurrencies}
+      />
       <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
@@ -479,6 +490,10 @@ async function ComparisonReport({
         {reportBasisDescription(filters.basis)}
       </p>
       {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice
+        currency={filters.currency}
+        missingCurrencies={result.missingCurrencies}
+      />
       <PeriodComparisonMatrix
         rows={result.rows}
         currency={filters.currency}
@@ -534,6 +549,10 @@ async function AssetPerformanceReport({
         <ApplyFiltersButton />
       </form>
       {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice
+        currency={filters.currency}
+        missingCurrencies={result.missingCurrencies}
+      />
       <AssetPerformanceMatrix
         positions={result.positions}
         performanceByClass={result.performanceByClass}
@@ -546,6 +565,30 @@ async function AssetPerformanceReport({
         calculada pelos fluxos datados.
       </p>
     </>
+  );
+}
+
+function ReportCurrencyNotice({
+  currency,
+  missingCurrencies,
+}: {
+  currency: SupportedCurrency;
+  missingCurrencies: SupportedCurrency[];
+}) {
+  if (missingCurrencies.length) {
+    return (
+      <p className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-950">
+        Não há conversão registrada de {missingCurrencies.join(", ")} para{" "}
+        {currency}; esses valores não foram somados. Registre uma transferência
+        entre as moedas para definir a taxa de referência.
+      </p>
+    );
+  }
+  return (
+    <p className="border-t border-emerald-100 bg-emerald-50 px-4 py-2 text-xs text-emerald-950">
+      Todas as moedas foram consolidadas em {currency} com as taxas registradas
+      nas transferências entre contas.
+    </p>
   );
 }
 

@@ -34,6 +34,32 @@ function revalidateFinancialPaths() {
   revalidatePath("/dashboard");
 }
 
+function recurringTransactionHref(input: {
+  accountId: string;
+  categoryId: string;
+  transactionType: "income" | "expense";
+  description: string;
+  amountMinor: number;
+  transactionDate: string;
+  notes: string | null;
+}) {
+  const query = new URLSearchParams({
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+    transactionType: input.transactionType,
+    description: input.description,
+    amountMinor: String(input.amountMinor),
+    startDate: input.transactionDate,
+    nextOccurrence: nextRecurrenceDate({
+      startDate: input.transactionDate,
+      currentOccurrence: input.transactionDate,
+      frequency: "monthly",
+    }),
+  });
+  if (input.notes) query.set("notes", input.notes);
+  return `/recurring-transactions/new?${query.toString()}`;
+}
+
 export async function createTransaction(
   _previousState: FinancialFormState,
   formData: FormData,
@@ -52,21 +78,7 @@ export async function createTransaction(
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
   if (formData.get("createRecurring") === "true") {
-    const query = new URLSearchParams({
-      accountId: parsed.data.accountId,
-      categoryId: parsed.data.categoryId,
-      transactionType: parsed.data.transactionType,
-      description: parsed.data.description,
-      amountMinor: String(parsed.data.amountMinor),
-      startDate: parsed.data.transactionDate,
-      nextOccurrence: nextRecurrenceDate({
-        startDate: parsed.data.transactionDate,
-        currentOccurrence: parsed.data.transactionDate,
-        frequency: "monthly",
-      }),
-    });
-    if (parsed.data.notes) query.set("notes", parsed.data.notes);
-    redirect(`/recurring-transactions/new?${query.toString()}`);
+    redirect(recurringTransactionHref(parsed.data));
   }
   if (formData.get("returnAccountId") === parsed.data.accountId) {
     revalidatePath(`/accounts/${parsed.data.accountId}`);
@@ -101,6 +113,9 @@ export async function updateTransaction(
   );
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
+  if (formData.get("createRecurring") === "true") {
+    redirect(recurringTransactionHref(parsed.data));
+  }
   redirect("/transactions?message=updated");
 }
 
