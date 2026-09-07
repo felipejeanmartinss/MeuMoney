@@ -178,6 +178,7 @@ export async function listCurrentUserInvestmentPositions() {
       realized_gain_loss_minor: performance.realizedGainLossMinor,
       performance_return_basis_minor: performance.returnBasisMinor,
       total_return_basis_points: performance.totalReturnBasisPoints,
+      monthly_return_basis_points: performance.monthlyReturnBasisPoints,
       annualized_return_basis_points:
         performance.annualizedReturnBasisPoints,
     };

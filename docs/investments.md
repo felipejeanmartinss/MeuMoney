@@ -41,7 +41,7 @@ torna custo e valor da fotografia inicial, sem valorização presumida.
 O cadastro direto de posição continua disponível para patrimônio anterior ao
 histórico transacional. Nessa situação, o usuário pode marcar o histórico como
 incompleto; resultado e retorno total são estimados pela diferença entre valor
-atual e custo acumulado, sem estimar retorno anualizado.
+atual e custo acumulado, sem estimar retornos mensal ou anualizado.
 
 Transferências já realizadas em contas do tipo Investimento aparecem em uma
 fila de vínculo. Uma entrada pode originar uma aplicação de mesmo valor; uma
@@ -60,8 +60,11 @@ contém todos os fluxos desde o início, o resultado total é
 os resgates com o custo baixado da posição. O retorno total divide o resultado
 pela base de aportes completa. O retorno anualizado usa os aportes, resgates,
 rendas e valor final em suas datas e só aparece quando há histórico completo e
-uma solução financeira válida. Com histórico parcial, a base do retorno total
-é o custo acumulado e o resultado permanece identificado como estimado.
+uma solução financeira válida. O retorno mensal é a taxa efetiva mensal
+equivalente ao retorno anualizado, permitindo comparar investimentos em uma
+referência comum. Com histórico parcial, a base do retorno total é o custo
+acumulado e o resultado permanece identificado por um asterisco, explicado na
+própria tela.
 
 A carteira principal lista somente posições ativas. Arquivadas permanecem
 acessíveis em uma visão separada e não compõem os totais. Cada grupo informa a

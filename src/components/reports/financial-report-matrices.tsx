@@ -762,42 +762,51 @@ export function AssetPerformanceMatrix({
     group.push(position);
     groups.set(position.investment_class, group);
   }
+  const performanceByClassLookup = new Map(
+    performanceByClass.map((performance) => [
+      performance.investmentClass,
+      performance,
+    ]),
+  );
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1480px] border-collapse text-[0.72rem] tabular-nums">
+      <table className="w-full min-w-[1180px] border-collapse text-[0.68rem] tabular-nums">
         <caption className="sr-only">
           Performance atual das posições de investimento
         </caption>
         <thead className="bg-slate-100 text-slate-700">
           <tr className="border-b border-slate-300">
-            <th scope="col" className="min-w-64 px-2.5 py-2 text-left">
+            <th scope="col" className="min-w-56 px-2 py-1.5 text-left">
               Ativo
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Aportes
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Resgates
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Rendimentos
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Valor atual
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Custo acumulado
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Lucro/perda realizado
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Resultado
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
               Retorno total
             </th>
-            <th scope="col" className="px-2.5 py-2 text-right">
+            <th scope="col" className="px-2 py-1.5 text-right">
+              Retorno mensal
+            </th>
+            <th scope="col" className="px-2 py-1.5 text-right">
               Retorno anualizado
             </th>
           </tr>
@@ -808,11 +817,7 @@ export function AssetPerformanceMatrix({
               key={investmentClass}
               label={INVESTMENT_CLASS_LABELS[investmentClass]}
               rows={rows}
-              performance={
-                performanceByClass.find(
-                  (item) => item.investmentClass === investmentClass,
-                ) ?? null
-              }
+              performance={performanceByClassLookup.get(investmentClass) ?? null}
               currency={currency}
             />
           ))}
@@ -841,41 +846,42 @@ function AssetGroupRows({
   return (
     <>
       <tr className="border-b border-slate-200 bg-emerald-50 font-extrabold text-emerald-950">
-        <th scope="row" className="px-2.5 py-1.5 text-left">
+        <th scope="row" className="px-2 py-1 text-left">
           {label}
         </th>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
           {amount(contributions, currency)}
         </td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
           {amount(redemptions, currency)}
         </td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
           {amount(income, currency)}
         </td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
           {amount(current, currency)}
         </td>
-        <td className="px-2.5 py-1.5 text-right">{amount(cost, currency)}</td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">{amount(cost, currency)}</td>
+        <td className="px-2 py-1 text-right">
           {performance?.realizedGainLossMinor === null || !performance
             ? "—"
             : signedAmount(performance.realizedGainLossMinor, currency)}
         </td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
           {performance
             ? signedAmount(performance.resultMinor, currency)
             : "—"}
           {performance?.resultIsEstimated ? (
-            <span className="ml-1 text-[0.65rem] font-semibold text-amber-700">
-              estimado
-            </span>
+            <span className="ml-0.5 text-amber-700">*</span>
           ) : null}
         </td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
           {basisPoints(performance?.totalReturnBasisPoints ?? null)}
         </td>
-        <td className="px-2.5 py-1.5 text-right">
+        <td className="px-2 py-1 text-right">
+          {basisPoints(performance?.monthlyReturnBasisPoints ?? null)}
+        </td>
+        <td className="px-2 py-1 text-right">
           {basisPoints(performance?.annualizedReturnBasisPoints ?? null)}
         </td>
       </tr>
@@ -886,45 +892,46 @@ function AssetGroupRows({
         >
           <th
             scope="row"
-            className="px-2.5 py-1.5 text-left font-medium text-slate-800"
+            className="max-w-72 truncate px-2 py-1 text-left font-medium text-slate-800"
           >
             {row.asset_name}
             <span className="ml-2 font-normal text-slate-500">
               {row.institution} · {INVESTMENT_TYPE_LABELS[row.investment_type]}
             </span>
           </th>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
             {amount(row.contributions_minor, currency)}
           </td>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
             {amount(row.redemptions_minor, currency)}
           </td>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
             {amount(row.income_minor, currency)}
           </td>
-          <td className="px-2.5 py-1.5 text-right font-bold">
+          <td className="px-2 py-1 text-right font-bold">
             {amount(row.current_value_minor, currency)}
           </td>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
             {amount(row.accumulated_cost_minor, currency)}
           </td>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
             {row.realized_gain_loss_minor === null
               ? "—"
               : signedAmount(row.realized_gain_loss_minor, currency)}
           </td>
-          <td className="px-2.5 py-1.5 text-right font-bold">
+          <td className="px-2 py-1 text-right font-bold">
             {signedAmount(row.performance_result_minor, currency)}
             {row.performance_result_is_estimated ? (
-              <span className="ml-1 text-[0.65rem] font-semibold text-amber-700">
-                estimado
-              </span>
+              <span className="ml-0.5 text-amber-700">*</span>
             ) : null}
           </td>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
             {basisPoints(row.total_return_basis_points)}
           </td>
-          <td className="px-2.5 py-1.5 text-right">
+          <td className="px-2 py-1 text-right">
+            {basisPoints(row.monthly_return_basis_points)}
+          </td>
+          <td className="px-2 py-1 text-right">
             {basisPoints(row.annualized_return_basis_points)}
           </td>
         </tr>

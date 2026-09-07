@@ -533,16 +533,18 @@ async function AssetPerformanceReport({
         </label>
         <ApplyFiltersButton />
       </form>
-      <p className="border-t border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-950">
-        Histórico parcial: resultado e retorno total usam valor atual menos
-        custo acumulado; retorno anualizado fica em branco.
-      </p>
       {result.hasError ? <ReportError /> : null}
       <AssetPerformanceMatrix
         positions={result.positions}
         performanceByClass={result.performanceByClass}
         currency={filters.currency}
       />
+      <p className="border-t border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-950">
+        * Histórico parcial: resultado e retorno total usam valor atual menos
+        custo acumulado. Os retornos mensal e anualizado aparecem somente com
+        histórico completo; o mensal é a taxa efetiva equivalente à anual,
+        calculada pelos fluxos datados.
+      </p>
     </>
   );
 }

@@ -19,17 +19,17 @@ export function AppShell({
         Pular para o conteúdo
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r border-slate-200 bg-white px-3 py-4 lg:flex">
         <Link
           href="/dashboard"
-          className="flex items-center gap-3 rounded-xl px-2 py-1 text-xl font-black tracking-tight text-emerald-950"
+          className="flex items-center gap-2.5 rounded-xl px-2 py-1 text-lg font-black tracking-tight text-emerald-950"
         >
-          <span className="grid size-9 place-items-center rounded-xl bg-emerald-800 text-sm font-black text-white shadow-sm">
+          <span className="grid size-8 place-items-center rounded-lg bg-emerald-800 text-xs font-black text-white shadow-sm">
             M
           </span>
           MeuMoney
         </Link>
-        <div className="mt-7 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
           <Suspense
             fallback={
               <div className="h-80 animate-pulse rounded-2xl bg-slate-50" />
@@ -38,8 +38,8 @@ export function AppShell({
             <DesktopNavigation />
           </Suspense>
         </div>
-        <form action={logout} className="mt-5 border-t border-slate-100 pt-4">
-          <button className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-950">
+        <form action={logout} className="mt-4 border-t border-slate-100 pt-3">
+          <button className="flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-950">
             Sair com segurança
           </button>
         </form>
@@ -75,7 +75,7 @@ export function AppShell({
       <div
         id="main-content"
         tabIndex={-1}
-        className="min-w-0 pb-24 lg:pl-64 lg:pb-0"
+        className="min-w-0 pb-24 lg:pl-56 lg:pb-0"
       >
         {children}
       </div>

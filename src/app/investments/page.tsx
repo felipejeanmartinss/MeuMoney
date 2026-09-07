@@ -10,7 +10,6 @@ import {
   formatInvestmentQuantity,
   getInvestmentFamily,
   INVESTMENT_FAMILY_LABELS,
-  INVESTMENT_CLASS_LABELS,
   INVESTMENT_TYPE_LABELS,
   type InvestmentPerformance,
 } from "@/domain/investments";
@@ -168,7 +167,7 @@ function PositionsView({
                     </p>
                   </div>
                 </div>
-                <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-slate-100 pt-3 text-xs">
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs sm:grid-cols-4">
                   <div>
                     <dt className="text-slate-500">Resultado</dt>
                     <dd
@@ -204,6 +203,14 @@ function PositionsView({
                     </dd>
                   </div>
                   <div>
+                    <dt className="text-slate-500">Retorno mensal</dt>
+                    <dd className="mt-0.5 font-extrabold text-slate-900">
+                      {formatBasisPoints(
+                        performance?.monthlyReturnBasisPoints ?? null,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
                     <dt className="text-slate-500">Anualizado</dt>
                     <dd className="mt-0.5 font-extrabold text-slate-900">
                       {formatBasisPoints(
@@ -223,7 +230,7 @@ function PositionsView({
           key={`${group.currency}-${group.family}`}
           className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-4 py-3">
+          <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-3 py-2.5">
             <div>
               <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.15em] text-emerald-700">
                 {group.currency}
@@ -252,27 +259,24 @@ function PositionsView({
               return (
                 <article
                   key={position.id}
-                  className={`grid gap-3 px-4 py-3 md:grid-cols-2 xl:grid-cols-[minmax(15rem,1.45fr)_repeat(6,minmax(5.8rem,auto))_auto] xl:items-center ${
+                  className={`grid gap-2 px-3 py-2 md:grid-cols-2 lg:grid-cols-[minmax(17rem,1.7fr)_repeat(7,minmax(4.9rem,auto))_auto] lg:items-center ${
                     archived ? "opacity-60" : ""
                   }`}
                 >
-                  <div className="min-w-0">
-                    <h3 className="truncate font-extrabold text-slate-950">
+                  <div className="flex min-w-0 items-baseline gap-2 overflow-hidden whitespace-nowrap">
+                    <h3 className="max-w-[45%] shrink-0 truncate text-sm font-extrabold text-slate-950">
                       {position.asset_name}
                     </h3>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {position.institution} · {CONTEXT_LABELS[position.context]}
-                    </p>
-                    <p className="mt-0.5 text-[0.7rem] text-slate-500">
+                    <p className="min-w-0 truncate text-[0.68rem] text-slate-500">
+                      {position.institution} · {CONTEXT_LABELS[position.context]} ·{" "}
                       {INVESTMENT_TYPE_LABELS[position.investment_type]} ·{" "}
-                      {INVESTMENT_CLASS_LABELS[position.investment_class]} ·{" "}
-                      {formatInvestmentQuantity(position.quantity)} unidades ·{" "}
+                      {formatInvestmentQuantity(position.quantity)} un. ·{" "}
                       {formatDate(position.position_date)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-500">Valor atual</p>
-                    <p className="mt-0.5 text-sm font-extrabold text-slate-950">
+                    <p className="text-[0.68rem] font-bold text-slate-500">Valor atual</p>
+                    <p className="text-xs font-extrabold text-slate-950">
                       {formatMoney(
                         position.current_value_minor,
                         position.currency,
@@ -281,8 +285,8 @@ function PositionsView({
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-500">Custo</p>
-                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    <p className="text-[0.68rem] font-bold text-slate-500">Custo</p>
+                    <p className="text-xs font-bold text-slate-800">
                       {formatMoney(
                         position.accumulated_cost_minor,
                         position.currency,
@@ -291,9 +295,9 @@ function PositionsView({
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-500">Resultado</p>
+                    <p className="text-[0.68rem] font-bold text-slate-500">Resultado</p>
                     <p
-                      className={`mt-0.5 text-sm font-bold ${
+                      className={`text-xs font-bold ${
                         position.performance_result_minor < 0
                           ? "text-rose-700"
                           : "text-emerald-700"
@@ -315,35 +319,45 @@ function PositionsView({
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-500">
+                    <p className="text-[0.68rem] font-bold text-slate-500">
                       Retorno total
                     </p>
-                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    <p className="text-xs font-bold text-slate-800">
                       {formatBasisPoints(position.total_return_basis_points)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-500">
+                    <p className="text-[0.68rem] font-bold text-slate-500">
+                      Retorno mensal
+                    </p>
+                    <p className="text-xs font-bold text-slate-800">
+                      {formatBasisPoints(
+                        position.monthly_return_basis_points,
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[0.68rem] font-bold text-slate-500">
                       Anualizado
                     </p>
-                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    <p className="text-xs font-bold text-slate-800">
                       {formatBasisPoints(
                         position.annualized_return_basis_points,
                       )}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-500">
+                    <p className="text-[0.68rem] font-bold text-slate-500">
                       Participação
                     </p>
-                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    <p className="text-xs font-bold text-slate-800">
                       {archived
                         ? "Arquivada"
                         : percentage(position.current_value_minor, total)}
                     </p>
                   </div>
                   <details className="relative z-20">
-                    <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-slate-300 px-3 text-sm font-bold">
+                    <summary className="flex min-h-8 cursor-pointer list-none items-center rounded-lg border border-slate-300 px-2.5 text-xs font-bold">
                       Ações
                     </summary>
                     <div className="z-30 mt-2 grid min-w-40 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl lg:absolute lg:right-0">
@@ -585,8 +599,8 @@ export default async function InvestmentsPage({
     financingResult.hasError;
 
   return (
-    <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto grid max-w-[1760px] gap-4 px-3 py-5 sm:px-5 lg:px-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Carteira e compromissos

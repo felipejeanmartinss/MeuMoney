@@ -586,6 +586,7 @@ export type InvestmentPerformance = {
   realizedGainLossMinor: number | null;
   returnBasisMinor: number;
   totalReturnBasisPoints: number | null;
+  monthlyReturnBasisPoints: number | null;
   annualizedReturnBasisPoints: number | null;
 };
 
@@ -678,6 +679,24 @@ function calculateAnnualizedReturnBasisPoints(
 
   const basisPoints = Math.round(((lower + upper) / 2) * 10_000);
   return Number.isSafeInteger(basisPoints) ? basisPoints : null;
+}
+
+function calculateMonthlyEquivalentBasisPoints(
+  annualizedReturnBasisPoints: number | null,
+) {
+  if (
+    annualizedReturnBasisPoints === null ||
+    annualizedReturnBasisPoints <= -10_000
+  ) {
+    return null;
+  }
+  const annualRate = annualizedReturnBasisPoints / 10_000;
+  const monthlyBasisPoints = Math.round(
+    ((1 + annualRate) ** (1 / 12) - 1) * 10_000,
+  );
+  return Number.isSafeInteger(monthlyBasisPoints)
+    ? monthlyBasisPoints
+    : null;
 }
 
 export function calculateInvestmentBreakdown(
@@ -776,6 +795,9 @@ export function calculateInvestmentPerformance(
       amountMinor: assertMinorUnits(position.currentValueMinor),
     });
   }
+  const annualizedReturnBasisPoints = position.historyIsComplete
+    ? calculateAnnualizedReturnBasisPoints(datedAmounts)
+    : null;
 
   return {
     resultMinor,
@@ -786,9 +808,10 @@ export function calculateInvestmentPerformance(
       resultMinor,
       returnBasisMinor,
     ),
-    annualizedReturnBasisPoints: position.historyIsComplete
-      ? calculateAnnualizedReturnBasisPoints(datedAmounts)
-      : null,
+    monthlyReturnBasisPoints: calculateMonthlyEquivalentBasisPoints(
+      annualizedReturnBasisPoints,
+    ),
+    annualizedReturnBasisPoints,
   };
 }
 
@@ -844,6 +867,9 @@ export function summarizeInvestmentPerformance(
       amountMinor: assertMinorUnits(position.currentValueMinor),
     });
   }
+  const annualizedReturnBasisPoints = complete
+    ? calculateAnnualizedReturnBasisPoints(datedAmounts)
+    : null;
 
   return {
     resultMinor,
@@ -854,9 +880,10 @@ export function summarizeInvestmentPerformance(
       resultMinor,
       returnBasisMinor,
     ),
-    annualizedReturnBasisPoints: complete
-      ? calculateAnnualizedReturnBasisPoints(datedAmounts)
-      : null,
+    monthlyReturnBasisPoints: calculateMonthlyEquivalentBasisPoints(
+      annualizedReturnBasisPoints,
+    ),
+    annualizedReturnBasisPoints,
   };
 }
 

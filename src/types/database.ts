@@ -564,6 +564,7 @@ export type InvestmentPositionPerformanceSummary =
     realized_gain_loss_minor: number | null;
     performance_return_basis_minor: number;
     total_return_basis_points: number | null;
+    monthly_return_basis_points: number | null;
     annualized_return_basis_points: number | null;
   };
 

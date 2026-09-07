@@ -332,6 +332,7 @@ describe("investment rules", () => {
       realizedGainLossMinor: null,
       returnBasisMinor: 100_000,
       totalReturnBasisPoints: 2_000,
+      monthlyReturnBasisPoints: null,
       annualizedReturnBasisPoints: null,
     });
   });
@@ -362,6 +363,7 @@ describe("investment rules", () => {
       realizedGainLossMinor: 0,
       returnBasisMinor: 100_000,
       totalReturnBasisPoints: 1_000,
+      monthlyReturnBasisPoints: 80,
       annualizedReturnBasisPoints: 1_000,
     });
   });
@@ -443,6 +445,7 @@ describe("investment rules", () => {
       realizedGainLossMinor: null,
       returnBasisMinor: 150_000,
       totalReturnBasisPoints: 1_000,
+      monthlyReturnBasisPoints: null,
       annualizedReturnBasisPoints: null,
     });
   });
