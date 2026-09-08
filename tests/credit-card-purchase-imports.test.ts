@@ -14,6 +14,14 @@ const stagingForm = readFileSync(
   resolve("src", "components", "forms", "import-staging-row-form.tsx"),
   "utf8",
 );
+const ignoredRowsMigration = readFileSync(
+  resolve(
+    "supabase",
+    "migrations",
+    "20260908000555_preserve_ignored_credit_card_import_rows.sql",
+  ),
+  "utf8",
+);
 
 describe("credit-card purchase imports", () => {
   it("keeps account and card targets mutually exclusive", () => {
@@ -60,5 +68,25 @@ describe("credit-card purchase imports", () => {
     expect(stagingForm).toContain(
       'isCreditCardPurchaseImport ? "categoryId" : "classification"',
     );
+  });
+
+  it("keeps explicitly ignored card rows ignored after later classifications", () => {
+    const capturePosition = ignoredRowsMigration.indexOf(
+      "array_agg(staging.id order by staging.source_row_number)",
+    );
+    const refreshPosition = ignoredRowsMigration.indexOf(
+      "perform private.refresh_import_job_before_persistent_credit_card_ignored_rows(",
+    );
+    const restorePosition = ignoredRowsMigration.indexOf(
+      "and id = any(ignored_row_ids)",
+    );
+
+    expect(ignoredRowsMigration).toContain("and staging.status = 'ignored'");
+    expect(ignoredRowsMigration).toContain("and not staging.is_selected");
+    expect(capturePosition).toBeGreaterThan(-1);
+    expect(refreshPosition).toBeGreaterThan(capturePosition);
+    expect(restorePosition).toBeGreaterThan(refreshPosition);
+    expect(ignoredRowsMigration).toContain("set status = 'ignored'");
+    expect(ignoredRowsMigration).toContain("is_selected = false");
   });
 });
