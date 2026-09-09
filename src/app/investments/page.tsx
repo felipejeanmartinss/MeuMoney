@@ -129,7 +129,21 @@ const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
 };
 
 const INVESTMENT_MATRIX_GRID =
-  "grid gap-x-5 lg:grid-cols-[minmax(20rem,2fr)_repeat(6,minmax(6.5rem,1fr))_auto]";
+  "grid gap-x-5 lg:grid-cols-[minmax(30rem,2.5fr)_repeat(6,minmax(6.5rem,1fr))_auto]";
+
+function formatInvestmentUnitValue(
+  totalMinor: number,
+  quantity: string,
+  currency: SupportedCurrency,
+) {
+  const numericQuantity = Number(quantity);
+  if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return "—";
+  return formatMoney(
+    Math.round(totalMinor / numericQuantity),
+    currency,
+    CURRENCY_LOCALES[currency],
+  );
+}
 
 function InvestmentCompositionChart({
   positions,
@@ -572,9 +586,58 @@ function PositionsView({
                           <summary
                             className={`${INVESTMENT_MATRIX_GRID} cursor-pointer list-none items-center gap-y-2 px-3 py-1.5 marker:hidden lg:grid`}
                           >
-                            <h3 className="min-w-0 truncate text-sm font-extrabold text-slate-950">
-                              {position.asset_name}
-                            </h3>
+                            <div className="min-w-0">
+                              <h3 className="truncate text-sm font-extrabold text-slate-950">
+                                {position.asset_name}
+                              </h3>
+                              {position.investment_type === "stock" ||
+                              position.investment_type === "fii" ? (
+                                <div className="mt-1 grid gap-0.5 text-[0.64rem] leading-tight text-slate-500">
+                                  <p className="truncate">
+                                    Custo unitário{" "}
+                                    <strong className="text-slate-700">
+                                      {formatInvestmentUnitValue(
+                                        position.accumulated_cost_minor,
+                                        position.quantity,
+                                        position.currency,
+                                      )}
+                                    </strong>{" "}
+                                    · Quantidade{" "}
+                                    <strong className="text-slate-700">
+                                      {formatInvestmentQuantity(
+                                        position.quantity,
+                                      )}
+                                    </strong>{" "}
+                                    · Custo acumulado{" "}
+                                    <strong className="text-slate-700">
+                                      {formatMoney(
+                                        position.accumulated_cost_minor,
+                                        position.currency,
+                                        CURRENCY_LOCALES[position.currency],
+                                      )}
+                                    </strong>
+                                  </p>
+                                  <p className="truncate">
+                                    Valor unitário{" "}
+                                    <strong className="text-slate-700">
+                                      {formatInvestmentUnitValue(
+                                        position.current_value_minor,
+                                        position.quantity,
+                                        position.currency,
+                                      )}
+                                    </strong>{" "}
+                                    · Valor atual{" "}
+                                    <strong className="text-slate-700">
+                                      {formatMoney(
+                                        position.current_value_minor,
+                                        position.currency,
+                                        CURRENCY_LOCALES[position.currency],
+                                      )}
+                                    </strong>
+                                  </p>
+                                </div>
+                              ) : null}
+                            </div>
                             <div>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Valor atual</p>
                               <p className="text-xs font-extrabold text-slate-950">

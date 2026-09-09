@@ -4,6 +4,10 @@ import { getCategoryDisplayName } from "@/domain/categories";
 import { cancelCreditCardPurchase } from "@/app/actions/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserCreditCardDetails } from "@/services/finance/credit-cards-service";
+import {
+  formatIsoDatePtBr,
+  formatReferenceMonthPtBr,
+} from "@/utils/dates";
 
 const messages: Record<string, string> = {
   updated: "Cartão atualizado.",
@@ -30,53 +34,80 @@ export default async function CreditCardPage({
       getCategoryDisplayName(item, categories),
     ]),
   );
+  const pendingInstallments = installments.filter(
+    (item) => item.status === "pending",
+  );
+  const openInvoices = invoices.filter((item) => item.status !== "paid");
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
-      <div>
-        <Link href="/credit-cards" className="text-sm font-semibold text-blue-700">
-          ← Voltar para cartões
-        </Link>
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-5 sm:px-5 lg:px-6">
+      <Link
+        href="/credit-cards"
+        className="w-fit text-sm font-semibold text-emerald-700"
+      >
+        ← Voltar para cartões
+      </Link>
+
+      <header className="rounded-3xl bg-slate-950 px-6 py-6 text-white shadow-sm lg:px-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-950">{card.name}</h1>
-            <p className="mt-2 text-slate-600">
-              {card.issuer} · final {card.last_four_digits} · fecha dia{" "}
-              {card.closing_day} · vence dia {card.due_day}
+            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-300">
+              {card.issuer} · final {card.last_four_digits}
+            </p>
+            <h1 className="mt-2 text-3xl font-extrabold">{card.name}</h1>
+            <p className="mt-1 text-sm text-slate-300">
+              Fecha dia {card.closing_day} · vence dia {card.due_day}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+            {[
+              ["Saldo do cartão", card.current_balance_minor],
+              ["Limite disponível", card.available_limit],
+              ["Limite total", card.credit_limit],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="min-w-36 text-right">
+                <p className="text-xs font-bold uppercase text-slate-400">
+                  {label}
+                </p>
+                <p className="mt-1 text-xl font-extrabold">
+                  {formatMoney(Number(value), card.currency)}
+                </p>
+              </div>
+            ))}
             <Link
               href={`/credit-cards/${card.id}/edit`}
-              className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 font-semibold"
+              className="inline-flex min-h-10 items-center rounded-xl border border-slate-600 px-4 text-sm font-semibold"
             >
               Editar cartão
             </Link>
-            <Link
-              href={`/credit-cards/${card.id}/invoices`}
-              className="inline-flex min-h-11 items-center rounded-xl border border-blue-700 px-4 font-semibold text-blue-700"
-            >
-              Ver faturas
-            </Link>
-            {card.is_active ? (
-              <>
-                <Link
-                  href={`/imports/new?creditCardId=${card.id}`}
-                  className="inline-flex min-h-11 items-center rounded-xl border border-blue-700 px-4 font-semibold text-blue-700"
-                >
-                  Importar compras
-                </Link>
-                <Link
-                  href={`/credit-cards/${card.id}/purchases/new`}
-                  className="inline-flex min-h-11 items-center rounded-xl bg-blue-700 px-4 font-semibold text-white"
-                >
-                  Nova compra
-                </Link>
-              </>
-            ) : null}
           </div>
         </div>
-      </div>
+      </header>
+
+      <nav className="flex flex-wrap items-center gap-2 rounded-2xl border bg-white p-2 shadow-sm">
+        <Link
+          href={`/credit-cards/${card.id}/invoices`}
+          className="inline-flex min-h-10 items-center rounded-xl border px-4 text-sm font-semibold"
+        >
+          Faturas
+        </Link>
+        {card.is_active ? (
+          <>
+            <Link
+              href={`/imports/new?creditCardId=${card.id}`}
+              className="inline-flex min-h-10 items-center rounded-xl border px-4 text-sm font-semibold"
+            >
+              Importar
+            </Link>
+            <Link
+              href={`/credit-cards/${card.id}/purchases/new`}
+              className="ml-auto inline-flex min-h-10 items-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white"
+            >
+              Nova compra
+            </Link>
+          </>
+        ) : null}
+      </nav>
 
       {query.message && messages[query.message] ? (
         <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900">
@@ -89,131 +120,142 @@ export default async function CreditCardPage({
         </p>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {[
-          ["Limite total", card.credit_limit],
-          ["Saldo atual do cartão", card.current_balance_minor],
-          ["Limite disponível", card.available_limit],
-        ].map(([label, value]) => (
-          <article key={String(label)} className="rounded-2xl border bg-white p-5">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-extrabold text-slate-950">
-              {formatMoney(Number(value), card.currency)}
-            </p>
-          </article>
-        ))}
-      </section>
-
-      <section className="grid gap-3">
-        <h2 className="text-xl font-bold text-slate-950">Compras</h2>
-        {purchases.length === 0 ? (
-          <p className="rounded-2xl border border-dashed bg-white p-8 text-center text-slate-600">
+      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h2 className="font-extrabold text-slate-950">Extrato de compras</h2>
+          <span className="text-xs text-slate-500">{purchases.length} compras</span>
+        </div>
+        {purchases.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] border-collapse text-sm">
+              <thead className="bg-slate-100 text-left text-xs uppercase text-slate-600">
+                <tr>
+                  <th className="px-4 py-2">Data</th>
+                  <th className="px-4 py-2">Descrição</th>
+                  <th className="px-4 py-2">Categoria</th>
+                  <th className="px-4 py-2 text-center">Parcelas</th>
+                  <th className="px-4 py-2 text-right">Valor</th>
+                  <th className="px-4 py-2 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchases.map((purchase) => (
+                  <tr
+                    key={purchase.id}
+                    className={`border-t ${
+                      purchase.status === "cancelled" ? "opacity-55" : ""
+                    }`}
+                  >
+                    <td className="whitespace-nowrap px-4 py-2.5">
+                      {formatIsoDatePtBr(purchase.purchase_date)}
+                    </td>
+                    <td className="px-4 py-2.5 font-bold text-slate-950">
+                      <span>{purchase.description}</span>
+                      {purchase.is_recurring ? (
+                        <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
+                          Assinatura
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="max-w-96 px-4 py-2.5 text-slate-600">
+                      {categoryById.get(purchase.category_id) ?? "Categoria"}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      {purchase.installment_count}x
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right font-extrabold">
+                      {formatMoney(purchase.total_amount, card.currency)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                      {purchase.status === "active" ? (
+                        <div className="flex justify-end gap-3">
+                          <Link
+                            href={`/credit-cards/${card.id}/purchases/${purchase.id}/edit`}
+                            className="font-semibold text-emerald-700"
+                          >
+                            Editar
+                          </Link>
+                          <form action={cancelCreditCardPurchase}>
+                            <input type="hidden" name="cardId" value={card.id} />
+                            <input
+                              type="hidden"
+                              name="purchaseId"
+                              value={purchase.id}
+                            />
+                            <button className="font-semibold text-rose-700">
+                              Cancelar
+                            </button>
+                          </form>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-slate-500">
+                          Cancelada
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="p-8 text-center text-slate-600">
             Nenhuma compra registrada.
           </p>
-        ) : null}
-        {purchases.map((purchase) => (
-          <article
-            key={purchase.id}
-            className={`rounded-2xl border bg-white p-5 ${
-              purchase.status === "cancelled" ? "opacity-60" : ""
-            }`}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-bold text-slate-950">{purchase.description}</h3>
-                <p className="text-sm text-slate-600">
-                  {categoryById.get(purchase.category_id) ?? "Categoria"} ·{" "}
-                  {purchase.purchase_date} · {purchase.installment_count}x
-                </p>
-              </div>
-              <p className="text-lg font-extrabold text-slate-950">
-                {formatMoney(purchase.total_amount, card.currency)}
-              </p>
-            </div>
-            <div className="mt-3 flex gap-2 border-t pt-3">
-              {purchase.status === "active" ? (
-                <>
-                  <Link
-                    href={`/credit-cards/${card.id}/purchases/${purchase.id}/edit`}
-                    className="inline-flex min-h-10 items-center rounded-lg border px-3 text-sm font-semibold"
-                  >
-                    Editar
-                  </Link>
-                  <form action={cancelCreditCardPurchase}>
-                    <input type="hidden" name="cardId" value={card.id} />
-                    <input type="hidden" name="purchaseId" value={purchase.id} />
-                    <button className="min-h-10 rounded-lg px-3 text-sm font-semibold text-rose-700">
-                      Cancelar
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <span className="text-sm font-semibold text-slate-600">Cancelada</span>
-              )}
-            </div>
-          </article>
-        ))}
+        )}
       </section>
 
-      <section className="grid gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-slate-950">
-            Parcelas e próximas faturas
-          </h2>
-          <Link
-            href={`/credit-cards/${card.id}/invoices`}
-            className="text-sm font-semibold text-blue-700"
-          >
-            Ver todas
-          </Link>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <article className="rounded-2xl border bg-white p-5">
-            <h3 className="font-bold text-slate-950">Parcelas futuras</h3>
-            <ul className="mt-3 grid gap-2 text-sm text-slate-700">
-              {installments
-                .filter((item) => item.status === "pending")
-                .slice(0, 6)
-                .map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex justify-between gap-3 border-b border-slate-100 pb-2"
-                  >
-                    <span>
-                      {item.competence_date.slice(0, 7)} ·{" "}
-                      {item.installment_number}/{item.installment_count}
-                    </span>
-                    <strong>{formatMoney(item.amount, card.currency)}</strong>
-                  </li>
-                ))}
-              {!installments.some((item) => item.status === "pending") ? (
-                <li>Nenhuma parcela futura.</li>
-              ) : null}
-            </ul>
-          </article>
-          <article className="rounded-2xl border bg-white p-5">
-            <h3 className="font-bold text-slate-950">Fatura atual e próximas</h3>
-            <ul className="mt-3 grid gap-2 text-sm text-slate-700">
-              {invoices
-                .filter((item) => item.status !== "paid")
-                .slice(0, 6)
-                .map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={`/credit-cards/${card.id}/invoices/${item.id}`}
-                      className="flex justify-between gap-3 border-b border-slate-100 pb-2 hover:text-blue-700"
-                    >
-                      <span>{item.reference_month.slice(0, 7)}</span>
-                      <strong>{formatMoney(item.total_amount, card.currency)}</strong>
-                    </Link>
-                  </li>
-                ))}
-              {!invoices.some((item) => item.status !== "paid") ? (
-                <li>Nenhuma fatura em aberto.</li>
-              ) : null}
-            </ul>
-          </article>
-        </div>
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="border-b px-4 py-3">
+            <h2 className="font-extrabold text-slate-950">Parcelas futuras</h2>
+          </div>
+          <ul className="divide-y text-sm">
+            {pendingInstallments.slice(0, 8).map((item) => (
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-4 px-4 py-2.5"
+              >
+                <span>
+                  {formatReferenceMonthPtBr(item.competence_date)} · parcela{" "}
+                  {item.installment_number}/{item.installment_count}
+                </span>
+                <strong>{formatMoney(item.amount, card.currency)}</strong>
+              </li>
+            ))}
+            {!pendingInstallments.length ? (
+              <li className="px-4 py-6 text-slate-600">Nenhuma parcela futura.</li>
+            ) : null}
+          </ul>
+        </article>
+
+        <article className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h2 className="font-extrabold text-slate-950">Faturas</h2>
+            <Link
+              href={`/credit-cards/${card.id}/invoices`}
+              className="text-sm font-semibold text-emerald-700"
+            >
+              Ver todas
+            </Link>
+          </div>
+          <ul className="divide-y text-sm">
+            {openInvoices.slice(0, 8).map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={`/credit-cards/${card.id}/invoices/${item.id}`}
+                  className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-slate-50"
+                >
+                  <span>{formatReferenceMonthPtBr(item.reference_month)}</span>
+                  <strong>{formatMoney(item.total_amount, card.currency)}</strong>
+                </Link>
+              </li>
+            ))}
+            {!openInvoices.length ? (
+              <li className="px-4 py-6 text-slate-600">Nenhuma fatura em aberto.</li>
+            ) : null}
+          </ul>
+        </article>
       </section>
     </main>
   );

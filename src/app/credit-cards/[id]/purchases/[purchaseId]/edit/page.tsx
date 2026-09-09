@@ -15,7 +15,7 @@ export default async function EditCreditCardPurchasePage({
   params: Promise<{ id: string; purchaseId: string }>;
 }) {
   const { id, purchaseId } = await params;
-  const [{ card, categories }, { purchase }] = await Promise.all([
+  const [{ card, categories }, { purchase, installments }] = await Promise.all([
     getCreditCardPurchaseFormOptions(id),
     getCurrentUserCreditCardPurchase(id, purchaseId),
   ]);
@@ -48,6 +48,10 @@ export default async function EditCreditCardPurchasePage({
             totalAmount: minorUnitsToInput(purchase.total_amount),
             purchaseDate: purchase.purchase_date,
             installmentCount: purchase.installment_count,
+            installmentAmounts: installments.map((installment) =>
+              minorUnitsToInput(installment.amount),
+            ),
+            isRecurring: purchase.is_recurring,
             notes: purchase.notes,
           }}
         />

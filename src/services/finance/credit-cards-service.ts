@@ -25,6 +25,8 @@ export type CreditCardPurchaseMutationInput = {
   totalAmount: number;
   purchaseDate: string;
   installmentCount: number;
+  installmentAmounts: number[];
+  isRecurring: boolean;
   notes: string | null;
 };
 
@@ -32,7 +34,7 @@ const cardColumns =
   "id, user_id, name, issuer, brand, last_four_digits, credit_limit, closing_day, due_day, currency, linked_account_id, is_active, created_at, updated_at";
 const cardSummaryColumns = `${cardColumns}, used_limit, available_limit, current_balance_minor`;
 const purchaseColumns =
-  "id, user_id, credit_card_id, category_id, description, total_amount, purchase_date, installment_count, status, notes, created_at, updated_at";
+  "id, user_id, credit_card_id, category_id, description, total_amount, purchase_date, installment_count, is_recurring, status, notes, created_at, updated_at";
 const invoiceColumns =
   "id, user_id, credit_card_id, reference_month, closing_date, due_date, status, total_amount, paid_amount, closed_at, paid_at, payment_account_id, payment_transaction_id, created_at, updated_at";
 const installmentColumns =
@@ -48,6 +50,15 @@ function mutationErrorMessage(error: { message?: string } | null) {
   }
   if (message.includes("purchase_structure_locked")) {
     return "Valor, data e parcelas não podem mudar após o fechamento da fatura.";
+  }
+  if (message.includes("invalid_installment_distribution")) {
+    return "A soma e a quantidade das parcelas devem corresponder à compra.";
+  }
+  if (message.includes("installment_not_editable")) {
+    return "A parcela só pode ser editada enquanto a fatura estiver aberta.";
+  }
+  if (message.includes("invalid_installment_amount")) {
+    return "Informe um valor de parcela maior que zero.";
   }
   if (message.includes("purchase_cancellation_locked")) {
     return "A compra não pode ser cancelada após o fechamento ou pagamento.";
@@ -287,14 +298,27 @@ export async function getCurrentUserCreditCardPurchase(
   purchaseId: string,
 ) {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase
-    .from("credit_card_purchases")
-    .select(purchaseColumns)
-    .eq("user_id", user.id)
-    .eq("credit_card_id", cardId)
-    .eq("id", purchaseId)
-    .maybeSingle();
-  return { purchase: data, hasError: Boolean(error) };
+  const [purchaseResult, installmentsResult] = await Promise.all([
+    supabase
+      .from("credit_card_purchases")
+      .select(purchaseColumns)
+      .eq("user_id", user.id)
+      .eq("credit_card_id", cardId)
+      .eq("id", purchaseId)
+      .maybeSingle(),
+    supabase
+      .from("credit_card_installments")
+      .select(installmentColumns)
+      .eq("user_id", user.id)
+      .eq("credit_card_id", cardId)
+      .eq("purchase_id", purchaseId)
+      .order("installment_number"),
+  ]);
+  return {
+    purchase: purchaseResult.data,
+    installments: installmentsResult.data ?? [],
+    hasError: Boolean(purchaseResult.error || installmentsResult.error),
+  };
 }
 
 export async function createCurrentUserCreditCardPurchase(
@@ -302,13 +326,15 @@ export async function createCurrentUserCreditCardPurchase(
   input: CreditCardPurchaseMutationInput,
 ) {
   const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("create_credit_card_purchase", {
+  const { error } = await supabase.rpc("create_credit_card_purchase_custom", {
     target_credit_card_id: cardId,
     target_category_id: input.categoryId,
     purchase_description: input.description,
     purchase_total_amount: input.totalAmount,
     target_purchase_date: input.purchaseDate,
     target_installment_count: input.installmentCount,
+    target_installment_amounts: input.installmentAmounts,
+    purchase_is_recurring: input.isRecurring,
     purchase_notes: input.notes,
   });
   return error
@@ -321,13 +347,15 @@ export async function updateCurrentUserCreditCardPurchase(
   input: CreditCardPurchaseMutationInput,
 ) {
   const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("update_credit_card_purchase", {
+  const { error } = await supabase.rpc("update_credit_card_purchase_custom", {
     target_purchase_id: purchaseId,
     target_category_id: input.categoryId,
     purchase_description: input.description,
     purchase_total_amount: input.totalAmount,
     target_purchase_date: input.purchaseDate,
     target_installment_count: input.installmentCount,
+    target_installment_amounts: input.installmentAmounts,
+    purchase_is_recurring: input.isRecurring,
     purchase_notes: input.notes,
   });
   return error
@@ -340,6 +368,23 @@ export async function cancelCurrentUserCreditCardPurchase(purchaseId: string) {
   const { error } = await supabase.rpc("cancel_credit_card_purchase", {
     target_purchase_id: purchaseId,
   });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function updateCurrentUserCreditCardInstallmentAmount(
+  installmentId: string,
+  amountMinor: number,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc(
+    "update_credit_card_installment_amount",
+    {
+      target_installment_id: installmentId,
+      target_amount_minor: amountMinor,
+    },
+  );
   return error
     ? { ok: false as const, message: mutationErrorMessage(error) }
     : { ok: true as const };
@@ -403,7 +448,7 @@ export async function getCurrentUserCreditCardInvoice(
         .order("installment_number"),
       supabase
         .from("credit_card_purchases")
-        .select("id, description, category_id")
+        .select("id, description, category_id, purchase_date, is_recurring")
         .eq("user_id", user.id)
         .eq("credit_card_id", cardId),
       supabase

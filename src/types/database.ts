@@ -222,6 +222,7 @@ export type CreditCardPurchase = {
   total_amount: number;
   purchase_date: string;
   installment_count: number;
+  is_recurring: boolean;
   status: CreditCardPurchaseStatus;
   notes: string | null;
   created_at: string;
@@ -1402,7 +1403,7 @@ export type Database = {
         };
         Returns: boolean;
       };
-      create_credit_card_purchase: {
+      create_credit_card_purchase_custom: {
         Args: {
           target_credit_card_id: string;
           target_category_id: string;
@@ -1410,11 +1411,13 @@ export type Database = {
           purchase_total_amount: number;
           target_purchase_date: string;
           target_installment_count: number;
+          target_installment_amounts: number[];
+          purchase_is_recurring?: boolean;
           purchase_notes?: string | null;
         };
         Returns: string;
       };
-      update_credit_card_purchase: {
+      update_credit_card_purchase_custom: {
         Args: {
           target_purchase_id: string;
           target_category_id: string;
@@ -1422,7 +1425,16 @@ export type Database = {
           purchase_total_amount: number;
           target_purchase_date: string;
           target_installment_count: number;
+          target_installment_amounts: number[];
+          purchase_is_recurring?: boolean;
           purchase_notes?: string | null;
+        };
+        Returns: boolean;
+      };
+      update_credit_card_installment_amount: {
+        Args: {
+          target_installment_id: string;
+          target_amount_minor: number;
         };
         Returns: boolean;
       };

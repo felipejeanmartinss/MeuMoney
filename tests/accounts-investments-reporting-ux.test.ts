@@ -32,6 +32,10 @@ describe("accounts, investments and reporting UX", () => {
     expect(page).toContain("sticky top-0");
     expect(page).toContain("InvestmentCompositionChart");
     expect(page).toContain("Composição da carteira");
+    expect(page).toContain("Custo unitário");
+    expect(page).toContain("Valor unitário");
+    expect(page).toContain('position.investment_type === "stock"');
+    expect(page).toContain('position.investment_type === "fii"');
     expect(page).not.toContain("requestedPage");
     expect(page).not.toContain("pageCount");
   });
