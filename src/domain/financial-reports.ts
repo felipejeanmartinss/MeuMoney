@@ -159,9 +159,9 @@ function reportHierarchy(entry: CategoryMonthlyReportEntry) {
   };
 }
 
-function compareMinorAscending(left: number, right: number) {
+function compareMinorDescending(left: number, right: number) {
   if (left === right) return 0;
-  return left < right ? -1 : 1;
+  return left > right ? -1 : 1;
 }
 
 export function buildMonthlyCategoryMatrix(
@@ -200,7 +200,7 @@ export function buildMonthlyCategoryMatrix(
       return left.section === "income" ? -1 : 1;
     }
     return (
-      compareMinorAscending(left.totalAmountMinor, right.totalAmountMinor) ||
+      compareMinorDescending(left.totalAmountMinor, right.totalAmountMinor) ||
       left.groupLabel.localeCompare(right.groupLabel, "pt-BR") ||
       left.label.localeCompare(right.label, "pt-BR")
     );
@@ -361,7 +361,7 @@ export function buildPeriodComparison(
         return left.section === "income" ? -1 : 1;
       }
       return (
-        compareMinorAscending(left.secondAmountMinor, right.secondAmountMinor) ||
+        compareMinorDescending(left.secondAmountMinor, right.secondAmountMinor) ||
         left.groupLabel.localeCompare(right.groupLabel, "pt-BR") ||
         left.label.localeCompare(right.label, "pt-BR")
       );

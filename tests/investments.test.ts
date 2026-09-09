@@ -3,6 +3,8 @@ import {
   calculateInvestmentBreakdown,
   calculateInvestmentPerformance,
   calculateInvestmentPositionMoneyEffect,
+  calculateInvestmentUnitPriceFromValue,
+  calculateInvestmentValueFromUnitPrice,
   calculatePreviousMonthInvestmentPerformance,
   formatInvestmentQuantity,
   inferInvestmentTransferEvent,
@@ -28,6 +30,12 @@ const basePosition = {
 };
 
 describe("investment rules", () => {
+  it("calculates market value from quantity and unit price in integer minor units", () => {
+    expect(calculateInvestmentValueFromUnitPrice("100", 1_737)).toBe(173_700);
+    expect(calculateInvestmentValueFromUnitPrice("0.5", 12_345)).toBe(6_173);
+    expect(calculateInvestmentUnitPriceFromValue(173_700, "100")).toBe(1_737);
+  });
+
   it("updates the position for contributions and leaves income outside principal", () => {
     expect(
       calculateInvestmentPositionMoneyEffect({

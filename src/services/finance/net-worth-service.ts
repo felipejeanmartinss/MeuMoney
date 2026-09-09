@@ -1,5 +1,6 @@
 import "server-only";
 import { kindForNetWorthItemType } from "@/domain/net-worth";
+import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   FinancialContext,
@@ -19,7 +20,7 @@ export type NetWorthItemMutationInput = {
 
 export async function listCurrentUserNetWorth() {
   const { supabase, user } = await requireUser();
-  const [itemsResult, summaryResult, accountsResult, cardBalancesResult] =
+  const [itemsResult, summaryResult, accountsResult, cardsResult, invoicesResult] =
     await Promise.all([
     supabase
       .from("net_worth_items")
@@ -45,23 +46,48 @@ export async function listCurrentUserNetWorth() {
       .is("archived_at", null)
       .order("name"),
     supabase
-      .from("credit_card_summaries")
-      .select("id, user_id, currency, current_balance_minor")
+      .from("credit_cards")
+      .select("id, user_id, currency")
       .eq("user_id", user.id)
       .eq("is_active", true),
+    supabase
+      .from("credit_card_invoices")
+      .select("credit_card_id, total_amount, paid_amount, status")
+      .eq("user_id", user.id)
+      .neq("status", "paid"),
     ]);
+
+  const invoicesByCard = new Map<string, number>();
+  for (const invoice of invoicesResult.data ?? []) {
+    const outstanding = Math.max(
+      0,
+      coerceMinorUnits(invoice.total_amount) -
+        coerceMinorUnits(invoice.paid_amount),
+    );
+    invoicesByCard.set(
+      invoice.credit_card_id,
+      coerceMinorUnits(
+        (invoicesByCard.get(invoice.credit_card_id) ?? 0) + outstanding,
+      ),
+    );
+  }
+  const cardBalances = (cardsResult.data ?? []).map((card) => ({
+    ...card,
+    current_balance_minor: invoicesByCard.get(card.id) ?? 0,
+  }));
 
   return {
     userId: user.id,
     items: itemsResult.data ?? [],
     summaries: summaryResult.data ?? [],
     accounts: accountsResult.data ?? [],
-    cardBalances: cardBalancesResult.data ?? [],
+    cardBalances,
     hasError: Boolean(
       itemsResult.error ||
         summaryResult.error ||
         accountsResult.error ||
-        cardBalancesResult.error,
+        cardsResult.error ||
+        invoicesResult.error,
     ),
   };
 }

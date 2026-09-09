@@ -73,7 +73,8 @@ export default async function CreditCardsPage({
       <section className="grid gap-4 md:grid-cols-2">
         {cards.map((card) => {
           const nextInvoice = invoices.find(
-            (invoice) => invoice.credit_card_id === card.id,
+            (invoice) =>
+              invoice.credit_card_id === card.id && invoice.status === "open",
           );
           return (
           <article
@@ -100,9 +101,11 @@ export default async function CreditCardsPage({
                 <dd className="font-bold">{formatMoney(card.credit_limit, card.currency)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-500">Saldo devedor</dt>
+                <dt className="text-xs text-slate-500">Próxima fatura</dt>
                 <dd className="font-bold text-rose-700">
-                  {formatMoney(card.current_balance_minor, card.currency)}
+                  {nextInvoice
+                    ? formatMoney(nextInvoice.total_amount, card.currency)
+                    : formatMoney(0, card.currency)}
                 </dd>
               </div>
               <div>
@@ -113,15 +116,9 @@ export default async function CreditCardsPage({
               </div>
             </dl>
             <p className="mt-3 text-sm text-slate-600">
-              Próxima fatura:{" "}
-              <strong className="text-slate-900">
-                {nextInvoice
-                  ? `${formatReferenceMonthPtBr(nextInvoice.reference_month)} · ${formatMoney(
-                      nextInvoice.total_amount,
-                      card.currency,
-                    )}`
-                  : "nenhuma"}
-              </strong>
+              {nextInvoice
+                ? `Fatura aberta de ${formatReferenceMonthPtBr(nextInvoice.reference_month)}`
+                : "Nenhuma fatura aberta"}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link

@@ -205,6 +205,40 @@ export function formatInvestmentQuantity(quantity: string | number): string {
   return decimalPart ? `${grouped},${decimalPart}` : grouped;
 }
 
+export function calculateInvestmentValueFromUnitPrice(
+  quantity: string | number,
+  unitPriceMinor: number,
+) {
+  const normalized = normalizeInvestmentQuantity(quantity);
+  const [integerPart, decimalPart = ""] = normalized.split(".");
+  const scale = 1_000_000_000_000n;
+  const scaledQuantity = BigInt(
+    `${integerPart}${decimalPart.padEnd(12, "0")}`,
+  );
+  const unitPrice = BigInt(assertMinorUnits(unitPriceMinor));
+  if (unitPrice < 0n) throw new Error("O valor unitário não pode ser negativo.");
+  const value = Number((scaledQuantity * unitPrice + scale / 2n) / scale);
+  return assertMinorUnits(value);
+}
+
+export function calculateInvestmentUnitPriceFromValue(
+  totalValueMinor: number,
+  quantity: string | number,
+) {
+  const normalized = normalizeInvestmentQuantity(quantity);
+  const [integerPart, decimalPart = ""] = normalized.split(".");
+  const scale = 1_000_000_000_000n;
+  const scaledQuantity = BigInt(
+    `${integerPart}${decimalPart.padEnd(12, "0")}`,
+  );
+  if (scaledQuantity === 0n) return null;
+  const totalValue = BigInt(assertMinorUnits(totalValueMinor));
+  const unitPrice = Number(
+    (totalValue * scale + scaledQuantity / 2n) / scaledQuantity,
+  );
+  return assertMinorUnits(unitPrice);
+}
+
 const nonNegativeMoneyInput = z
   .string()
   .trim()
@@ -336,6 +370,18 @@ export const investmentPositionFormSchema = z.object({
       message: "O tipo não corresponde à classe de investimento selecionada.",
     });
   }
+});
+
+export const investmentUnitPriceBatchSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        positionId: z.uuid("Posição de investimento inválida."),
+        unitPriceMinor: positiveMoneyInput,
+      }),
+    )
+    .min(1, "Informe ao menos uma cotação.")
+    .max(500, "Atualize no máximo 500 posições por vez."),
 });
 
 export const investmentCashFlowFormSchema = z.object({

@@ -259,6 +259,7 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
         .select(purchaseColumns)
         .eq("user_id", user.id)
         .eq("credit_card_id", cardId)
+        .eq("status", "active")
         .order("purchase_date", { ascending: false }),
       supabase
         .from("credit_card_installments")
@@ -445,12 +446,14 @@ export async function getCurrentUserCreditCardInvoice(
         .eq("user_id", user.id)
         .eq("credit_card_id", cardId)
         .eq("invoice_id", invoiceId)
+        .neq("status", "cancelled")
         .order("installment_number"),
       supabase
         .from("credit_card_purchases")
         .select("id, description, category_id, purchase_date, is_recurring")
         .eq("user_id", user.id)
-        .eq("credit_card_id", cardId),
+        .eq("credit_card_id", cardId)
+        .eq("status", "active"),
       supabase
         .from("accounts")
         .select("id, name, currency")

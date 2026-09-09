@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { ExpenseDistribution } from "@/components/dashboard/expense-distribution";
-import { FinancialPulse } from "@/components/dashboard/financial-pulse";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { MonthlyEvolution } from "@/components/dashboard/monthly-evolution";
-import { SpendingTracker } from "@/components/dashboard/spending-tracker";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { currentReferenceMonth, referenceMonthSchema } from "@/domain/budgets";
 import { CURRENCY_LABELS, CURRENCY_LOCALES } from "@/domain/currencies";
@@ -55,8 +53,8 @@ export default async function DashboardPage({
   const firstName = data.profile?.full_name?.trim().split(/\s+/)[0];
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+    <main className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
+      <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Visão financeira
@@ -64,14 +62,13 @@ export default async function DashboardPage({
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             {formatReferenceMonth(referenceMonth)}
           </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            {firstName ? `${firstName}, acompanhe` : "Acompanhe"} o essencial,
-            sempre separado por moeda e por regime financeiro.
+          <p className="mt-1 text-sm text-slate-600">
+            {firstName ? `${firstName}, acompanhe` : "Acompanhe"} saldos, resultado e compromissos.
           </p>
         </div>
         <form
           method="get"
-          className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+          className="grid gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
         >
           <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
             Mês
@@ -117,7 +114,7 @@ export default async function DashboardPage({
         const locale = CURRENCY_LOCALES[section.currency];
         const month = section.selectedMonth;
         return (
-          <section key={section.currency} aria-labelledby={`currency-${section.currency}`} className="grid gap-5">
+          <section key={section.currency} aria-labelledby={`currency-${section.currency}`} className="grid gap-4">
             <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">{section.currency}</p>
@@ -135,25 +132,12 @@ export default async function DashboardPage({
               <MetricCard label="Resultado" value={formatMoney(month.result_amount_minor, section.currency, locale)} helper={`${basisLabels[basis]} do mês`} tone={month.result_amount_minor < 0 ? "negative" : "positive"} />
             </div>
 
-            <FinancialPulse
-              basis={basis}
-              currency={section.currency}
-              locale={locale}
-              incomeAmountMinor={month.income_amount_minor}
-              expenseAmountMinor={month.expense_amount_minor}
-              resultAmountMinor={month.result_amount_minor}
-              plannedAmountMinor={month.planned_amount_minor}
-              budgetPercentageConsumed={month.budget_percentage_consumed}
-              recurrenceCount={section.recurrences.length}
-              invoices={section.invoices}
-            />
-
-            <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
               <MonthlyEvolution rows={section.evolution} currency={section.currency} locale={locale} basis={basis} />
               <ExpenseDistribution rows={section.categories} currency={section.currency} locale={locale} basis={basis} />
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
               <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                   <div><h3 className="font-black text-slate-950">Contas</h3><p className="mt-1 text-sm text-slate-600">Saldos atuais e acesso ao extrato.</p></div>
@@ -173,8 +157,8 @@ export default async function DashboardPage({
 
               <section className="grid gap-4">
                 <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3"><h3 className="font-black text-slate-950">Próximas contas a pagar</h3><Link href="/recurring-transactions" className="text-sm font-bold text-emerald-700">Ver todas</Link></div>
-                  {section.recurrences.length ? <div className="mt-3 divide-y divide-slate-100">{section.recurrences.slice(0, 3).map((row) => <div key={row.id} className="flex justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{row.description}</p><p className="text-xs text-slate-500">{formatFinancialDate(row.next_occurrence)} · {RECURRENCE_FREQUENCY_LABELS[row.frequency]}</p></div><p className={`shrink-0 text-sm font-bold ${row.transaction_type === "income" ? "text-emerald-700" : "text-rose-700"}`}>{row.transaction_type === "income" ? "+" : "−"}{formatMoney(row.amount_minor, section.currency, locale)}</p></div>)}</div> : <p className="mt-3 text-sm text-slate-600">Nenhuma conta a pagar próxima.</p>}
+                  <div className="flex items-center justify-between gap-3"><h3 className="font-black text-slate-950">Próximas recorrências</h3><Link href="/recurring-transactions" className="text-sm font-bold text-emerald-700">Ver todas</Link></div>
+                  {section.recurrences.length ? <div className="mt-3 divide-y divide-slate-100">{section.recurrences.slice(0, 3).map((row) => <div key={row.id} className="flex justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{row.description}</p><p className="text-xs text-slate-500">{formatFinancialDate(row.next_occurrence)} · {RECURRENCE_FREQUENCY_LABELS[row.frequency]}</p></div><p className={`shrink-0 text-sm font-bold ${row.transaction_type === "income" ? "text-emerald-700" : "text-rose-700"}`}>{row.transaction_type === "income" ? "+" : "−"}{formatMoney(row.amount_minor, section.currency, locale)}</p></div>)}</div> : <p className="mt-3 text-sm text-slate-600">Nenhuma recorrência próxima.</p>}
                 </article>
                 <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3"><h3 className="font-black text-slate-950">Faturas pendentes</h3><Link href="/credit-cards" className="text-sm font-bold text-emerald-700">Ver cartões</Link></div>
@@ -183,7 +167,6 @@ export default async function DashboardPage({
               </section>
             </div>
 
-            {basis === "competence" ? <SpendingTracker rows={section.spendingTracker} currency={section.currency} locale={locale} /> : null}
           </section>
         );
       })}

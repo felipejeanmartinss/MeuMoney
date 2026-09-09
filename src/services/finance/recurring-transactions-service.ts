@@ -31,20 +31,28 @@ function mutationErrorMessage(error: { message?: string } | null) {
     return "Selecione uma conta ativa.";
   }
   if (message.includes("recurring_transaction_already_ended")) {
-    return "Uma conta a pagar encerrada não pode ser reativada.";
+    return "Uma recorrência encerrada não pode ser reativada.";
   }
   if (message.includes("recurring_transaction_schedule_ended")) {
-    return "A conta a pagar já ultrapassou sua data final.";
+    return "A recorrência já ultrapassou sua data final.";
   }
   if (message.includes("recurring_transaction_generation_limit")) {
     return "O período solicitado é muito extenso. Escolha uma data mais próxima.";
   }
-  return "Não foi possível concluir a operação com a conta a pagar.";
+  return "Não foi possível concluir a operação com a recorrência.";
 }
 
 export async function listCurrentUserRecurringTransactions() {
   const { supabase, user } = await requireUser();
-  const [recurrencesResult, accountsResult, categoriesResult, groupsResult] =
+  const [
+    recurrencesResult,
+    accountsResult,
+    categoriesResult,
+    groupsResult,
+    cardsResult,
+    purchasesResult,
+    installmentsResult,
+  ] =
     await Promise.all([
       supabase
         .from("recurring_transactions")
@@ -68,6 +76,25 @@ export async function listCurrentUserRecurringTransactions() {
         .select("id, name, kind, context, archived_at")
         .eq("user_id", user.id)
         .order("name"),
+      supabase
+        .from("credit_cards")
+        .select("id, name, currency")
+        .eq("user_id", user.id)
+        .eq("is_active", true),
+      supabase
+        .from("credit_card_purchases")
+        .select("id, credit_card_id, description, total_amount, is_recurring")
+        .eq("user_id", user.id)
+        .eq("status", "active"),
+      supabase
+        .from("credit_card_installments")
+        .select(
+          "id, purchase_id, credit_card_id, installment_number, installment_count, amount, competence_date",
+        )
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .order("competence_date")
+        .limit(120),
     ]);
 
   return {
@@ -75,11 +102,17 @@ export async function listCurrentUserRecurringTransactions() {
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
     groups: groupsResult.data ?? [],
+    cards: cardsResult.data ?? [],
+    cardPurchases: purchasesResult.data ?? [],
+    cardInstallments: installmentsResult.data ?? [],
     hasError: Boolean(
       recurrencesResult.error ||
         accountsResult.error ||
         categoriesResult.error ||
-        groupsResult.error,
+        groupsResult.error ||
+        cardsResult.error ||
+        purchasesResult.error ||
+        installmentsResult.error,
     ),
   };
 }

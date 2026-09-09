@@ -44,7 +44,7 @@ describe("navigation model", () => {
       secondaryNavigationFor("/recurring-transactions").map(
         (item) => item.label,
       ),
-    ).toContain("Contas a Pagar");
+    ).toContain("Recorrências");
   });
 
   it("distinguishes investment tabs by query string", () => {

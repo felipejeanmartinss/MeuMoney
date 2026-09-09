@@ -21,15 +21,15 @@ import type {
 import { toIsoDate } from "@/utils/dates";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
-export const metadata = { title: "Contas a Pagar" };
+export const metadata = { title: "Recorrências" };
 
 const messages: Record<string, string> = {
-  created: "Conta a pagar criada com sucesso.",
-  updated: "Conta a pagar atualizada com sucesso.",
-  "state-active": "Conta a pagar reativada.",
-  "state-suspended": "Conta a pagar suspensa.",
-  "state-ended": "Conta a pagar encerrada definitivamente.",
-  "status-error": "Não foi possível alterar o estado da conta a pagar.",
+  created: "Recorrência criada com sucesso.",
+  updated: "Recorrência atualizada com sucesso.",
+  "state-active": "Recorrência reativada.",
+  "state-suspended": "Recorrência suspensa.",
+  "state-ended": "Recorrência encerrada definitivamente.",
+  "status-error": "Não foi possível alterar o estado da recorrência.",
   "generation-error": "Não foi possível gerar os lançamentos previstos.",
 };
 
@@ -138,11 +138,24 @@ export default async function RecurringTransactionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const rawParams = await searchParams;
-  const { recurrences, accounts, categories, groups, hasError } =
+  const {
+    recurrences,
+    accounts,
+    categories,
+    groups,
+    cards,
+    cardPurchases,
+    cardInstallments,
+    hasError,
+  } =
     await listCurrentUserRecurringTransactions();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
+  );
+  const cardById = new Map(cards.map((card) => [card.id, card]));
+  const purchaseById = new Map(
+    cardPurchases.map((purchase) => [purchase.id, purchase]),
   );
   const asString = (value: string | string[] | undefined) =>
     typeof value === "string" ? value : undefined;
@@ -215,7 +228,7 @@ export default async function RecurringTransactionsPage({
             Agenda financeira
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Contas a Pagar
+            Recorrências
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
             Acompanhe compromissos futuros e gere previsões sem alterar o saldo
@@ -226,7 +239,7 @@ export default async function RecurringTransactionsPage({
           href="/recurring-transactions/new"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
-          Nova conta a pagar
+          Nova recorrência
         </Link>
       </header>
 
@@ -376,14 +389,14 @@ export default async function RecurringTransactionsPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Não foi possível carregar as contas a pagar. Tente novamente.
+          Não foi possível carregar as recorrências. Tente novamente.
         </p>
       ) : null}
 
       {!hasError && filtered.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <h2 className="text-xl font-extrabold text-slate-950">
-            Nenhuma conta a pagar encontrada
+            Nenhuma recorrência encontrada
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-slate-600">
             Ajuste os filtros ou cadastre um novo compromisso.
@@ -515,6 +528,49 @@ export default async function RecurringTransactionsPage({
                     <RecurrenceMenu id={recurrence.id} state={state} />
                   </div>
                 </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {cardInstallments.length ? (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="font-extrabold text-slate-950">
+              Compromissos dos cartões
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Assinaturas e parcelas futuras aparecem apenas para consulta e não geram recorrências duplicadas.
+            </p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {cardInstallments.slice(0, 18).map((installment) => {
+              const purchase = purchaseById.get(installment.purchase_id);
+              const card = cardById.get(installment.credit_card_id);
+              const currency = (card?.currency ?? "BRL") as SupportedCurrency;
+              return (
+                <div
+                  key={installment.id}
+                  className="grid gap-1 px-5 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-6"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-slate-950">
+                      {purchase?.description ?? "Compra do cartão"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {card?.name ?? "Cartão"} · {purchase?.is_recurring
+                        ? "Assinatura mensal"
+                        : `Parcela ${installment.installment_number}/${installment.installment_count}`}
+                    </p>
+                  </div>
+                  <time className="text-slate-600">
+                    {formatFinancialDate(installment.competence_date)}
+                  </time>
+                  <strong className="text-slate-950">
+                    {formatMoney(installment.amount, currency, CURRENCY_LOCALES[currency])}
+                  </strong>
+                </div>
               );
             })}
           </div>

@@ -106,6 +106,36 @@ describe("financial operations and reports", () => {
     });
   });
 
+  it("orders report categories by annual accumulated value descending", () => {
+    const matrix = buildMonthlyCategoryMatrix(2026, [
+      {
+        rowId: "small",
+        section: "expense",
+        groupLabel: "Grupo",
+        label: "Menor",
+        categoryKey: "small",
+        categoryLabel: "Menor",
+        subcategoryKey: null,
+        subcategoryLabel: null,
+        referenceMonth: "2026-01-01",
+        amountMinor: 100_00,
+      },
+      {
+        rowId: "large",
+        section: "expense",
+        groupLabel: "Grupo",
+        label: "Maior",
+        categoryKey: "large",
+        categoryLabel: "Maior",
+        subcategoryKey: null,
+        subcategoryLabel: null,
+        referenceMonth: "2026-12-01",
+        amountMinor: 900_00,
+      },
+    ]);
+    expect(matrix.map((row) => row.label)).toEqual(["Maior", "Menor"]);
+  });
+
   it("projects recurring fixed expenses without treating them as paid", () => {
     const matrix = projectFixedExpenseMatrix(2026, [
       {
@@ -165,6 +195,10 @@ describe("financial operations and reports", () => {
       variationBasisPoints: 2_500,
     });
     expect(compared.find((row) => row.label === "Nova despesa")?.variationBasisPoints).toBeNull();
+    expect(compared.map((row) => row.label)).toEqual([
+      "Restaurantes",
+      "Nova despesa",
+    ]);
   });
 
   it("does not invent investment return without a complete cash-flow base", () => {

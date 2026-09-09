@@ -7,6 +7,7 @@ import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
 import {
+  calculateInvestmentUnitPriceFromValue,
   formatInvestmentQuantity,
   getInvestmentFamily,
   INVESTMENT_FAMILY_LABELS,
@@ -42,6 +43,7 @@ const messages: Record<string, string> = {
   "delete-error": "Não foi possível excluir a posição de investimento.",
   "import-cancelled": "Prévia de financiamento cancelada.",
   "import-error": "Não foi possível concluir a importação do financiamento.",
+  "prices-updated": "Cotações e valores atuais atualizados.",
 };
 
 function formatDate(value: string) {
@@ -136,10 +138,10 @@ function formatInvestmentUnitValue(
   quantity: string,
   currency: SupportedCurrency,
 ) {
-  const numericQuantity = Number(quantity);
-  if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return "—";
+  const unitPrice = calculateInvestmentUnitPriceFromValue(totalMinor, quantity);
+  if (unitPrice === null) return "—";
   return formatMoney(
-    Math.round(totalMinor / numericQuantity),
+    unitPrice,
     currency,
     CURRENCY_LOCALES[currency],
   );
@@ -957,6 +959,14 @@ export default async function InvestmentsPage({
               ? "Nova posição"
               : "Importar financiamento"}
           </Link>
+          {activeTab === "positions" ? (
+            <Link
+              href="/investments/prices"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-700 bg-white px-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50"
+            >
+              Atualizar cotações
+            </Link>
+          ) : null}
         </div>
       </header>
 

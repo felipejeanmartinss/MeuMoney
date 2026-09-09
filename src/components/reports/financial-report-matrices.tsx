@@ -86,9 +86,9 @@ type MonthlyGroupNode = {
   totalAmountMinor: number;
 };
 
-function compareAmount(left: number, right: number) {
+function compareAmountDescending(left: number, right: number) {
   if (left === right) return 0;
-  return left < right ? -1 : 1;
+  return left > right ? -1 : 1;
 }
 
 function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
@@ -119,7 +119,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
                 label: childRows[0].categoryLabel,
                 rows: [...childRows].sort(
                   (left, right) =>
-                    compareAmount(
+                    compareAmountDescending(
                       left.totalAmountMinor,
                       right.totalAmountMinor,
                     ) || left.label.localeCompare(right.label, "pt-BR"),
@@ -131,7 +131,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
             })
             .sort(
               (left, right) =>
-                compareAmount(left.totalAmountMinor, right.totalAmountMinor) ||
+                compareAmountDescending(left.totalAmountMinor, right.totalAmountMinor) ||
                 left.label.localeCompare(right.label, "pt-BR"),
             );
           const monthAmountsMinor = sumMonths(
@@ -146,7 +146,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
         })
         .sort(
           (left, right) =>
-            compareAmount(left.totalAmountMinor, right.totalAmountMinor) ||
+            compareAmountDescending(left.totalAmountMinor, right.totalAmountMinor) ||
             left.label.localeCompare(right.label, "pt-BR"),
         ),
     ]),
@@ -498,7 +498,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
             label: childRows[0].categoryLabel,
             rows: [...childRows].sort(
               (left, right) =>
-                compareAmount(
+                compareAmountDescending(
                   left.secondAmountMinor,
                   right.secondAmountMinor,
                 ) || left.label.localeCompare(right.label, "pt-BR"),
@@ -513,7 +513,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
         })
         .sort(
           (left, right) =>
-            compareAmount(
+            compareAmountDescending(
               left.secondAmountMinor,
               right.secondAmountMinor,
             ) || left.label.localeCompare(right.label, "pt-BR"),
@@ -541,7 +541,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
         return left.section === "income" ? -1 : 1;
       }
       return (
-        compareAmount(left.secondAmountMinor, right.secondAmountMinor) ||
+        compareAmountDescending(left.secondAmountMinor, right.secondAmountMinor) ||
         left.label.localeCompare(right.label, "pt-BR")
       );
     });

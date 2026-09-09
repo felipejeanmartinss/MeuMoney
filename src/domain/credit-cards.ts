@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isValidIsoDate } from "./dates";
-import { parseMoneyInputToMinor } from "./money";
+import { assertMinorUnits, parseMoneyInputToMinor } from "./money";
 import type {
   CreditCardBrand,
   CreditCardInvoiceStatus,
@@ -104,6 +104,16 @@ export const creditCardPurchaseFormSchema = z
     notes: optionalText(1000),
   })
   .superRefine((data, context) => {
+    if (
+      data.isRecurring &&
+      (data.installmentCount !== 1 || data.installmentAmounts.length !== 1)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentCount"],
+        message: "Assinaturas não possuem quantidade fixa de parcelas.",
+      });
+    }
     if (data.installmentCount > data.totalAmount) {
       context.addIssue({
         code: "custom",
@@ -257,4 +267,57 @@ export function effectiveInvoiceStatus(
   today: string,
 ): CreditCardInvoiceStatus {
   return status === "closed" && dueDate < today ? "overdue" : status;
+}
+
+export type CreditCardInvoiceForecastRow = {
+  referenceMonth: string;
+  amountMinor: number;
+  invoiceId: string | null;
+  projected: boolean;
+};
+
+export function buildCreditCardInvoiceForecast(input: {
+  referenceMonth: string;
+  months?: number;
+  invoices: readonly {
+    id: string;
+    referenceMonth: string;
+    totalAmountMinor: number;
+  }[];
+  subscriptions: readonly {
+    amountMinor: number;
+    firstReferenceMonth: string;
+  }[];
+}): CreditCardInvoiceForecastRow[] {
+  const months = input.months ?? 6;
+  const start = parseIsoDate(input.referenceMonth);
+  if (!Number.isInteger(months) || months < 1 || months > 24) {
+    throw new Error("Quantidade de meses da projeção inválida.");
+  }
+  const invoiceByMonth = new Map(
+    input.invoices.map((invoice) => [invoice.referenceMonth, invoice]),
+  );
+
+  return Array.from({ length: months }, (_, index) => {
+    const shifted = shiftMonth(start.year, start.month, index);
+    const referenceMonth = boundedDayDate(shifted.year, shifted.month, 1);
+    const invoice = invoiceByMonth.get(referenceMonth);
+    const recurringProjection = input.subscriptions.reduce(
+      (total, subscription) =>
+        referenceMonth > subscription.firstReferenceMonth
+          ? total + subscription.amountMinor
+          : total,
+      0,
+    );
+    const amountMinor = assertMinorUnits(
+      assertMinorUnits(invoice?.totalAmountMinor ?? 0) +
+        assertMinorUnits(recurringProjection),
+    );
+    return {
+      referenceMonth,
+      amountMinor,
+      invoiceId: invoice?.id ?? null,
+      projected: !invoice || recurringProjection > 0,
+    };
+  });
 }
