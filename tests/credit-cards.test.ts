@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   boundedDayDate,
+  creditCardPurchaseFormSchema,
   effectiveInvoiceStatus,
   getInvoiceDueDate,
   getPurchaseReferenceMonth,
   splitInstallments,
 } from "../src/domain/credit-cards";
+import {
+  formatIsoDatePtBr,
+  formatReferenceMonthPtBr,
+} from "../src/utils/dates";
 
 describe("credit card cycles", () => {
   it("keeps purchases through closing day in the current competence", () => {
@@ -57,5 +62,42 @@ describe("invoice presentation status", () => {
     expect(effectiveInvoiceStatus("paid", "2026-07-10", "2026-07-11")).toBe(
       "paid",
     );
+  });
+});
+
+describe("editable installment purchases", () => {
+  const purchase = {
+    categoryId: "d9428888-122b-11e1-b85c-61cd3cbb3210",
+    description: "Assinatura",
+    totalAmount: "100,00",
+    purchaseDate: "2026-09-07",
+    installmentCount: "3",
+    installmentAmounts: ["33,33", "33,33", "33,34"],
+    isRecurring: true,
+    notes: "",
+  };
+
+  it("accepts a custom distribution that preserves the purchase total", () => {
+    const parsed = creditCardPurchaseFormSchema.safeParse(purchase);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.installmentAmounts).toEqual([3333, 3333, 3334]);
+      expect(parsed.data.isRecurring).toBe(true);
+    }
+  });
+
+  it("rejects installment values whose sum differs from the purchase", () => {
+    const parsed = creditCardPurchaseFormSchema.safeParse({
+      ...purchase,
+      installmentAmounts: ["33,33", "33,33", "33,33"],
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("Brazilian card dates", () => {
+  it("formats dates and invoice references without timezone conversion", () => {
+    expect(formatIsoDatePtBr("2026-09-07")).toBe("07/09/2026");
+    expect(formatReferenceMonthPtBr("2026-09-01")).toBe("09/2026");
   });
 });

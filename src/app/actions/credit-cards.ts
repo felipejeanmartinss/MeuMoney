@@ -6,6 +6,8 @@ import type { FinancialFormState } from "@/app/actions/accounts";
 import {
   creditCardFormSchema,
   creditCardIdSchema,
+  creditCardInstallmentAmountFormSchema,
+  creditCardInstallmentIdSchema,
   creditCardInvoiceIdSchema,
   creditCardPurchaseFormSchema,
   creditCardPurchaseIdSchema,
@@ -20,6 +22,7 @@ import {
   reverseCurrentUserCreditCardInvoicePayment,
   setCurrentUserCreditCardActive,
   updateCurrentUserCreditCard,
+  updateCurrentUserCreditCardInstallmentAmount,
   updateCurrentUserCreditCardPurchase,
 } from "@/services/finance/credit-cards-service";
 
@@ -41,6 +44,8 @@ const purchaseInputFrom = (formData: FormData) => ({
   totalAmount: formData.get("totalAmount"),
   purchaseDate: formData.get("purchaseDate"),
   installmentCount: formData.get("installmentCount"),
+  installmentAmounts: formData.getAll("installmentAmounts"),
+  isRecurring: formData.get("isRecurring") === "true",
   notes: formData.get("notes") ?? "",
 });
 
@@ -189,6 +194,39 @@ export async function closeCreditCardInvoice(formData: FormData) {
   redirect(
     `/credit-cards/${cardId.data}/invoices/${invoiceId.data}?message=${
       result.ok ? "invoice-closed" : "invoice-error"
+    }`,
+  );
+}
+
+export async function updateCreditCardInstallmentAmount(formData: FormData) {
+  const cardId = creditCardIdSchema.safeParse(formData.get("cardId"));
+  const invoiceId = creditCardInvoiceIdSchema.safeParse(
+    formData.get("invoiceId"),
+  );
+  const installmentId = creditCardInstallmentIdSchema.safeParse(
+    formData.get("installmentId"),
+  );
+  const parsed = creditCardInstallmentAmountFormSchema.safeParse({
+    amount: formData.get("amount"),
+  });
+  if (!cardId.success || !invoiceId.success || !installmentId.success) {
+    redirect("/credit-cards?message=invoice-error");
+  }
+  if (!parsed.success) {
+    redirect(
+      `/credit-cards/${cardId.data}/invoices/${invoiceId.data}?message=installment-error`,
+    );
+  }
+
+  const result = await updateCurrentUserCreditCardInstallmentAmount(
+    installmentId.data,
+    parsed.data.amount,
+  );
+  revalidateCardPaths(cardId.data);
+  revalidatePath(`/credit-cards/${cardId.data}/invoices/${invoiceId.data}`);
+  redirect(
+    `/credit-cards/${cardId.data}/invoices/${invoiceId.data}?message=${
+      result.ok ? "installment-updated" : "installment-error"
     }`,
   );
 }

@@ -3,6 +3,7 @@ import { toggleCreditCardActivity } from "@/app/actions/credit-cards";
 import { CREDIT_CARD_BRAND_LABELS } from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
+import { formatReferenceMonthPtBr } from "@/utils/dates";
 
 export const metadata = { title: "Cartões" };
 
@@ -115,7 +116,7 @@ export default async function CreditCardsPage({
               Próxima fatura:{" "}
               <strong className="text-slate-900">
                 {nextInvoice
-                  ? `${nextInvoice.reference_month.slice(0, 7)} · ${formatMoney(
+                  ? `${formatReferenceMonthPtBr(nextInvoice.reference_month)} · ${formatMoney(
                       nextInvoice.total_amount,
                       card.currency,
                     )}`

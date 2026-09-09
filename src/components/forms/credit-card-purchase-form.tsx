@@ -10,7 +10,15 @@ import {
   getInvoiceDueDate,
   splitInstallments,
 } from "@/domain/credit-cards";
-import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
+import {
+  formatMoney,
+  minorUnitsToInput,
+  parseMoneyInputToMinor,
+} from "@/domain/money";
+import {
+  formatIsoDatePtBr,
+  formatReferenceMonthPtBr,
+} from "@/utils/dates";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import { CategoryCombobox } from "./category-combobox";
 import type { FinancialContext, SupportedCurrency } from "@/types/database";
@@ -22,10 +30,30 @@ type Values = {
   totalAmount?: string;
   purchaseDate?: string;
   installmentCount?: number;
+  installmentAmounts?: string[];
+  isRecurring?: boolean;
   notes?: string | null;
 };
 
 const initialState: FinancialFormState = { status: "idle" };
+
+function buildInstallmentAmountInputs(
+  amount: string,
+  count: number,
+  date: string,
+  closingDay: number,
+) {
+  try {
+    return splitInstallments(
+      parseMoneyInputToMinor(amount),
+      count,
+      date,
+      closingDay,
+    ).map((item) => minorUnitsToInput(item.amountMinor));
+  } catch {
+    return [];
+  }
+}
 
 export function CreditCardPurchaseForm({
   cardId,
@@ -54,15 +82,66 @@ export function CreditCardPurchaseForm({
   const [amount, setAmount] = useState(values.totalAmount ?? "");
   const [date, setDate] = useState(values.purchaseDate ?? "");
   const [count, setCount] = useState(values.installmentCount ?? 1);
+  const [installmentAmounts, setInstallmentAmounts] = useState(() =>
+    values.installmentAmounts ??
+      buildInstallmentAmountInputs(
+        values.totalAmount ?? "",
+        values.installmentCount ?? 1,
+        values.purchaseDate ?? "",
+        closingDay,
+      ),
+  );
 
   const preview = useMemo(() => {
     try {
       const total = parseMoneyInputToMinor(amount);
-      return splitInstallments(total, count, date, closingDay).slice(0, 12);
+      return splitInstallments(total, count, date, closingDay).map(
+        (item, index) => ({
+          ...item,
+          amountInput:
+            installmentAmounts[index] ?? minorUnitsToInput(item.amountMinor),
+        }),
+      );
     } catch {
       return [];
     }
-  }, [amount, closingDay, count, date]);
+  }, [amount, closingDay, count, date, installmentAmounts]);
+
+  const distributionMatches = useMemo(() => {
+    if (preview.length !== count) return false;
+    try {
+      return (
+        installmentAmounts.reduce(
+          (sum, item) => sum + parseMoneyInputToMinor(item),
+          0,
+        ) === parseMoneyInputToMinor(amount)
+      );
+    } catch {
+      return false;
+    }
+  }, [amount, count, installmentAmounts, preview.length]);
+
+  function changeAmount(nextAmount: string) {
+    setAmount(nextAmount);
+    setInstallmentAmounts(
+      buildInstallmentAmountInputs(nextAmount, count, date, closingDay),
+    );
+  }
+
+  function changeCount(nextCount: number) {
+    setCount(nextCount);
+    setInstallmentAmounts(
+      buildInstallmentAmountInputs(amount, nextCount, date, closingDay),
+    );
+  }
+
+  function changeInstallmentAmount(index: number, nextAmount: string) {
+    setInstallmentAmounts((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? nextAmount : item,
+      ),
+    );
+  }
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -105,7 +184,7 @@ export function CreditCardPurchaseForm({
             className={inputClass(Boolean(state.fieldErrors?.totalAmount))}
             name="totalAmount"
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => changeAmount(event.target.value)}
             inputMode="decimal"
             placeholder="0,00"
             required
@@ -132,11 +211,22 @@ export function CreditCardPurchaseForm({
             min={1}
             max={240}
             value={count}
-            onChange={(event) => setCount(Number(event.target.value))}
+            onChange={(event) => changeCount(Number(event.target.value))}
             required
           />
         </Field>
       </div>
+
+      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-800">
+        <input
+          className="h-4 w-4 accent-blue-700"
+          type="checkbox"
+          name="isRecurring"
+          value="true"
+          defaultChecked={values.isRecurring}
+        />
+        Assinatura ou compra recorrente
+      </label>
 
       <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>
         <textarea
@@ -149,30 +239,76 @@ export function CreditCardPurchaseForm({
       </Field>
 
       {preview.length ? (
-        <section
-          aria-live="polite"
-          className="rounded-xl border border-blue-100 bg-blue-50 p-4"
-        >
-          <h2 className="font-bold text-blue-950">Prévia das parcelas</h2>
-          <ul className="mt-3 grid gap-2 text-sm text-blue-950 sm:grid-cols-2">
-            {preview.map((item) => (
-              <li key={item.installmentNumber}>
-                {item.installmentNumber}/{item.installmentCount} ·{" "}
-                {formatMoney(item.amountMinor, currency)} · fatura{" "}
-                {item.competenceDate.slice(0, 7)} · vence{" "}
-                {getInvoiceDueDate(item.competenceDate, closingDay, dueDay)}
-              </li>
-            ))}
-          </ul>
-          {count > 12 ? (
-            <p className="mt-2 text-xs text-blue-800">
-              Mostrando as 12 primeiras de {count} parcelas.
+        <section aria-live="polite" className="overflow-hidden rounded-xl border">
+          <div className="flex items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3">
+            <h2 className="font-bold text-slate-950">Prévia das parcelas</h2>
+            <span
+              className={`text-xs font-semibold ${
+                distributionMatches ? "text-emerald-700" : "text-rose-700"
+              }`}
+            >
+              {distributionMatches
+                ? `Total ${formatMoney(parseMoneyInputToMinor(amount), currency)}`
+                : "A soma precisa coincidir com a compra"}
+            </span>
+          </div>
+          <div className="max-h-96 overflow-auto">
+            <table className="w-full min-w-[620px] border-collapse text-sm">
+              <thead className="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th className="px-4 py-2">Parcela</th>
+                  <th className="px-4 py-2">Fatura</th>
+                  <th className="px-4 py-2">Vencimento</th>
+                  <th className="px-4 py-2 text-right">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((item, index) => (
+                  <tr key={item.installmentNumber} className="border-t">
+                    <td className="px-4 py-2 font-semibold">
+                      {item.installmentNumber}/{item.installmentCount}
+                    </td>
+                    <td className="px-4 py-2">
+                      {formatReferenceMonthPtBr(item.competenceDate)}
+                    </td>
+                    <td className="px-4 py-2">
+                      {formatIsoDatePtBr(
+                        getInvoiceDueDate(
+                          item.competenceDate,
+                          closingDay,
+                          dueDay,
+                        ),
+                      )}
+                    </td>
+                    <td className="px-4 py-1.5 text-right">
+                      <input
+                        aria-label={`Valor da parcela ${item.installmentNumber}`}
+                        className={`${inputClass(
+                          Boolean(state.fieldErrors?.installmentAmounts),
+                        )} ml-auto h-10 max-w-36 text-right`}
+                        name="installmentAmounts"
+                        value={item.amountInput}
+                        onChange={(event) =>
+                          changeInstallmentAmount(index, event.target.value)
+                        }
+                        inputMode="decimal"
+                        required
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {state.fieldErrors?.installmentAmounts?.[0] ? (
+            <p className="border-t bg-rose-50 px-4 py-2 text-xs text-rose-700">
+              {state.fieldErrors.installmentAmounts[0]}
             </p>
           ) : null}
         </section>
       ) : null}
 
-      <SubmitButton pending={pending}>
+      <SubmitButton pending={pending} disabled={!distributionMatches}>
         {values.purchaseId ? "Salvar compra" : "Registrar compra"}
       </SubmitButton>
     </form>

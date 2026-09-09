@@ -96,12 +96,44 @@ export const creditCardPurchaseFormSchema = z
       .string()
       .refine(isValidIsoDate, "Informe uma data válida."),
     installmentCount: z.coerce.number().int().min(1).max(240),
+    installmentAmounts: z
+      .array(moneyInput())
+      .min(1, "Informe o valor das parcelas.")
+      .max(240),
+    isRecurring: z.boolean(),
     notes: optionalText(1000),
   })
-  .refine((data) => data.installmentCount <= data.totalAmount, {
-    path: ["installmentCount"],
-    message: "O número de parcelas não pode superar o total em centavos.",
+  .superRefine((data, context) => {
+    if (data.installmentCount > data.totalAmount) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentCount"],
+        message: "O número de parcelas não pode superar o total em centavos.",
+      });
+    }
+    if (data.installmentAmounts.length !== data.installmentCount) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentAmounts"],
+        message: "Revise a quantidade de valores da prévia.",
+      });
+    }
+    const distributionTotal = data.installmentAmounts.reduce(
+      (sum, amount) => sum + amount,
+      0,
+    );
+    if (!Number.isSafeInteger(distributionTotal) || distributionTotal !== data.totalAmount) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentAmounts"],
+        message: "A soma das parcelas deve ser igual ao valor total da compra.",
+      });
+    }
   });
+
+export const creditCardInstallmentAmountFormSchema = z.object({
+  amount: moneyInput(),
+});
 
 export const invoicePaymentFormSchema = z.object({
   accountId: z.uuid("Selecione uma conta válida."),
@@ -114,6 +146,7 @@ export const invoicePaymentFormSchema = z.object({
 export const creditCardIdSchema = z.uuid("Cartão inválido.");
 export const creditCardPurchaseIdSchema = z.uuid("Compra inválida.");
 export const creditCardInvoiceIdSchema = z.uuid("Fatura inválida.");
+export const creditCardInstallmentIdSchema = z.uuid("Parcela inválida.");
 
 type DateParts = { year: number; month: number; day: number };
 
