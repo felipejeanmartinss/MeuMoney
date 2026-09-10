@@ -2,7 +2,7 @@ import Link from "next/link";
 import { InvestmentUnitPriceForm } from "@/components/forms/investment-unit-price-form";
 import { listCurrentUserMarketPricedInvestmentPositions } from "@/services/finance/investments-service";
 
-export const metadata = { title: "Atualizar cotações" };
+export const metadata = { title: "Cotações" };
 
 export default async function InvestmentPricesPage() {
   const { positions, hasError } =
@@ -18,7 +18,7 @@ export default async function InvestmentPricesPage() {
           Ações e fundos imobiliários
         </p>
         <h1 className="mt-2 text-3xl font-black text-slate-950">
-          Atualizar cotações
+          Cotações
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           O valor atual será recalculado pela quantidade multiplicada pelo valor unitário.

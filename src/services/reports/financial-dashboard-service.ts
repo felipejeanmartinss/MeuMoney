@@ -8,6 +8,10 @@ import {
 } from "@/domain/financial-dashboard";
 import { coerceMinorUnits } from "@/domain/money";
 import { SUPPORTED_CURRENCIES } from "@/domain/currencies";
+import {
+  convertMinorUnits,
+  type CurrencyConversionSample,
+} from "@/domain/currency-conversion";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   AccountBalance,
@@ -62,6 +66,7 @@ function normalizeAccount(row: AccountBalance): AccountBalance {
     ...row,
     opening_balance_minor: coerceMinorUnits(row.opening_balance_minor),
     current_balance_minor: coerceMinorUnits(row.current_balance_minor),
+    projected_balance_minor: coerceMinorUnits(row.projected_balance_minor),
   };
 }
 
@@ -142,6 +147,7 @@ export type FinancialDashboardData = {
   userEmail: string;
   profile: Profile | null;
   currencies: FinancialDashboardCurrencyData[];
+  missingCurrencies: SupportedCurrency[];
   hasError: boolean;
 };
 
@@ -165,6 +171,7 @@ export async function getFinancialDashboard(
     cardBalancesResult,
     recurrenceResults,
     invoiceResults,
+    conversionResult,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -231,6 +238,16 @@ export async function getFinancialDashboard(
           .limit(5),
       ),
     ),
+    supabase
+      .from("transfers")
+      .select("currency, destination_currency, amount_minor, destination_amount_minor, transaction_date")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .eq("is_active", true)
+      .not("destination_account_id", "is", null)
+      .not("destination_currency", "is", null)
+      .not("destination_amount_minor", "is", null)
+      .order("transaction_date", { ascending: false }),
   ]);
 
   const accounts = (accountsResult.data ?? []).map(normalizeAccount);
@@ -251,109 +268,177 @@ export async function getFinancialDashboard(
     (result.data ?? []).map(normalizeInvoice),
   );
   const profile = profileResult.data;
-
-  const presentCurrencies = new Set<SupportedCurrency>([
-    ...(profile ? [profile.preferred_currency] : []),
-    ...accounts.map((row) => row.currency),
-    ...summaries.map((row) => row.currency),
-    ...categories.map((row) => row.currency),
-    ...budgets.map((row) => row.currency),
-    ...netWorth.map((row) => row.currency),
-    ...cardBalances.map((row) => row.currency),
-    ...recurrences.map((row) => row.currency),
-    ...invoices.map((row) => row.currency),
-  ]);
-
-  const currencies = SUPPORTED_CURRENCIES.filter((currency) =>
-    presentCurrencies.has(currency),
-  ).map((currency) => {
-    const currencyAccounts = accounts.filter(
-      (account) => account.currency === currency,
+  const preferredCurrency = profile?.preferred_currency ?? "BRL";
+  const conversionSamples: CurrencyConversionSample[] = (
+    conversionResult.data ?? []
+  ).flatMap((row) =>
+    row.destination_currency && row.destination_amount_minor
+      ? [{
+          sourceCurrency: row.currency,
+          destinationCurrency: row.destination_currency,
+          sourceAmountMinor: coerceMinorUnits(row.amount_minor),
+          destinationAmountMinor: coerceMinorUnits(row.destination_amount_minor),
+          transactionDate: row.transaction_date,
+        }]
+      : [],
+  );
+  const missingCurrencies = new Set<SupportedCurrency>();
+  const converted = (
+    value: number,
+    sourceCurrency: SupportedCurrency,
+    referenceDate: string,
+  ) => {
+    const result = convertMinorUnits(
+      coerceMinorUnits(value),
+      sourceCurrency,
+      preferredCurrency,
+      referenceDate,
+      conversionSamples,
     );
-    const selectedMonth = summaries.find(
-      (row) =>
-        row.currency === currency &&
-        row.reference_month === selectedReferenceMonth,
-    ) ?? {
+    if (result === null) {
+      missingCurrencies.add(sourceCurrency);
+      return 0;
+    }
+    return result;
+  };
+  const convertedAccounts = accounts.map((account) => ({
+    ...account,
+    currency: preferredCurrency,
+    opening_balance_minor: converted(account.opening_balance_minor, account.currency, today),
+    current_balance_minor: converted(account.current_balance_minor, account.currency, today),
+    projected_balance_minor: converted(account.projected_balance_minor, account.currency, today),
+  }));
+  const accountBalanceMinor = convertedAccounts.reduce(
+    (total, account) => coerceMinorUnits(total + account.current_balance_minor),
+    0,
+  );
+  const summaryByMonth = new Map<string, FinancialDashboardMonthlySummary>();
+  for (const row of summaries) {
+    const date = `${row.reference_month.slice(0, 7)}-31`;
+    const current = summaryByMonth.get(row.reference_month) ?? {
       user_id: user.id,
-      reference_month: selectedReferenceMonth,
-      currency,
+      reference_month: row.reference_month,
+      currency: preferredCurrency,
       income_amount_minor: 0,
       expense_amount_minor: 0,
       result_amount_minor: 0,
       planned_amount_minor: 0,
       budget_percentage_consumed: null,
     };
-    const currencyInvoices = invoices.filter(
-      (row) => row.currency === currency,
+    current.income_amount_minor = coerceMinorUnits(
+      current.income_amount_minor + converted(row.income_amount_minor, row.currency, date),
     );
-    const manualNetWorthMinor =
-      netWorth.find((row) => row.currency === currency)?.net_worth_minor ?? 0;
-    const creditCardBalanceMinor = cardBalances
-      .filter((card) => card.currency === currency)
-      .reduce(
-      (total, card) =>
-        coerceMinorUnits(total + Math.max(0, card.current_balance_minor)),
-      0,
+    current.expense_amount_minor = coerceMinorUnits(
+      current.expense_amount_minor + converted(row.expense_amount_minor, row.currency, date),
     );
-    const accountBalanceMinor = currencyAccounts.reduce(
-      (total, account) =>
-        coerceMinorUnits(total + account.current_balance_minor),
-      0,
+    current.planned_amount_minor = coerceMinorUnits(
+      current.planned_amount_minor + converted(row.planned_amount_minor, row.currency, date),
     );
-
-    return {
-      currency,
-      accounts: currencyAccounts,
-      accountBalanceMinor,
-      selectedMonth,
-      evolution: fillMonthlyEvolution(
-        currency,
-        referenceMonth,
-        summaries.map((row) => ({
-          currency: row.currency,
-          referenceMonth: row.reference_month,
-          incomeAmountMinor: row.income_amount_minor,
-          expenseAmountMinor: row.expense_amount_minor,
-          resultAmountMinor: row.result_amount_minor,
-          plannedAmountMinor: row.planned_amount_minor,
-          budgetPercentageConsumed: row.budget_percentage_consumed,
-        })),
-      ),
-      categories: limitExpenseCategories(
-        categories
-          .filter((row) => row.currency === currency)
-          .map((row) => ({
-            categoryId:
-              row.category_id ?? `cash-card-payment-${row.context}`,
-            categoryName: row.category_name,
-            context: row.context,
-            amountMinor: row.expense_amount_minor,
-          })),
-      ).map((row) => ({
-        user_id: user.id,
-        reference_month: selectedReferenceMonth,
-        currency,
-        category_id: row.categoryId,
-        category_name: row.categoryName,
-        context: row.context,
-        expense_amount_minor: row.amountMinor,
-      })),
-      recurrences: recurrences.filter((row) => row.currency === currency),
-      invoices: currencyInvoices,
-      spendingTracker: budgets.filter((row) => row.currency === currency),
-      netWorthMinor: calculateExecutiveDashboardNetWorth({
-        accountBalanceMinor,
-        manualNetWorthMinor,
-        creditCardBalanceMinor,
-      }),
+    current.result_amount_minor = coerceMinorUnits(
+      current.income_amount_minor - current.expense_amount_minor,
+    );
+    current.budget_percentage_consumed = current.planned_amount_minor > 0
+      ? (current.expense_amount_minor / current.planned_amount_minor) * 100
+      : null;
+    summaryByMonth.set(row.reference_month, current);
+  }
+  const selectedMonth = summaryByMonth.get(selectedReferenceMonth) ?? {
+    user_id: user.id,
+    reference_month: selectedReferenceMonth,
+    currency: preferredCurrency,
+    income_amount_minor: 0,
+    expense_amount_minor: 0,
+    result_amount_minor: 0,
+    planned_amount_minor: 0,
+    budget_percentage_consumed: null,
+  };
+  const categoryMap = new Map<
+    string,
+    {
+      categoryId: string;
+      categoryName: string;
+      context: FinancialDashboardExpenseCategory["context"];
+      amountMinor: number;
+    }
+  >();
+  for (const row of categories) {
+    const categoryId = row.category_id ?? `cash-card-payment-${row.context}`;
+    const key = `${categoryId}:${row.context}`;
+    const current = categoryMap.get(key) ?? {
+      categoryId,
+      categoryName: row.category_name,
+      context: row.context,
+      amountMinor: 0,
     };
-  });
+    current.amountMinor = coerceMinorUnits(
+      current.amountMinor + converted(row.expense_amount_minor, row.currency, `${referenceMonth}-31`),
+    );
+    categoryMap.set(key, current);
+  }
+  const convertedCategories = limitExpenseCategories([...categoryMap.values()]).map((row) => ({
+    user_id: user.id,
+    reference_month: selectedReferenceMonth,
+    currency: preferredCurrency,
+    category_id: row.categoryId,
+    category_name: row.categoryName,
+    context: row.context,
+    expense_amount_minor: row.amountMinor,
+  }));
+  const convertedRecurrences = recurrences.map((row) => ({
+    ...row,
+    currency: preferredCurrency,
+    amount_minor: converted(row.amount_minor, row.currency, row.next_occurrence),
+  }));
+  const convertedInvoices = invoices.map((row) => ({
+    ...row,
+    currency: preferredCurrency,
+    total_amount_minor: converted(row.total_amount_minor, row.currency, row.due_date),
+    outstanding_amount_minor: converted(row.outstanding_amount_minor, row.currency, row.due_date),
+  }));
+  const manualNetWorthMinor = netWorth.reduce(
+    (total, row) => coerceMinorUnits(total + converted(row.net_worth_minor, row.currency, today)),
+    0,
+  );
+  const creditCardBalanceMinor = cardBalances.reduce(
+    (total, card) => coerceMinorUnits(
+      total + converted(Math.max(0, card.current_balance_minor), card.currency, today),
+    ),
+    0,
+  );
+  const currencies: FinancialDashboardCurrencyData[] = [{
+    currency: preferredCurrency,
+    accounts: convertedAccounts,
+    accountBalanceMinor,
+    selectedMonth,
+    evolution: fillMonthlyEvolution(
+      preferredCurrency,
+      referenceMonth,
+      [...summaryByMonth.values()].map((row) => ({
+        currency: preferredCurrency,
+        referenceMonth: row.reference_month,
+        incomeAmountMinor: row.income_amount_minor,
+        expenseAmountMinor: row.expense_amount_minor,
+        resultAmountMinor: row.result_amount_minor,
+        plannedAmountMinor: row.planned_amount_minor,
+        budgetPercentageConsumed: row.budget_percentage_consumed,
+      })),
+    ),
+    categories: convertedCategories,
+    recurrences: convertedRecurrences,
+    invoices: convertedInvoices,
+    spendingTracker: budgets.filter((row) => row.currency === preferredCurrency),
+    netWorthMinor: calculateExecutiveDashboardNetWorth({
+      accountBalanceMinor,
+      manualNetWorthMinor,
+      creditCardBalanceMinor,
+    }),
+  }];
 
   return {
     userEmail: user.email ?? "",
     profile,
     currencies,
+    missingCurrencies: [...missingCurrencies],
     hasError: Boolean(
       profileResult.error ||
         accountsResult.error ||
@@ -363,7 +448,8 @@ export async function getFinancialDashboard(
         netWorthResult.error ||
         cardBalancesResult.error ||
         recurrenceResults.some((result) => result.error) ||
-        invoiceResults.some((result) => result.error),
+        invoiceResults.some((result) => result.error) ||
+        conversionResult.error,
     ),
   };
 }

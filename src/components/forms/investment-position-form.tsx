@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import {
   createInvestmentPosition,
   updateInvestmentPosition,
@@ -9,11 +9,18 @@ import {
 import { CONTEXT_LABELS, FINANCIAL_CONTEXTS } from "@/domain/accounts";
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
 import {
+  calculateInvestmentUnitPriceFromValue,
+  calculateInvestmentValueFromUnitPrice,
   INVESTMENT_CLASSES,
   INVESTMENT_CLASS_LABELS,
   INVESTMENT_TYPES_BY_CLASS,
   INVESTMENT_TYPE_LABELS,
 } from "@/domain/investments";
+import {
+  formatMoney,
+  minorUnitsToInput,
+  parseMoneyInputToMinor,
+} from "@/domain/money";
 import type {
   FinancialContext,
   InvestmentClass,
@@ -57,6 +64,56 @@ export function InvestmentPositionForm({
   );
   const validTypes = INVESTMENT_TYPES_BY_CLASS[investmentClass];
   const initialType = values.investmentType ?? validTypes[0];
+  const [investmentType, setInvestmentType] = useState<InvestmentType>(
+    validTypes.includes(initialType) ? initialType : validTypes[0],
+  );
+  const [quantity, setQuantity] = useState(values.quantity ?? "0");
+  const [currency, setCurrency] = useState<SupportedCurrency>(
+    values.currency ?? "BRL",
+  );
+  const [accumulatedCost, setAccumulatedCost] = useState(
+    values.accumulatedCostMinor ?? "0,00",
+  );
+  const [currentValue, setCurrentValue] = useState(
+    values.currentValueMinor ?? "0,00",
+  );
+  const [unitPrice, setUnitPrice] = useState(() => {
+    try {
+      const calculated = calculateInvestmentUnitPriceFromValue(
+        parseMoneyInputToMinor(values.currentValueMinor ?? "0,00"),
+        values.quantity ?? "0",
+      );
+      return minorUnitsToInput(calculated ?? 0);
+    } catch {
+      return "0,00";
+    }
+  });
+  const isMarketPriced = investmentType === "stock" || investmentType === "fii";
+  const positionSummary = useMemo(() => {
+    try {
+      const costMinor = parseMoneyInputToMinor(accumulatedCost);
+      const valueMinor = parseMoneyInputToMinor(currentValue);
+      return {
+        costUnit: calculateInvestmentUnitPriceFromValue(costMinor, quantity),
+        costMinor,
+        valueMinor,
+      };
+    } catch {
+      return null;
+    }
+  }, [accumulatedCost, currentValue, quantity]);
+
+  function updateMarketValue(nextQuantity: string, nextUnitPrice: string) {
+    try {
+      const calculated = calculateInvestmentValueFromUnitPrice(
+        nextQuantity,
+        parseMoneyInputToMinor(nextUnitPrice),
+      );
+      setCurrentValue(minorUnitsToInput(calculated));
+    } catch {
+      // Preserve the last valid total while the user is still typing.
+    }
+  }
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -65,7 +122,7 @@ export function InvestmentPositionForm({
         <input
           type="hidden"
           name="currency"
-          value={values.currency ?? "BRL"}
+          value={currency}
         />
       ) : null}
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
@@ -93,9 +150,11 @@ export function InvestmentPositionForm({
             )}
             name="investmentClass"
             value={investmentClass}
-            onChange={(event) =>
-              setInvestmentClass(event.target.value as InvestmentClass)
-            }
+            onChange={(event) => {
+              const nextClass = event.target.value as InvestmentClass;
+              setInvestmentClass(nextClass);
+              setInvestmentType(INVESTMENT_TYPES_BY_CLASS[nextClass][0]);
+            }}
             required
             aria-invalid={Boolean(state.fieldErrors?.investmentClass)}
           >
@@ -112,10 +171,12 @@ export function InvestmentPositionForm({
           error={state.fieldErrors?.investmentType?.[0]}
         >
           <select
-            key={investmentClass}
             className={inputClass(Boolean(state.fieldErrors?.investmentType))}
             name="investmentType"
-            defaultValue={validTypes.includes(initialType) ? initialType : validTypes[0]}
+            value={validTypes.includes(investmentType) ? investmentType : validTypes[0]}
+            onChange={(event) =>
+              setInvestmentType(event.target.value as InvestmentType)
+            }
             required
             aria-invalid={Boolean(state.fieldErrors?.investmentType)}
           >
@@ -161,7 +222,10 @@ export function InvestmentPositionForm({
           <select
             className={inputClass(Boolean(state.fieldErrors?.currency))}
             name={currencyIsLocked ? undefined : "currency"}
-            defaultValue={values.currency ?? "BRL"}
+            value={currency}
+            onChange={(event) =>
+              setCurrency(event.target.value as SupportedCurrency)
+            }
             disabled={currencyIsLocked}
             required
             aria-invalid={Boolean(state.fieldErrors?.currency)}
@@ -180,12 +244,31 @@ export function InvestmentPositionForm({
         </Field>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
+      {isMarketPriced && positionSummary ? (
+        <div className="grid gap-1 rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-slate-700 sm:grid-cols-2">
+          <p>
+            Custo unitário <strong>{formatMoney(positionSummary.costUnit ?? 0, currency)}</strong>
+            {" · "}Quantidade <strong>{quantity || "0"}</strong>
+            {" · "}Custo acumulado <strong>{formatMoney(positionSummary.costMinor, currency)}</strong>
+          </p>
+          <p className="sm:text-right">
+            Cotação <strong>{unitPrice || "0,00"}</strong>
+            {" · "}Valor atual <strong>{formatMoney(positionSummary.valueMinor, currency)}</strong>
+          </p>
+        </div>
+      ) : null}
+
+      <div className={`grid gap-5 ${isMarketPriced ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
         <Field label="Quantidade" error={state.fieldErrors?.quantity?.[0]}>
           <input
             className={inputClass(Boolean(state.fieldErrors?.quantity))}
             name="quantity"
-            defaultValue={values.quantity ?? "0"}
+            value={quantity}
+            onChange={(event) => {
+              const nextQuantity = event.target.value;
+              setQuantity(nextQuantity);
+              if (isMarketPriced) updateMarketValue(nextQuantity, unitPrice);
+            }}
             inputMode="decimal"
             placeholder="0,00000000"
             required
@@ -205,7 +288,8 @@ export function InvestmentPositionForm({
               Boolean(state.fieldErrors?.accumulatedCostMinor),
             )}
             name="accumulatedCostMinor"
-            defaultValue={values.accumulatedCostMinor ?? "0,00"}
+            value={accumulatedCost}
+            onChange={(event) => setAccumulatedCost(event.target.value)}
             inputMode="decimal"
             placeholder="0,00"
             required
@@ -213,21 +297,41 @@ export function InvestmentPositionForm({
           />
         </Field>
 
-        <Field
-          label="Valor atual"
-          error={state.fieldErrors?.currentValueMinor?.[0]}
-        >
-          <input
-            className={inputClass(
-              Boolean(state.fieldErrors?.currentValueMinor),
-            )}
-            name="currentValueMinor"
-            defaultValue={values.currentValueMinor ?? "0,00"}
-            inputMode="decimal"
-            placeholder="0,00"
-            required
-            aria-invalid={Boolean(state.fieldErrors?.currentValueMinor)}
-          />
+        {isMarketPriced ? (
+          <Field label="Cotação atual">
+            <input
+              className={inputClass()}
+              value={unitPrice}
+              onChange={(event) => {
+                const nextUnitPrice = event.target.value;
+                setUnitPrice(nextUnitPrice);
+                updateMarketValue(quantity, nextUnitPrice);
+              }}
+              inputMode="decimal"
+              placeholder="0,00"
+              required
+            />
+          </Field>
+        ) : null}
+
+        <Field label="Valor atual" error={state.fieldErrors?.currentValueMinor?.[0]}>
+          {isMarketPriced ? (
+            <>
+              <input type="hidden" name="currentValueMinor" value={currentValue} />
+              <input className={inputClass()} value={currentValue} readOnly tabIndex={-1} />
+            </>
+          ) : (
+            <input
+              className={inputClass(Boolean(state.fieldErrors?.currentValueMinor))}
+              name="currentValueMinor"
+              value={currentValue}
+              onChange={(event) => setCurrentValue(event.target.value)}
+              inputMode="decimal"
+              placeholder="0,00"
+              required
+              aria-invalid={Boolean(state.fieldErrors?.currentValueMinor)}
+            />
+          )}
         </Field>
       </div>
 

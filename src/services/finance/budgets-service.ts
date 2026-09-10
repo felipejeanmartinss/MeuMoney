@@ -215,17 +215,43 @@ export async function copyCurrentUserPreviousMonthBudgets(input: {
   context: FinancialContext;
   currency: SupportedCurrency;
 }) {
-  const { supabase } = await requireUser();
-  const { data, error } = await supabase.rpc("copy_previous_month_budgets", {
-    target_reference_month: input.referenceMonth,
-    target_context: input.context,
-    target_currency: input.currency,
+  const { supabase, user } = await requireUser();
+  const target = new Date(`${input.referenceMonth}T12:00:00Z`);
+  target.setUTCMonth(target.getUTCMonth() - 1);
+  const previousReferenceMonth = `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const { data: categories, error: categoriesError } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("context", input.context);
+  if (categoriesError) {
+    return { ok: false as const, message: "Não foi possível localizar as categorias do orçamento." };
+  }
+  const categoryIds = (categories ?? []).map((category) => category.id);
+  if (categoryIds.length === 0) return { ok: true as const, copiedCount: 0 };
+  const { data: previousRows, error: previousError } = await supabase
+    .from("monthly_budgets")
+    .select("category_id, planned_amount_minor")
+    .eq("user_id", user.id)
+    .eq("reference_month", previousReferenceMonth)
+    .eq("currency", input.currency)
+    .in("category_id", categoryIds);
+  if (previousError) {
+    return { ok: false as const, message: "Não foi possível ler o orçamento do mês anterior." };
+  }
+  const rows = (previousRows ?? []).map((row) => ({
+    categoryId: row.category_id,
+    referenceMonth: input.referenceMonth,
+    plannedAmountMinor: coerceMinorUnits(row.planned_amount_minor),
+  }));
+  if (rows.length === 0) return { ok: true as const, copiedCount: 0 };
+  const result = await saveCurrentUserBudgetRows({
+    supabase,
+    userId: user.id,
+    currency: input.currency,
+    rows,
   });
-
-  return error
-    ? {
-        ok: false as const,
-        message: "Não foi possível copiar o orçamento do mês anterior.",
-      }
-    : { ok: true as const, copiedCount: data };
+  return result.ok
+    ? { ok: true as const, copiedCount: rows.length }
+    : result;
 }

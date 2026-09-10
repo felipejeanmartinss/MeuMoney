@@ -27,15 +27,23 @@ describe("accounts, investments and reporting UX", () => {
 
   it("uses one collapsible investment matrix with a sticky header and no UI pagination", () => {
     const page = readSource("src", "app", "investments", "page.tsx");
+    const positionForm = readSource(
+      "src",
+      "components",
+      "forms",
+      "investment-position-form.tsx",
+    );
 
     expect(page).toContain("INVESTMENT_MATRIX_GRID");
     expect(page).toContain("sticky top-0");
     expect(page).toContain("InvestmentCompositionChart");
     expect(page).toContain("Composição da carteira");
-    expect(page).toContain("Custo unitário");
-    expect(page).toContain("Valor unitário");
-    expect(page).toContain('position.investment_type === "stock"');
-    expect(page).toContain('position.investment_type === "fii"');
+    expect(page).not.toContain("Custo unitário");
+    expect(page).not.toContain("Valor unitário");
+    expect(positionForm).toContain("Custo unitário");
+    expect(positionForm).toContain("Cotação atual");
+    expect(positionForm).toContain('investmentType === "stock"');
+    expect(positionForm).toContain('investmentType === "fii"');
     expect(page).not.toContain("requestedPage");
     expect(page).not.toContain("pageCount");
   });
@@ -51,9 +59,13 @@ describe("accounts, investments and reporting UX", () => {
 
     expect(page).toContain("getCurrentProfile");
     expect(page).toContain("preferred_currency");
-    expect(page).toContain("Moeda de referência");
+    expect(page).toContain("Moedas incluídas");
+    expect(page).toContain('<input type="hidden" name="currency" value={currency} />');
+    expect(page).not.toContain("Moeda de referência");
     expect(page).toContain("missingCurrencies");
     expect(service).toContain("convertMinorUnits");
+    expect(service).toContain('from("credit_card_invoices")');
+    expect(service).toContain("invoice.paid_at");
     expect(service).not.toContain('.eq("currency", input.currency)');
   });
 });

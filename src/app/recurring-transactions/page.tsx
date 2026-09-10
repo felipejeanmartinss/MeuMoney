@@ -143,19 +143,12 @@ export default async function RecurringTransactionsPage({
     accounts,
     categories,
     groups,
-    cards,
-    cardPurchases,
-    cardInstallments,
     hasError,
   } =
     await listCurrentUserRecurringTransactions();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
-  );
-  const cardById = new Map(cards.map((card) => [card.id, card]));
-  const purchaseById = new Map(
-    cardPurchases.map((purchase) => [purchase.id, purchase]),
   );
   const asString = (value: string | string[] | undefined) =>
     typeof value === "string" ? value : undefined;
@@ -528,49 +521,6 @@ export default async function RecurringTransactionsPage({
                     <RecurrenceMenu id={recurrence.id} state={state} />
                   </div>
                 </article>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {cardInstallments.length ? (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="font-extrabold text-slate-950">
-              Compromissos dos cartões
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Assinaturas e parcelas futuras aparecem apenas para consulta e não geram recorrências duplicadas.
-            </p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {cardInstallments.slice(0, 18).map((installment) => {
-              const purchase = purchaseById.get(installment.purchase_id);
-              const card = cardById.get(installment.credit_card_id);
-              const currency = (card?.currency ?? "BRL") as SupportedCurrency;
-              return (
-                <div
-                  key={installment.id}
-                  className="grid gap-1 px-5 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-6"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-bold text-slate-950">
-                      {purchase?.description ?? "Compra do cartão"}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {card?.name ?? "Cartão"} · {purchase?.is_recurring
-                        ? "Assinatura mensal"
-                        : `Parcela ${installment.installment_number}/${installment.installment_count}`}
-                    </p>
-                  </div>
-                  <time className="text-slate-600">
-                    {formatFinancialDate(installment.competence_date)}
-                  </time>
-                  <strong className="text-slate-950">
-                    {formatMoney(installment.amount, currency, CURRENCY_LOCALES[currency])}
-                  </strong>
-                </div>
               );
             })}
           </div>

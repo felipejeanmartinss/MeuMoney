@@ -35,7 +35,7 @@ function sum(values: readonly number[]) {
 
 function compareAmount(left: number, right: number) {
   if (left === right) return 0;
-  return left < right ? -1 : 1;
+  return left > right ? -1 : 1;
 }
 
 function buildBudgetHierarchy(categories: AnnualBudgetCategory[]) {
@@ -81,13 +81,9 @@ function buildBudgetHierarchy(categories: AnnualBudgetCategory[]) {
 
 function formatMatrixAmount(value: number) {
   if (value === 0) return "—";
-  const absolute = Math.abs(assertMinorUnits(value));
-  const integer = Math.floor(absolute / 100);
-  const cents = String(absolute % 100).padStart(2, "0");
-  const sign = value < 0 ? "-" : "";
-  return `${sign}${new Intl.NumberFormat("pt-BR", {
+  return new Intl.NumberFormat("pt-BR", {
     maximumFractionDigits: 0,
-  }).format(integer)},${cents}`;
+  }).format(Math.round(assertMinorUnits(value) / 100));
 }
 
 export function AnnualBudgetForm({ year, context, currency, categories }: {

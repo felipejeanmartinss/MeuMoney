@@ -4,7 +4,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { MonthlyEvolution } from "@/components/dashboard/monthly-evolution";
 import { CONTEXT_LABELS } from "@/domain/accounts";
 import { currentReferenceMonth, referenceMonthSchema } from "@/domain/budgets";
-import { CURRENCY_LABELS, CURRENCY_LOCALES } from "@/domain/currencies";
+import { CURRENCY_LOCALES } from "@/domain/currencies";
 import { formatMoney } from "@/domain/money";
 import { RECURRENCE_FREQUENCY_LABELS } from "@/domain/recurring-transactions";
 import { getFinancialDashboard } from "@/services/reports/financial-dashboard-service";
@@ -101,6 +101,12 @@ export default async function DashboardPage({
           Parte dos indicadores não pôde ser carregada. Confirme a migration desta feature e tente novamente.
         </p>
       ) : null}
+      {data.missingCurrencies.length ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Sem taxa de conversão para {data.missingCurrencies.join(", ")}; esses
+          valores não entraram no consolidado.
+        </p>
+      ) : null}
 
       {data.currencies.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -114,12 +120,9 @@ export default async function DashboardPage({
         const locale = CURRENCY_LOCALES[section.currency];
         const month = section.selectedMonth;
         return (
-          <section key={section.currency} aria-labelledby={`currency-${section.currency}`} className="grid gap-4">
+          <section key={section.currency} aria-labelledby="consolidated-dashboard" className="grid gap-4">
             <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">{section.currency}</p>
-                <h2 id={`currency-${section.currency}`} className="mt-1 text-2xl font-black text-slate-950">{CURRENCY_LABELS[section.currency]}</h2>
-              </div>
+              <h2 id="consolidated-dashboard" className="text-xl font-black text-slate-950">Resumo consolidado</h2>
               <p className="text-sm text-slate-600">
                 Patrimônio líquido: <strong className={section.netWorthMinor < 0 ? "text-rose-700" : "text-emerald-800"}>{formatMoney(section.netWorthMinor, section.currency, locale)}</strong>
               </p>
@@ -152,7 +155,7 @@ export default async function DashboardPage({
                       </Link>
                     ))}
                   </div>
-                ) : <p className="p-5 text-sm text-slate-600">Nenhuma conta ativa nesta moeda.</p>}
+                ) : <p className="p-5 text-sm text-slate-600">Nenhuma conta ativa.</p>}
               </section>
 
               <section className="grid gap-4">

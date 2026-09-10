@@ -152,8 +152,8 @@ export default async function CreditCardPage({
         </div>
         {purchases.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase text-slate-600">
+            <table className="w-full min-w-[980px] border-collapse text-[0.82rem]">
+              <thead className="bg-slate-100 text-left text-[0.68rem] uppercase tracking-wide text-slate-600">
                 <tr>
                   <th className="px-4 py-2">Data</th>
                   <th className="px-4 py-2">Descrição</th>
@@ -174,7 +174,7 @@ export default async function CreditCardPage({
                     <td className="whitespace-nowrap px-4 py-2.5">
                       {formatIsoDatePtBr(purchase.purchase_date)}
                     </td>
-                    <td className="px-4 py-2.5 font-bold text-slate-950">
+                    <td className="px-4 py-2 font-semibold text-slate-950">
                       <span>{purchase.description}</span>
                       {purchase.is_recurring ? (
                         <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
@@ -182,12 +182,12 @@ export default async function CreditCardPage({
                         </span>
                       ) : null}
                     </td>
-                    <td className="max-w-96 px-4 py-2.5 text-slate-600">
+                    <td className="max-w-96 px-4 py-2 text-slate-600">
                       {categoryById.get(purchase.category_id) ?? "Categoria"}
                     </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="px-4 py-2 text-center text-slate-600">
                       {purchase.is_recurring
-                        ? "Assinatura"
+                        ? "—"
                         : `${purchase.installment_count}x`}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right font-extrabold">
