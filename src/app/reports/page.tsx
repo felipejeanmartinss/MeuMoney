@@ -200,16 +200,20 @@ function CommonReportFields({
         </label>
       ) : null}
       <input type="hidden" name="currency" value={currency} />
-      <fieldset className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-        <legend className="sr-only">Moedas incluídas</legend>
+      <fieldset className="grid min-w-0 gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+        <legend>Moedas</legend>
         <details className="relative">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-800 hover:bg-slate-50">
-            <span>Moedas incluídas</span>
-            <span className="text-[0.68rem] font-bold text-slate-500">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-900 outline-none hover:bg-slate-50 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 marker:hidden">
+            <span className="truncate font-semibold">
+              {sourceCurrencies.length === SUPPORTED_CURRENCIES.length
+                ? "Todas as moedas"
+                : `${sourceCurrencies.length} moedas`}
+            </span>
+            <span className="shrink-0 text-[0.68rem] font-bold text-slate-500">
               {sourceCurrencies.length}/{SUPPORTED_CURRENCIES.length}
             </span>
           </summary>
-          <div className="absolute left-0 right-0 top-full z-30 mt-1 grid gap-1 rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
+          <div className="absolute left-0 top-full z-30 mt-1 grid min-w-64 gap-1 rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
             {SUPPORTED_CURRENCIES.map((item) => (
               <label
                 key={item}

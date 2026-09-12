@@ -275,32 +275,33 @@ export default async function RecurringTransactionsPage({
         </article>
       </section>
 
-      <section className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-extrabold text-slate-950">Filtros</h2>
-          </div>
-          <Link
-            href="/recurring-transactions"
-            className="text-xs font-bold text-emerald-700 hover:underline"
-          >
-            Limpar
-          </Link>
-        </div>
-        <form method="get" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          <label className="grid gap-1 text-xs font-bold text-slate-700">
+      <details
+        open={Boolean(period || accountFilter || typeFilter || stateFilter)}
+        className="group rounded-xl border border-slate-200 bg-white shadow-sm"
+      >
+        <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-extrabold text-slate-800 marker:hidden">
+          <span>Filtros</span>
+          <span className="text-slate-400 transition group-open:rotate-180" aria-hidden="true">
+            ▾
+          </span>
+        </summary>
+        <form
+          method="get"
+          className="grid gap-2 border-t border-slate-100 p-2 sm:grid-cols-2 xl:grid-cols-5"
+        >
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Período
             <input
-              className={`${inputClass()} min-h-9 px-2 text-xs`}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="period"
               type="month"
               defaultValue={period}
             />
           </label>
-          <label className="grid gap-1 text-xs font-bold text-slate-700">
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Conta
             <select
-              className={`${inputClass()} min-h-9 px-2 text-xs`}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="accountId"
               defaultValue={accountFilter}
             >
@@ -312,10 +313,10 @@ export default async function RecurringTransactionsPage({
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-bold text-slate-700">
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Tipo
             <select
-              className={`${inputClass()} min-h-9 px-2 text-xs`}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="type"
               defaultValue={typeFilter}
             >
@@ -324,10 +325,10 @@ export default async function RecurringTransactionsPage({
               <option value="expense">Despesa</option>
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-bold text-slate-700">
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Situação
             <select
-              className={`${inputClass()} min-h-9 px-2 text-xs`}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="state"
               defaultValue={stateFilter}
             >
@@ -336,11 +337,19 @@ export default async function RecurringTransactionsPage({
               <option value="suspended">Suspensa</option>
             </select>
           </label>
-          <button className="min-h-9 self-end rounded-lg bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800">
-            Aplicar filtros
-          </button>
+          <div className="flex h-8 self-end gap-2">
+            <Link
+              href="/recurring-transactions"
+              className="inline-flex flex-1 items-center justify-center rounded-md border border-slate-300 px-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Limpar
+            </Link>
+            <button className="flex-1 rounded-md bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800">
+              Aplicar
+            </button>
+          </div>
         </form>
-      </section>
+      </details>
 
       <section className="grid gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:grid-cols-[1fr_auto] sm:items-end">
         <div>

@@ -1479,6 +1479,13 @@ export type Database = {
         };
         Returns: string;
       };
+      create_manual_financing_contract: {
+        Args: {
+          target_contract: Json;
+          target_schedule: Json;
+        };
+        Returns: string;
+      };
       cancel_financing_import: {
         Args: { target_job_id: string };
         Returns: boolean;

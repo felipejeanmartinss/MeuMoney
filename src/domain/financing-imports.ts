@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { parseImportAmountToMinor, parseImportDate } from "./file-imports";
+import { isValidIsoDate } from "./dates";
+import { parseMoneyInputToMinor } from "./money";
+import { SUPPORTED_CURRENCIES } from "./currencies";
 import type { PdfTextDocument, PdfTextPage } from "./pdf-imports";
 
 export const FINANCING_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -727,3 +730,111 @@ export const financingImportConfirmationSchema = z.object({
   productType: z.enum(["financing", "loan"]),
   context: z.enum(["personal", "professional"]),
 });
+
+const manualMoneyInput = z.string().trim().transform((value, context) => {
+  try {
+    return parseMoneyInputToMinor(value);
+  } catch (error) {
+    context.addIssue({
+      code: "custom",
+      message:
+        error instanceof Error ? error.message : "Informe um valor válido.",
+    });
+    return z.NEVER;
+  }
+});
+
+const optionalRateInput = z
+  .string()
+  .trim()
+  .transform((value) => value.replace("%", "").replace(",", "."))
+  .refine((value) => value === "" || /^\d+(?:\.\d{1,8})?$/.test(value), {
+    message: "Informe uma taxa válida.",
+  })
+  .transform((value) => value || null);
+
+const optionalFactorInput = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(",", "."))
+  .refine((value) => value === "" || /^\d+(?:\.\d{1,10})?$/.test(value), {
+    message: "Informe um fator válido.",
+  })
+  .transform((value) => value || null);
+
+const manualScheduleRowSchema = z
+  .object({
+    installmentNumber: z.coerce.number().int().min(0).max(10000),
+    dueDate: z.string().refine(isValidIsoDate, "Informe uma data válida."),
+    totalAmountMinor: manualMoneyInput.refine((value) => value >= 0),
+    principalMinor: manualMoneyInput.refine((value) => value >= 0),
+    interestMinor: manualMoneyInput.refine((value) => value >= 0),
+    correctionFactor: optionalFactorInput,
+    chargesMinor: manualMoneyInput.refine((value) => value >= 0),
+    outstandingBalanceMinor: manualMoneyInput.refine((value) => value >= 0),
+    paymentStatus: z.enum(["paid", "scheduled"]),
+    paymentDate: z.string(),
+    paidAmountMinor: manualMoneyInput.refine((value) => value >= 0),
+  })
+  .superRefine((row, context) => {
+    if (row.paymentStatus === "paid" && !isValidIsoDate(row.paymentDate)) {
+      context.addIssue({
+        code: "custom",
+        path: ["paymentDate"],
+        message: "Informe a data de pagamento.",
+      });
+    }
+    if (row.paymentStatus === "scheduled" && row.paymentDate !== "") {
+      context.addIssue({
+        code: "custom",
+        path: ["paymentDate"],
+        message: "Parcela a vencer não deve ter data de pagamento.",
+      });
+    }
+  });
+
+const manualScheduleInput = z
+  .string()
+  .transform((value, context) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      context.addIssue({
+        code: "custom",
+        message: "A tabela de parcelas é inválida.",
+      });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.array(manualScheduleRowSchema).min(1, "Inclua ao menos uma parcela."));
+
+export const manualFinancingContractSchema = z.object({
+  name: z.string().trim().min(1, "Informe um nome.").max(100),
+  institution: z.string().trim().min(1, "Informe a instituição.").max(120),
+  contractReference: z.string().trim().min(1, "Informe o contrato.").max(80),
+  productType: z.enum(["financing", "loan"]),
+  context: z.enum(["personal", "professional"]),
+  currency: z.enum(SUPPORTED_CURRENCIES),
+  amortizationSystem: z.enum(["SAC", "PRICE"]),
+  indexer: z.string().trim().max(40).transform((value) => value || null),
+  originalPrincipalMinor: manualMoneyInput.refine(
+    (value) => value > 0,
+    "Informe o principal original.",
+  ),
+  originalTermMonths: z.coerce.number().int().min(1).max(1200),
+  contractDate: z.string().refine(isValidIsoDate, "Informe uma data válida."),
+  releaseDate: z
+    .string()
+    .refine((value) => value === "" || isValidIsoDate(value), "Informe uma data válida.")
+    .transform((value) => value || null),
+  currentBalanceMinor: manualMoneyInput.refine((value) => value >= 0),
+  balanceDate: z.string().refine(isValidIsoDate, "Informe uma data válida."),
+  nominalAnnualRate: optionalRateInput,
+  effectiveAnnualRate: optionalRateInput,
+  cetAnnualRate: optionalRateInput,
+  schedule: manualScheduleInput,
+});
+
+export type ManualFinancingContractInput = z.infer<
+  typeof manualFinancingContractSchema
+>;

@@ -59,7 +59,7 @@ describe("accounts, investments and reporting UX", () => {
 
     expect(page).toContain("getCurrentProfile");
     expect(page).toContain("preferred_currency");
-    expect(page).toContain("Moedas incluídas");
+    expect(page).toContain("Todas as moedas");
     expect(page).toContain('<input type="hidden" name="currency" value={currency} />');
     expect(page).not.toContain("Moeda de referência");
     expect(page).toContain("missingCurrencies");
@@ -81,5 +81,26 @@ describe("accounts, investments and reporting UX", () => {
     expect(migration).toContain("purchases.is_recurring");
     expect(migration).toContain("generate_series");
     expect(migration).toContain("cards.credit_limit - coalesce(committed.used_amount, 0)");
+  });
+
+  it("keeps investment header, subtotals and assets on one shared column grid", () => {
+    const page = readSource("src", "app", "investments", "page.tsx");
+
+    expect(page).toContain("INVESTMENT_METRIC_CELL");
+    expect(page).toContain("repeat(6,minmax(8.25rem,1fr))");
+    expect(page).not.toContain("gap-x-8 lg:grid-cols");
+  });
+
+  it("keeps recurrence filters compact and collapsible", () => {
+    const page = readSource(
+      "src",
+      "app",
+      "recurring-transactions",
+      "page.tsx",
+    );
+
+    expect(page).toContain("group rounded-xl border");
+    expect(page).toContain('className="h-8 rounded-md border');
+    expect(page).toContain("Aplicar");
   });
 });

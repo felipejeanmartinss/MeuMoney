@@ -73,7 +73,7 @@
 - Compra não altera saldo de conta. Uma transferência realizada para o cartão reduz o saldo da conta de origem e o saldo devedor atual do cartão, sem exigir vínculo com uma fatura.
 - Valores são positivos e exatos em unidades menores; parcelas nunca possuem valor zero. Eventual resto da divisão fica na última parcela.
 - Compra realizada até o dia de fechamento pertence à competência atual; após esse dia, pertence à seguinte. Dias inexistentes em um mês são limitados ao último dia real.
-- O limite comprometido soma todas as parcelas de compras ativas ainda pendentes ou faturadas, inclusive competências futuras. O limite disponível é `limite total - comprometido` e não é artificialmente liberado por transferências sem baixa das parcelas. O saldo devedor pode deduzir transferências livres realizadas para o cartão.
+- O limite comprometido soma parcelas pendentes ou faturadas de compras ativas somente até o último mês de fatura cadastrada. Assinaturas ativas completam os meses ainda não materializados dentro desse mesmo horizonte, sem recriar competências já pagas. O limite disponível é `limite total - comprometido` e não é artificialmente liberado por transferências sem baixa das parcelas. O saldo devedor pode deduzir transferências livres realizadas para o cartão.
 - Fechamento é idempotente. Uma fatura fechada ou paga impede mudanças estruturais nas compras que a compõem.
 - A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
@@ -221,6 +221,7 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - O extrato de financiamento é processado somente no servidor e o PDF original é descartado depois da extração em memória.
 - Nenhum passivo é criado antes da revisão e confirmação explícita do usuário.
 - A confirmação cria atomicamente um passivo patrimonial, um contrato, seu cronograma e as amortizações extraordinárias. Qualquer falha reverte toda a operação.
+- O cadastro histórico manual oferece a mesma atomicidade sem depender do PDF: recebe resumo do contrato e uma tabela de parcelas com amortização/principal, juros, correção, taxas, saldo, situação e pagamento. SAC e PRICE são registrados como sistemas de amortização, não como tipos de investimento.
 - O contrato e o passivo usam vínculo um-para-um; o patrimônio considera apenas o passivo para impedir dupla contagem.
 - Valores monetários são inteiros em unidades menores. Taxas e fatores usam decimal exato no banco e texto decimal no domínio.
 - Valor pago, principal, juros e encargos consideram apenas parcelas marcadas como pagas no documento. Amortizações extraordinárias são somadas separadamente por recursos próprios e FGTS.

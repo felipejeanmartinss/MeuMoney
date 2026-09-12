@@ -72,6 +72,8 @@ export function classifyPdfExtractionError(error: unknown) {
 export async function extractSearchablePdfText(
   bytes: Uint8Array,
 ): Promise<PdfTextDocument> {
+  // Keep the optional native canvas runtime in the deployed server trace.
+  await import("@napi-rs/canvas");
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(bytes),
