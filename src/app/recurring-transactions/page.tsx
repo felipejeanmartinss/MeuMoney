@@ -275,35 +275,32 @@ export default async function RecurringTransactionsPage({
         </article>
       </section>
 
-      <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-extrabold text-slate-950">Filtros</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Refine a agenda sem alterar os compromissos.
-            </p>
+            <h2 className="text-sm font-extrabold text-slate-950">Filtros</h2>
           </div>
           <Link
             href="/recurring-transactions"
-            className="text-sm font-bold text-emerald-700 hover:underline"
+            className="text-xs font-bold text-emerald-700 hover:underline"
           >
             Limpar
           </Link>
         </div>
-        <form method="get" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+        <form method="get" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <label className="grid gap-1 text-xs font-bold text-slate-700">
             Período
             <input
-              className={inputClass()}
+              className={`${inputClass()} min-h-9 px-2 text-xs`}
               name="period"
               type="month"
               defaultValue={period}
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          <label className="grid gap-1 text-xs font-bold text-slate-700">
             Conta
             <select
-              className={inputClass()}
+              className={`${inputClass()} min-h-9 px-2 text-xs`}
               name="accountId"
               defaultValue={accountFilter}
             >
@@ -315,10 +312,10 @@ export default async function RecurringTransactionsPage({
               ))}
             </select>
           </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          <label className="grid gap-1 text-xs font-bold text-slate-700">
             Tipo
             <select
-              className={inputClass()}
+              className={`${inputClass()} min-h-9 px-2 text-xs`}
               name="type"
               defaultValue={typeFilter}
             >
@@ -327,10 +324,10 @@ export default async function RecurringTransactionsPage({
               <option value="expense">Despesa</option>
             </select>
           </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          <label className="grid gap-1 text-xs font-bold text-slate-700">
             Situação
             <select
-              className={inputClass()}
+              className={`${inputClass()} min-h-9 px-2 text-xs`}
               name="state"
               defaultValue={stateFilter}
             >
@@ -339,14 +336,10 @@ export default async function RecurringTransactionsPage({
               <option value="suspended">Suspensa</option>
             </select>
           </label>
-          <button className="min-h-11 self-end rounded-xl bg-slate-950 px-4 font-bold text-white hover:bg-slate-800">
+          <button className="min-h-9 self-end rounded-lg bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800">
             Aplicar filtros
           </button>
         </form>
-        <p className="text-xs text-slate-500">
-          Contas encerradas saem da agenda, mas permanecem preservadas no
-          histórico para auditoria.
-        </p>
       </section>
 
       <section className="grid gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:grid-cols-[1fr_auto] sm:items-end">

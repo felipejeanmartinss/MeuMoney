@@ -13,6 +13,10 @@ function maskedReference(reference: string) {
     : `${"•".repeat(Math.min(reference.length - 4, 8))}${reference.slice(-4)}`;
 }
 
+function formatRate(value: string | null, suffix = "a.a.") {
+  return value ? `${value.replace(".", ",")}% ${suffix}` : "Não informado";
+}
+
 export default async function FinancingImportReviewPage({
   params,
 }: {
@@ -74,11 +78,14 @@ export default async function FinancingImportReviewPage({
         </p>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {[
-          ["Saldo devedor", job.current_balance_minor],
+          ["Saldo inicial", job.original_principal_minor],
+          ["Saldo atual", job.current_balance_minor],
           ["Total pago", indicators.totalPaidMinor],
+          ["Principal pago", indicators.principalPaidMinor],
           ["Juros pagos", indicators.interestPaidMinor],
+          ["Encargos pagos", indicators.chargesPaidMinor],
           ["Amortizações extras", indicators.extraCashMinor + indicators.extraFgtsMinor],
         ].map(([label, value]) => (
           <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -100,6 +107,10 @@ export default async function FinancingImportReviewPage({
             <div><dt className="text-slate-500">Indexador</dt><dd className="font-bold">{job.indexer ?? "Não informado"}</dd></div>
             <div><dt className="text-slate-500">Prazo original</dt><dd className="font-bold">{job.original_term_months ? `${job.original_term_months} meses` : "Não informado"}</dd></div>
             <div><dt className="text-slate-500">Data-base do saldo</dt><dd className="font-bold">{formatFinancialDate(job.balance_date)}</dd></div>
+            <div><dt className="text-slate-500">Taxa nominal</dt><dd className="font-bold">{formatRate(job.nominal_annual_rate)}</dd></div>
+            <div><dt className="text-slate-500">Taxa efetiva</dt><dd className="font-bold">{formatRate(job.effective_annual_rate)}</dd></div>
+            <div><dt className="text-slate-500">CET</dt><dd className="font-bold">{formatRate(job.cet_annual_rate)}</dd></div>
+            <div><dt className="text-slate-500">CESH</dt><dd className="font-bold">{formatRate(job.cesh_annual_rate)}</dd></div>
           </dl>
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

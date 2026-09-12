@@ -201,21 +201,32 @@ function CommonReportFields({
       ) : null}
       <input type="hidden" name="currency" value={currency} />
       <fieldset className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-        <legend>Moedas incluídas</legend>
-        <div className="flex min-h-10 items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal">
-          {SUPPORTED_CURRENCIES.map((item) => (
-            <label key={item} className="inline-flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                name="sourceCurrencies"
-                value={item}
-                defaultChecked={sourceCurrencies.includes(item)}
-                className="size-4 accent-emerald-700"
-              />
-              {CURRENCY_LABELS[item]}
-            </label>
-          ))}
-        </div>
+        <legend className="sr-only">Moedas incluídas</legend>
+        <details className="relative">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-800 hover:bg-slate-50">
+            <span>Moedas incluídas</span>
+            <span className="text-[0.68rem] font-bold text-slate-500">
+              {sourceCurrencies.length}/{SUPPORTED_CURRENCIES.length}
+            </span>
+          </summary>
+          <div className="absolute left-0 right-0 top-full z-30 mt-1 grid gap-1 rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
+            {SUPPORTED_CURRENCIES.map((item) => (
+              <label
+                key={item}
+                className="flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  name="sourceCurrencies"
+                  value={item}
+                  defaultChecked={sourceCurrencies.includes(item)}
+                  className="size-4 accent-emerald-700"
+                />
+                {CURRENCY_LABELS[item]}
+              </label>
+            ))}
+          </div>
+        </details>
       </fieldset>
       <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
         Contexto

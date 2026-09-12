@@ -129,7 +129,7 @@ const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
 };
 
 const INVESTMENT_MATRIX_GRID =
-  "grid gap-x-5 lg:grid-cols-[minmax(30rem,2.5fr)_repeat(6,minmax(6.5rem,1fr))_auto]";
+  "grid gap-x-8 lg:grid-cols-[minmax(24rem,2.45fr)_repeat(6,minmax(7rem,1fr))_auto]";
 
 function InvestmentCompositionChart({
   positions,
@@ -295,18 +295,18 @@ function InvestmentSubtotalMetrics({
   ];
 
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[0.66rem] sm:grid-cols-3 lg:col-span-6 lg:grid-cols-subgrid lg:gap-x-5">
+    <>
       {metrics.map((metric) => (
-        <div key={metric.label} className="min-w-0 text-center">
-          <dt className="whitespace-nowrap font-semibold text-slate-500 lg:sr-only">
+        <div key={metric.label} className="min-w-0 px-1 text-center lg:px-3">
+          <span className="block whitespace-nowrap text-[0.68rem] font-bold text-slate-500 lg:sr-only">
             {metric.label}
-          </dt>
-          <dd className={`truncate font-extrabold ${metric.tone}`}>
+          </span>
+          <span className={`block whitespace-nowrap truncate text-xs font-extrabold ${metric.tone}`}>
             {metric.value}
-          </dd>
+          </span>
         </div>
       ))}
-    </dl>
+    </>
   );
 }
 
@@ -482,7 +482,7 @@ function PositionsView({
       ) : null}
 
       <div
-        className={`${INVESTMENT_MATRIX_GRID} sticky top-0 z-20 hidden items-center border border-slate-300 bg-slate-100/95 px-3 py-1.5 text-center text-[0.66rem] font-bold text-slate-600 shadow-sm backdrop-blur lg:grid`}
+        className={`${INVESTMENT_MATRIX_GRID} sticky top-0 z-20 hidden items-center border border-slate-300 bg-slate-100/95 px-3 py-1.5 text-center text-[0.68rem] font-bold text-slate-600 shadow-sm backdrop-blur lg:grid`}
       >
         <span className="text-left">Ativo</span>
         <span>Valor atual</span>
@@ -566,19 +566,19 @@ function PositionsView({
                                 {position.asset_name}
                               </h3>
                             </div>
-                            <div className="text-center">
+                            <div className="px-1 text-center lg:px-3">
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Valor atual</p>
                               <p className="text-xs font-extrabold text-slate-950">
                                 {formatMoney(position.current_value_minor, position.currency, CURRENCY_LOCALES[position.currency])}
                               </p>
                             </div>
-                            <div className="text-center">
+                            <div className="px-1 text-center lg:px-3">
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Custo</p>
                               <p className="text-xs font-bold text-slate-800">
                                 {formatMoney(position.accumulated_cost_minor, position.currency, CURRENCY_LOCALES[position.currency])}
                               </p>
                             </div>
-                            <div className="text-center">
+                            <div className="px-1 text-center lg:px-3">
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Resultado</p>
                               <p className={`text-xs font-bold ${position.performance_result_minor < 0 ? "text-rose-700" : "text-emerald-700"}`}>
                                 {formatMoney(position.performance_result_minor, position.currency, CURRENCY_LOCALES[position.currency])}
@@ -587,15 +587,15 @@ function PositionsView({
                                 ) : null}
                               </p>
                             </div>
-                            <div className="text-center">
+                            <div className="px-1 text-center lg:px-3">
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Retorno total</p>
                               <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.total_return_basis_points)}</p>
                             </div>
-                            <div className="text-center">
+                            <div className="px-1 text-center lg:px-3">
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Mês anterior</p>
                               <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.previous_month_return_basis_points)}</p>
                             </div>
-                            <div className="text-center">
+                            <div className="px-1 text-center lg:px-3">
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Participação</p>
                               <p className="text-xs font-bold text-slate-800">
                                 {archived ? "Arquivada" : percentage(position.current_value_minor, total)}

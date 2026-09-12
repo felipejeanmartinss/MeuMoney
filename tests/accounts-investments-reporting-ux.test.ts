@@ -68,4 +68,18 @@ describe("accounts, investments and reporting UX", () => {
     expect(service).toContain("invoice.paid_at");
     expect(service).not.toContain('.eq("currency", input.currency)');
   });
+
+  it("uses the latest registered invoice as the card commitment horizon", () => {
+    const migration = readSource(
+      "supabase",
+      "migrations",
+      "20260911090000_card_commitment_horizon.sql",
+    );
+
+    expect(migration).toContain("max(invoices.reference_month)");
+    expect(migration).toContain("installments.competence_date <= horizon.last_invoice_month");
+    expect(migration).toContain("purchases.is_recurring");
+    expect(migration).toContain("generate_series");
+    expect(migration).toContain("cards.credit_limit - coalesce(committed.used_amount, 0)");
+  });
 });
