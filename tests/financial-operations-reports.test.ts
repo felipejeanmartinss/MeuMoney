@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildMonthlyCategoryMatrix,
+  buildMonthlyCategoryMatrixForMonths,
   buildPeriodComparison,
   calculateInvestmentReturnBasisPoints,
   fillIncomeExpenseReportYear,
@@ -32,6 +33,14 @@ const fixedExpenseMigration = readFileSync(
     "supabase",
     "migrations",
     "20260905153310_fixed_expense_subcategories.sql",
+  ),
+  "utf8",
+);
+const creditCardLimitMigration = readFileSync(
+  resolve(
+    "supabase",
+    "migrations",
+    "20260910024558_fix_credit_card_committed_limit.sql",
   ),
   "utf8",
 );
@@ -106,6 +115,66 @@ describe("financial operations and reports", () => {
     });
   });
 
+  it("orders report categories by annual accumulated value descending", () => {
+    const matrix = buildMonthlyCategoryMatrix(2026, [
+      {
+        rowId: "small",
+        section: "expense",
+        groupLabel: "Grupo",
+        label: "Menor",
+        categoryKey: "small",
+        categoryLabel: "Menor",
+        subcategoryKey: null,
+        subcategoryLabel: null,
+        referenceMonth: "2026-01-01",
+        amountMinor: 100_00,
+      },
+      {
+        rowId: "large",
+        section: "expense",
+        groupLabel: "Grupo",
+        label: "Maior",
+        categoryKey: "large",
+        categoryLabel: "Maior",
+        subcategoryKey: null,
+        subcategoryLabel: null,
+        referenceMonth: "2026-12-01",
+        amountMinor: 900_00,
+      },
+    ]);
+    expect(matrix.map((row) => row.label)).toEqual(["Maior", "Menor"]);
+  });
+
+  it("builds report matrices for rolling and custom month ranges", () => {
+    const matrix = buildMonthlyCategoryMatrixForMonths(
+      ["2026-11", "2026-12", "2027-01"],
+      [
+        {
+          rowId: "salary",
+          section: "income",
+          groupLabel: "Receitas",
+          label: "Salário",
+          referenceMonth: "2027-01-01",
+          amountMinor: 12_000_00,
+        },
+      ],
+    );
+    expect(matrix[0].monthAmountsMinor).toEqual([0, 0, 12_000_00]);
+    expect(matrix[0].totalAmountMinor).toBe(12_000_00);
+  });
+
+  it("keeps committed card limit independent from free card transfers", () => {
+    expect(creditCardLimitMigration).toContain(
+      "cards.credit_limit - coalesce(committed.used_amount, 0)",
+    );
+    const usedLimitExpression = creditCardLimitMigration.slice(
+      creditCardLimitMigration.indexOf("as used_limit") - 100,
+      creditCardLimitMigration.indexOf("as available_limit"),
+    );
+    expect(usedLimitExpression).not.toContain("transferred_amount");
+    expect(creditCardLimitMigration).toContain("card_transfers.transferred_amount");
+  });
+
   it("projects recurring fixed expenses without treating them as paid", () => {
     const matrix = projectFixedExpenseMatrix(2026, [
       {
@@ -165,6 +234,10 @@ describe("financial operations and reports", () => {
       variationBasisPoints: 2_500,
     });
     expect(compared.find((row) => row.label === "Nova despesa")?.variationBasisPoints).toBeNull();
+    expect(compared.map((row) => row.label)).toEqual([
+      "Restaurantes",
+      "Nova despesa",
+    ]);
   });
 
   it("does not invent investment return without a complete cash-flow base", () => {

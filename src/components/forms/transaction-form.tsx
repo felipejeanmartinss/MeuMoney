@@ -312,8 +312,8 @@ export function TransactionForm({
             className="size-4 accent-emerald-700"
           />
           {values.id
-            ? "Criar recorrência em Contas a Pagar"
-            : "Tornar recorrente em Contas a Pagar"}
+            ? "Criar recorrência"
+            : "Tornar recorrente"}
         </label>
 
         <SubmitButton pending={pending} compact={compact}>

@@ -8,7 +8,7 @@ import {
   getRecurringTransactionFormOptions,
 } from "@/services/finance/recurring-transactions-service";
 
-export const metadata = { title: "Editar conta a pagar" };
+export const metadata = { title: "Editar recorrência" };
 
 export default async function EditRecurringTransactionPage({
   params,
@@ -35,10 +35,10 @@ export default async function EditRecurringTransactionPage({
           href="/recurring-transactions"
           className="text-sm font-semibold text-blue-700 hover:underline"
         >
-          ← Voltar para Contas a Pagar
+          ← Voltar para Recorrências
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950">
-          Editar conta a pagar
+          Editar recorrência
         </h1>
         <p className="mt-2 text-slate-600">
           A alteração vale para gerações futuras; previsões existentes são

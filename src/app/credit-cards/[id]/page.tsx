@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCategoryDisplayName } from "@/domain/categories";
 import { cancelCreditCardPurchase } from "@/app/actions/credit-cards";
+import {
+  buildCreditCardInvoiceForecast,
+  getPurchaseReferenceMonth,
+} from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserCreditCardDetails } from "@/services/finance/credit-cards-service";
 import {
@@ -13,8 +17,8 @@ const messages: Record<string, string> = {
   updated: "Cartão atualizado.",
   "purchase-created": "Compra registrada e parcelas geradas.",
   "purchase-updated": "Compra atualizada.",
-  "purchase-cancelled": "Compra cancelada.",
-  "purchase-error": "A compra não pôde ser cancelada.",
+  "purchase-cancelled": "Compra excluída das compras e das faturas abertas.",
+  "purchase-error": "A compra não pôde ser excluída.",
 };
 
 export default async function CreditCardPage({
@@ -38,6 +42,27 @@ export default async function CreditCardPage({
     (item) => item.status === "pending",
   );
   const openInvoices = invoices.filter((item) => item.status !== "paid");
+  const nextOpenInvoice = openInvoices.find((item) => item.status === "open");
+  const forecastStart =
+    nextOpenInvoice?.reference_month ??
+    new Date().toISOString().slice(0, 7) + "-01";
+  const invoiceForecast = buildCreditCardInvoiceForecast({
+    referenceMonth: forecastStart,
+    invoices: openInvoices.map((invoice) => ({
+      id: invoice.id,
+      referenceMonth: invoice.reference_month,
+      totalAmountMinor: invoice.total_amount,
+    })),
+    subscriptions: purchases
+      .filter((purchase) => purchase.is_recurring)
+      .map((purchase) => ({
+        amountMinor: purchase.total_amount,
+        firstReferenceMonth: getPurchaseReferenceMonth(
+          purchase.purchase_date,
+          card.closing_day,
+        ),
+      })),
+  });
 
   return (
     <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-5 sm:px-5 lg:px-6">
@@ -61,7 +86,7 @@ export default async function CreditCardPage({
           </div>
           <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
             {[
-              ["Saldo do cartão", card.current_balance_minor],
+              ["Próxima fatura", nextOpenInvoice?.total_amount ?? 0],
               ["Limite disponível", card.available_limit],
               ["Limite total", card.credit_limit],
             ].map(([label, value]) => (
@@ -127,8 +152,8 @@ export default async function CreditCardPage({
         </div>
         {purchases.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase text-slate-600">
+            <table className="w-full min-w-[980px] border-collapse text-[0.82rem]">
+              <thead className="bg-slate-100 text-left text-[0.68rem] uppercase tracking-wide text-slate-600">
                 <tr>
                   <th className="px-4 py-2">Data</th>
                   <th className="px-4 py-2">Descrição</th>
@@ -149,7 +174,7 @@ export default async function CreditCardPage({
                     <td className="whitespace-nowrap px-4 py-2.5">
                       {formatIsoDatePtBr(purchase.purchase_date)}
                     </td>
-                    <td className="px-4 py-2.5 font-bold text-slate-950">
+                    <td className="px-4 py-2 font-semibold text-slate-950">
                       <span>{purchase.description}</span>
                       {purchase.is_recurring ? (
                         <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
@@ -157,11 +182,13 @@ export default async function CreditCardPage({
                         </span>
                       ) : null}
                     </td>
-                    <td className="max-w-96 px-4 py-2.5 text-slate-600">
+                    <td className="max-w-96 px-4 py-2 text-slate-600">
                       {categoryById.get(purchase.category_id) ?? "Categoria"}
                     </td>
-                    <td className="px-4 py-2.5 text-center">
-                      {purchase.installment_count}x
+                    <td className="px-4 py-2 text-center text-slate-600">
+                      {purchase.is_recurring
+                        ? "—"
+                        : `${purchase.installment_count}x`}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right font-extrabold">
                       {formatMoney(purchase.total_amount, card.currency)}
@@ -183,7 +210,7 @@ export default async function CreditCardPage({
                               value={purchase.id}
                             />
                             <button className="font-semibold text-rose-700">
-                              Cancelar
+                              Excluir
                             </button>
                           </form>
                         </div>
@@ -240,18 +267,32 @@ export default async function CreditCardPage({
             </Link>
           </div>
           <ul className="divide-y text-sm">
-            {openInvoices.slice(0, 8).map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={`/credit-cards/${card.id}/invoices/${item.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-slate-50"
-                >
-                  <span>{formatReferenceMonthPtBr(item.reference_month)}</span>
-                  <strong>{formatMoney(item.total_amount, card.currency)}</strong>
-                </Link>
+            {invoiceForecast.map((item) => (
+              <li key={item.referenceMonth}>
+                {item.invoiceId ? (
+                  <Link
+                    href={`/credit-cards/${card.id}/invoices/${item.invoiceId}`}
+                    className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-slate-50"
+                  >
+                    <span>
+                      {formatReferenceMonthPtBr(item.referenceMonth)}
+                      {item.projected ? (
+                        <small className="ml-2 text-slate-500">projeção</small>
+                      ) : null}
+                    </span>
+                    <strong>{formatMoney(item.amountMinor, card.currency)}</strong>
+                  </Link>
+                ) : (
+                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 text-slate-600">
+                    <span>{formatReferenceMonthPtBr(item.referenceMonth)} · projeção</span>
+                    <strong className="text-slate-900">
+                      {formatMoney(item.amountMinor, card.currency)}
+                    </strong>
+                  </div>
+                )}
               </li>
             ))}
-            {!openInvoices.length ? (
+            {!invoiceForecast.some((item) => item.amountMinor > 0) ? (
               <li className="px-4 py-6 text-slate-600">Nenhuma fatura em aberto.</li>
             ) : null}
           </ul>

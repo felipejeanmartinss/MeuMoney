@@ -9,8 +9,8 @@ describe("transaction to recurring-account handoff", () => {
   it("offers recurrence for new and edited manual transactions", () => {
     const form = readSource("src", "components", "forms", "transaction-form.tsx");
     expect(form).toContain('name="createRecurring"');
-    expect(form).toContain("Tornar recorrente em Contas a Pagar");
-    expect(form).toContain("Criar recorrência em Contas a Pagar");
+    expect(form).toContain("Tornar recorrente");
+    expect(form).toContain("Criar recorrência");
   });
 
   it("creates the transaction first and forwards its validated fields", () => {

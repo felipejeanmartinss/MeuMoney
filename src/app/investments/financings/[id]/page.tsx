@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FinancingAmortizationSimulator } from "@/components/financing/financing-amortization-simulator";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserFinancingContract } from "@/services/finance/financing-imports-service";
 import { formatFinancialDate } from "@/utils/financial-formatters";
@@ -7,6 +8,10 @@ import { formatFinancialDate } from "@/utils/financial-formatters";
 const messages: Record<string, string> = {
   imported: "Financiamento criado a partir do PDF revisado.",
 };
+
+function formatRate(value: string | null, suffix = "a.a.") {
+  return value ? `${value.replace(".", ",")}% ${suffix}` : "Não informado";
+}
 
 export default async function FinancingDetailPage({
   params,
@@ -59,6 +64,51 @@ export default async function FinancingDetailPage({
           </article>
         ))}
       </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-black text-slate-950">Condições do contrato</h2>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-slate-500">Taxa nominal</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.nominal_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Taxa efetiva</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.effective_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">CET</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.cet_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">CESH</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.cesh_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Saldo inicial</dt>
+            <dd className="font-bold text-slate-950">{formatMoney(contract.original_principal_minor, contract.currency)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Saldo atual</dt>
+            <dd className="font-bold text-slate-950">{formatMoney(contract.current_balance_minor, contract.currency)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Prazo original</dt>
+            <dd className="font-bold text-slate-950">{contract.original_term_months ? `${contract.original_term_months} meses` : "Não informado"}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Indexador</dt>
+            <dd className="font-bold text-slate-950">{contract.indexer ?? "Não informado"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <FinancingAmortizationSimulator
+        currency={contract.currency}
+        principalMinor={contract.current_balance_minor}
+        annualRate={contract.nominal_annual_rate}
+        termMonths={contract.original_term_months}
+      />
 
       {extraAmortizations.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

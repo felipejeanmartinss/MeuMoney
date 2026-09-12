@@ -82,6 +82,7 @@ export function CreditCardPurchaseForm({
   const [amount, setAmount] = useState(values.totalAmount ?? "");
   const [date, setDate] = useState(values.purchaseDate ?? "");
   const [count, setCount] = useState(values.installmentCount ?? 1);
+  const [isRecurring, setIsRecurring] = useState(values.isRecurring ?? false);
   const [installmentAmounts, setInstallmentAmounts] = useState(() =>
     values.installmentAmounts ??
       buildInstallmentAmountInputs(
@@ -143,6 +144,11 @@ export function CreditCardPurchaseForm({
     );
   }
 
+  function changeRecurring(nextRecurring: boolean) {
+    setIsRecurring(nextRecurring);
+    if (nextRecurring) changeCount(1);
+  }
+
   return (
     <form action={formAction} className="grid gap-5">
       <input type="hidden" name="cardId" value={cardId} />
@@ -200,21 +206,31 @@ export function CreditCardPurchaseForm({
             required
           />
         </Field>
-        <Field
-          label="Parcelas"
-          error={state.fieldErrors?.installmentCount?.[0]}
-        >
-          <input
-            className={inputClass(Boolean(state.fieldErrors?.installmentCount))}
-            name="installmentCount"
-            type="number"
-            min={1}
-            max={240}
-            value={count}
-            onChange={(event) => changeCount(Number(event.target.value))}
-            required
-          />
-        </Field>
+        {isRecurring ? (
+          <div className="grid content-end gap-1.5">
+            <span className="text-sm font-semibold text-slate-700">Cobrança</span>
+            <div className="flex min-h-12 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700">
+              Mensal, sem quantidade fixa
+            </div>
+            <input type="hidden" name="installmentCount" value="1" />
+          </div>
+        ) : (
+          <Field
+            label="Parcelas"
+            error={state.fieldErrors?.installmentCount?.[0]}
+          >
+            <input
+              className={inputClass(Boolean(state.fieldErrors?.installmentCount))}
+              name="installmentCount"
+              type="number"
+              min={1}
+              max={240}
+              value={count}
+              onChange={(event) => changeCount(Number(event.target.value))}
+              required
+            />
+          </Field>
+        )}
       </div>
 
       <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-800">
@@ -223,7 +239,8 @@ export function CreditCardPurchaseForm({
           type="checkbox"
           name="isRecurring"
           value="true"
-          defaultChecked={values.isRecurring}
+          checked={isRecurring}
+          onChange={(event) => changeRecurring(event.target.checked)}
         />
         Assinatura ou compra recorrente
       </label>
@@ -241,7 +258,9 @@ export function CreditCardPurchaseForm({
       {preview.length ? (
         <section aria-live="polite" className="overflow-hidden rounded-xl border">
           <div className="flex items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3">
-            <h2 className="font-bold text-slate-950">Prévia das parcelas</h2>
+            <h2 className="font-bold text-slate-950">
+              {isRecurring ? "Primeira cobrança" : "Prévia das parcelas"}
+            </h2>
             <span
               className={`text-xs font-semibold ${
                 distributionMatches ? "text-emerald-700" : "text-rose-700"
@@ -256,7 +275,7 @@ export function CreditCardPurchaseForm({
             <table className="w-full min-w-[620px] border-collapse text-sm">
               <thead className="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
                 <tr>
-                  <th className="px-4 py-2">Parcela</th>
+                  <th className="px-4 py-2">{isRecurring ? "Tipo" : "Parcela"}</th>
                   <th className="px-4 py-2">Fatura</th>
                   <th className="px-4 py-2">Vencimento</th>
                   <th className="px-4 py-2 text-right">Valor</th>
@@ -266,7 +285,9 @@ export function CreditCardPurchaseForm({
                 {preview.map((item, index) => (
                   <tr key={item.installmentNumber} className="border-t">
                     <td className="px-4 py-2 font-semibold">
-                      {item.installmentNumber}/{item.installmentCount}
+                      {isRecurring
+                        ? "Assinatura"
+                        : `${item.installmentNumber}/${item.installmentCount}`}
                     </td>
                     <td className="px-4 py-2">
                       {formatReferenceMonthPtBr(item.competenceDate)}

@@ -27,18 +27,14 @@ export function ExpenseDistribution({
       <h3 className="text-lg font-extrabold text-slate-950">
         Despesas por categoria
       </h3>
-      <p className="mt-1 text-sm text-slate-600">
-        {basis === "cash"
-          ? "Distribuição das saídas efetivas da conta."
-          : "Distribuição do consumo reconhecido no mês."}
-      </p>
+      <p className="mt-1 text-sm text-slate-600">{basis === "cash" ? "Saídas efetivas." : "Consumo por competência."}</p>
       {rows.length ? (
-        <div className="mt-5 grid gap-4">
+        <div className="mt-3 divide-y divide-slate-100">
           {rows.map((row) => {
             const percentage =
               total === 0 ? 0 : (row.expense_amount_minor / total) * 100;
             return (
-              <article key={row.category_id}>
+              <article key={row.category_id} className="py-2.5">
                 <div className="flex items-start justify-between gap-3 text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-slate-800">
@@ -63,12 +59,6 @@ export function ExpenseDistribution({
                       %
                     </p>
                   </div>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-blue-600"
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
-                  />
                 </div>
               </article>
             );

@@ -234,7 +234,7 @@ export function RecurringTransactionForm({
       </div>
 
       <FormMessage tone="info">
-        A geração cria apenas lançamentos previstos. Editar a conta a pagar não
+        A geração cria apenas lançamentos previstos. Editar a recorrência não
         altera previsões que já foram geradas.
       </FormMessage>
 
@@ -249,7 +249,7 @@ export function RecurringTransactionForm({
       </Field>
 
       <SubmitButton pending={pending}>
-        {values.id ? "Salvar alterações" : "Criar conta a pagar"}
+        {values.id ? "Salvar alterações" : "Criar recorrência"}
       </SubmitButton>
     </form>
   );

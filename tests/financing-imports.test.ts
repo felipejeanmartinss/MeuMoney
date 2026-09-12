@@ -5,6 +5,7 @@ import {
   calculateFinancingIndicators,
   FinancingImportError,
   parseSupportedFinancingPdf,
+  simulateFinancing,
 } from "../src/domain/financing-imports";
 import type { PdfTextDocument } from "../src/domain/pdf-imports";
 
@@ -166,5 +167,38 @@ describe("financing PDF imports", () => {
     );
     expect(indexes).toContain("financing_contracts_net_worth_owner_fk_idx");
     expect(indexes).toContain("financing_schedule_contract_owner_fk_idx");
+  });
+
+  it("simulates SAC with a decreasing balance and optional extra amortization", () => {
+    const result = simulateFinancing({
+      principalMinor: 120_000,
+      annualRatePercent: 12,
+      termMonths: 12,
+      method: "sac",
+      extraAmortizationMinor: 10_000,
+      extraAmortizationMode: "term",
+    });
+
+    expect(result.rows.length).toBeLessThan(12);
+    expect(result.rows[0].interestMinor).toBeGreaterThan(
+      result.rows.at(-1)?.interestMinor ?? 0,
+    );
+    expect(result.rows.at(-1)?.balanceMinor).toBe(0);
+    expect(result.totalExtraAmortizationMinor).toBeGreaterThan(0);
+    expect(result.totalPrincipalMinor).toBe(120_000);
+  });
+
+  it("simulates PRICE with stable payments when no extra is applied", () => {
+    const result = simulateFinancing({
+      principalMinor: 100_000,
+      annualRatePercent: 12,
+      termMonths: 12,
+      method: "price",
+    });
+
+    expect(result.rows).toHaveLength(12);
+    expect(result.rows[0].paymentMinor).toBe(result.rows[1].paymentMinor);
+    expect(result.rows.at(-1)?.balanceMinor).toBe(0);
+    expect(result.totalPrincipalMinor).toBe(100_000);
   });
 });

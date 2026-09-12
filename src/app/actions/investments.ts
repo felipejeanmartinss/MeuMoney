@@ -9,6 +9,7 @@ import {
   investmentPositionFormSchema,
   investmentPositionIdSchema,
   investmentPositionSnapshotIdSchema,
+  investmentUnitPriceBatchSchema,
   investmentTransferLinkFormSchema,
 } from "@/domain/investments";
 import {
@@ -21,6 +22,7 @@ import {
   linkCurrentUserInvestmentTransferEntry,
   setCurrentUserInvestmentPositionArchived,
   updateCurrentUserInvestmentPosition,
+  updateCurrentUserInvestmentUnitPrices,
 } from "@/services/finance/investments-service";
 import { accountIdSchema } from "@/domain/accounts";
 
@@ -96,6 +98,34 @@ export async function updateInvestmentPosition(
   revalidatePath(`/investments/${parsedId.data}/history`);
   revalidatePath("/net-worth");
   redirect("/investments?message=updated");
+}
+
+export async function updateInvestmentUnitPrices(
+  _previousState: InvestmentFormState,
+  formData: FormData,
+): Promise<InvestmentFormState> {
+  const positionIds = formData.getAll("positionId");
+  const unitPrices = formData.getAll("unitPriceMinor");
+  const parsed = investmentUnitPriceBatchSchema.safeParse({
+    rows: positionIds.map((positionId, index) => ({
+      positionId,
+      unitPriceMinor: unitPrices[index],
+    })),
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Revise as cotações.",
+    };
+  }
+  const result = await updateCurrentUserInvestmentUnitPrices(parsed.data.rows);
+  if (!result.ok) return { status: "error", message: result.message };
+  revalidatePath("/investments");
+  revalidatePath("/investments/prices");
+  revalidatePath("/net-worth");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  redirect("/investments?message=prices-updated");
 }
 
 export async function toggleInvestmentPositionStatus(formData: FormData) {

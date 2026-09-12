@@ -549,6 +549,177 @@ export function calculateFinancingIndicators(
   };
 }
 
+export type FinancingAmortizationMethod = "sac" | "price";
+export type FinancingExtraAmortizationMode = "term" | "payment";
+
+export type FinancingSimulationRow = {
+  installment: number;
+  principalMinor: number;
+  interestMinor: number;
+  extraAmortizationMinor: number;
+  paymentMinor: number;
+  balanceMinor: number;
+};
+
+export type FinancingSimulation = {
+  rows: FinancingSimulationRow[];
+  totalPaymentMinor: number;
+  totalPrincipalMinor: number;
+  totalInterestMinor: number;
+  totalExtraAmortizationMinor: number;
+  initialPaymentMinor: number;
+  finalPaymentMinor: number;
+};
+
+function roundSimulationMinor(value: number) {
+  if (!Number.isFinite(value)) {
+    throw new Error("A simulação excede o limite seguro.");
+  }
+  const rounded = Math.round(value);
+  if (!Number.isSafeInteger(rounded)) {
+    throw new Error("A simulação excede o limite seguro.");
+  }
+  return rounded;
+}
+
+function pricePaymentMinor(balanceMinor: number, monthlyRate: number, months: number) {
+  if (months <= 0 || balanceMinor <= 0) return 0;
+  if (monthlyRate === 0) return Math.round(balanceMinor / months);
+  return roundSimulationMinor(
+    balanceMinor * (monthlyRate / (1 - (1 + monthlyRate) ** -months)),
+  );
+}
+
+/**
+ * Simula um fluxo educativo de SAC ou PRICE sem gravar parcelas no banco.
+ * A amortização extra é aplicada mensalmente e pode reduzir prazo ou prestação.
+ */
+export function simulateFinancing(input: {
+  principalMinor: number;
+  annualRatePercent: number;
+  termMonths: number;
+  method: FinancingAmortizationMethod;
+  extraAmortizationMinor?: number;
+  extraAmortizationMode?: FinancingExtraAmortizationMode;
+}): FinancingSimulation {
+  if (
+    !Number.isSafeInteger(input.principalMinor) ||
+    input.principalMinor <= 0
+  ) {
+    throw new Error("Informe um saldo inicial válido.");
+  }
+  if (
+    !Number.isFinite(input.annualRatePercent) ||
+    input.annualRatePercent < 0 ||
+    input.annualRatePercent > 100
+  ) {
+    throw new Error("A taxa anual deve estar entre 0% e 100%.");
+  }
+  if (
+    !Number.isSafeInteger(input.termMonths) ||
+    input.termMonths < 1 ||
+    input.termMonths > 600
+  ) {
+    throw new Error("O prazo deve estar entre 1 e 600 meses.");
+  }
+  if (input.method !== "sac" && input.method !== "price") {
+    throw new Error("Escolha SAC ou PRICE.");
+  }
+
+  const extraAmortizationMinor = input.extraAmortizationMinor ?? 0;
+  if (
+    !Number.isSafeInteger(extraAmortizationMinor) ||
+    extraAmortizationMinor < 0
+  ) {
+    throw new Error("A amortização extra não pode ser negativa.");
+  }
+  const extraAmortizationMode = input.extraAmortizationMode ?? "term";
+  if (extraAmortizationMode !== "term" && extraAmortizationMode !== "payment") {
+    throw new Error("Escolha como a amortização extra será aplicada.");
+  }
+
+  const monthlyRate = input.annualRatePercent / 100 / 12;
+  const originalPrincipal = input.principalMinor;
+  let balance = originalPrincipal;
+  let sacPrincipal = originalPrincipal / input.termMonths;
+  let pricePayment = pricePaymentMinor(
+    originalPrincipal,
+    monthlyRate,
+    input.termMonths,
+  );
+  const rows: FinancingSimulationRow[] = [];
+
+  for (
+    let installment = 1;
+    installment <= input.termMonths && balance > 0;
+    installment += 1
+  ) {
+    const remainingMonths = input.termMonths - installment + 1;
+    const interest = Math.min(
+      balance,
+      roundSimulationMinor(balance * monthlyRate),
+    );
+    const scheduledPrincipal =
+      input.method === "sac"
+        ? Math.min(
+            balance,
+            installment === input.termMonths
+              ? balance
+              : Math.max(1, roundSimulationMinor(sacPrincipal)),
+          )
+        : Math.min(
+            balance,
+            Math.max(0, roundSimulationMinor(pricePayment - interest)),
+          );
+    const extra = Math.min(
+      extraAmortizationMinor,
+      Math.max(0, balance - scheduledPrincipal),
+    );
+    const payment = roundSimulationMinor(interest + scheduledPrincipal);
+    balance = Math.max(0, balance - scheduledPrincipal - extra);
+
+    rows.push({
+      installment,
+      principalMinor: scheduledPrincipal,
+      interestMinor: interest,
+      extraAmortizationMinor: extra,
+      paymentMinor: payment,
+      balanceMinor: balance,
+    });
+
+    const nextMonths = remainingMonths - 1;
+    if (nextMonths > 0 && balance > 0 && extra > 0 && extraAmortizationMode === "payment") {
+      if (input.method === "sac") {
+        sacPrincipal = balance / nextMonths;
+      } else {
+        pricePayment = pricePaymentMinor(balance, monthlyRate, nextMonths);
+      }
+    }
+  }
+
+  return {
+    rows,
+    totalPaymentMinor: rows.reduce(
+      (total, row) => total + row.paymentMinor + row.extraAmortizationMinor,
+      0,
+    ),
+    totalPrincipalMinor: rows.reduce(
+      (total, row) => total + row.principalMinor + row.extraAmortizationMinor,
+      0,
+    ),
+    totalInterestMinor: rows.reduce(
+      (total, row) => total + row.interestMinor,
+      0,
+    ),
+    totalExtraAmortizationMinor: rows.reduce(
+      (total, row) => total + row.extraAmortizationMinor,
+      0,
+    ),
+    initialPaymentMinor: rows[0]?.paymentMinor ?? 0,
+    finalPaymentMinor: rows.at(-1)?.paymentMinor ?? 0,
+  };
+}
+
 export const financingImportJobIdSchema = z.uuid("Importação inválida.");
 
 export const financingImportConfirmationSchema = z.object({

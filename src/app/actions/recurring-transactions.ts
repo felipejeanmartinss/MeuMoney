@@ -67,7 +67,7 @@ export async function updateRecurringTransaction(
   if (!parsed.success || !parsedId.success) {
     return {
       status: "error",
-      message: parsedId.success ? undefined : "Conta a pagar inválida.",
+      message: parsedId.success ? undefined : "Recorrência inválida.",
       fieldErrors: parsed.success
         ? undefined
         : parsed.error.flatten().fieldErrors,
