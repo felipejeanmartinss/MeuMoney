@@ -6,9 +6,12 @@ import {
   updateCreditCardInstallmentAmount,
 } from "@/app/actions/credit-cards";
 import { InvoicePaymentForm } from "@/components/forms/invoice-payment-form";
+import { CreditCardPurchaseForm } from "@/components/forms/credit-card-purchase-form";
 import {
+  CREDIT_CARD_ENTRY_KIND_LABELS,
   CREDIT_CARD_INVOICE_STATUS_LABELS,
   effectiveInvoiceStatus,
+  getInvoiceBillingMonth,
 } from "@/domain/credit-cards";
 import { formatMoney, minorUnitsToInput } from "@/domain/money";
 import { getCurrentUserCreditCardInvoice } from "@/services/finance/credit-cards-service";
@@ -25,6 +28,7 @@ const messages: Record<string, string> = {
   "installment-updated": "Valor da parcela atualizado.",
   "installment-error": "A parcela só pode ser alterada em uma fatura aberta.",
   "invoice-error": "Não foi possível concluir a operação.",
+  "entry-created": "Crédito incluído na fatura.",
 };
 
 export default async function CreditCardInvoicePage({
@@ -63,7 +67,7 @@ export default async function CreditCardInvoicePage({
               {card.name}
             </p>
             <h1 className="mt-2 text-3xl font-extrabold">
-              Fatura {formatReferenceMonthPtBr(invoice.reference_month)}
+              Fatura {formatReferenceMonthPtBr(getInvoiceBillingMonth(invoice.due_date))}
             </h1>
             <p className="mt-1 text-sm text-slate-300">
               Fecha {formatIsoDatePtBr(invoice.closing_date)} · vence{" "}
@@ -95,6 +99,37 @@ export default async function CreditCardInvoicePage({
         </p>
       ) : null}
 
+      {invoice.status === "open" ? (
+        <details className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 marker:hidden">
+            <span className="font-extrabold text-slate-950">
+              Crédito na fatura
+            </span>
+            <span className="rounded-lg border px-3 py-2 text-sm font-bold text-emerald-700 group-open:text-slate-700">
+              <span className="group-open:hidden">Adicionar estorno ou cashback</span>
+              <span className="hidden group-open:inline">Fechar</span>
+            </span>
+          </summary>
+          <div className="border-t bg-slate-50/60 p-3 sm:p-4">
+            <CreditCardPurchaseForm
+              cardId={card.id}
+              closingDay={card.closing_day}
+              dueDay={card.due_day}
+              currency={card.currency}
+              categories={[]}
+              compact
+              targetInvoiceId={invoice.id}
+              entryKinds={["refund", "cashback"]}
+              values={{
+                entryKind: "refund",
+                purchaseDate: today,
+                installmentCount: 1,
+              }}
+            />
+          </div>
+        </details>
+      ) : null}
+
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div>
@@ -122,6 +157,7 @@ export default async function CreditCardInvoicePage({
               <tr>
                 <th className="px-4 py-2">Data</th>
                 <th className="px-4 py-2">Descrição</th>
+                <th className="px-4 py-2">Tipo</th>
                 <th className="px-4 py-2 text-center">Parcela</th>
                 <th className="px-4 py-2 text-right">Valor</th>
               </tr>
@@ -143,6 +179,11 @@ export default async function CreditCardInvoicePage({
                           Assinatura
                         </span>
                       ) : null}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600">
+                      {purchase
+                        ? CREDIT_CARD_ENTRY_KIND_LABELS[purchase.entry_kind]
+                        : "Compra"}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       {installment.installment_number}/
@@ -179,7 +220,16 @@ export default async function CreditCardInvoicePage({
                           </button>
                         </form>
                       ) : (
-                        <strong>{formatMoney(installment.amount, card.currency)}</strong>
+                        <strong
+                          className={
+                            purchase?.entry_kind === "purchase"
+                              ? undefined
+                              : "text-emerald-700"
+                          }
+                        >
+                          {purchase?.entry_kind === "purchase" ? "" : "− "}
+                          {formatMoney(installment.amount, card.currency)}
+                        </strong>
                       )}
                     </td>
                   </tr>

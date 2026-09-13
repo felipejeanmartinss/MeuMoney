@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import {
   CREDIT_CARD_INVOICE_STATUS_LABELS,
   effectiveInvoiceStatus,
+  getInvoiceBillingMonth,
 } from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserCreditCardInvoices } from "@/services/finance/credit-cards-service";
@@ -60,7 +61,9 @@ export default async function CreditCardInvoicesPage({
                   <tr key={invoice.id} className="border-t hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-bold text-slate-950">
                       <Link href={`/credit-cards/${id}/invoices/${invoice.id}`}>
-                        {formatReferenceMonthPtBr(invoice.reference_month)}
+                        {formatReferenceMonthPtBr(
+                          getInvoiceBillingMonth(invoice.due_date),
+                        )}
                       </Link>
                     </td>
                     <td className="px-4 py-2.5">

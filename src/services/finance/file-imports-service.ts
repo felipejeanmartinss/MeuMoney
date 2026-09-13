@@ -573,15 +573,13 @@ export async function cancelCurrentUserImport(jobId: string) {
     : { ok: true as const };
 }
 
-export async function clearCurrentUserCancelledImports() {
+export async function clearCurrentUserImports() {
   const { supabase } = await requireUser();
-  const { data, error } = await supabase.rpc(
-    "clear_cancelled_import_jobs",
-  );
+  const { data, error } = await supabase.rpc("clear_all_import_jobs");
   return error
     ? {
         ok: false as const,
-        message: "Não foi possível limpar as importações canceladas.",
+        message: "Não foi possível limpar o histórico de importações.",
       }
     : { ok: true as const, deletedCount: data };
 }

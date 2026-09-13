@@ -39,6 +39,7 @@ const cardInputFrom = (formData: FormData) => ({
 });
 
 const purchaseInputFrom = (formData: FormData) => ({
+  entryKind: formData.get("entryKind"),
   categoryId: formData.get("categoryId"),
   description: formData.get("description"),
   totalAmount: formData.get("totalAmount"),
@@ -47,6 +48,7 @@ const purchaseInputFrom = (formData: FormData) => ({
   installmentAmounts: formData.getAll("installmentAmounts"),
   isRecurring: formData.get("isRecurring") === "true",
   notes: formData.get("notes") ?? "",
+  targetInvoiceId: formData.get("targetInvoiceId") || null,
 });
 
 function revalidateCardPaths(cardId?: string) {
@@ -131,7 +133,11 @@ export async function createCreditCardPurchase(
   );
   if (!result.ok) return { status: "error", message: result.message };
   revalidateCardPaths(cardId.data);
-  redirect(`/credit-cards/${cardId.data}?message=purchase-created`);
+  redirect(
+    parsed.data.targetInvoiceId
+      ? `/credit-cards/${cardId.data}/invoices/${parsed.data.targetInvoiceId}?message=entry-created`
+      : `/credit-cards/${cardId.data}?message=purchase-created`,
+  );
 }
 
 export async function updateCreditCardPurchase(

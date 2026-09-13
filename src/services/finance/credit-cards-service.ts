@@ -4,6 +4,7 @@ import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   CreditCardBrand,
+  CreditCardEntryKind,
   CreditCardInstallment,
   CreditCardInvoice,
   CreditCardPurchase,
@@ -25,7 +26,8 @@ export type CreditCardMutationInput = {
 };
 
 export type CreditCardPurchaseMutationInput = {
-  categoryId: string;
+  categoryId: string | null;
+  entryKind: CreditCardEntryKind;
   description: string;
   totalAmount: number;
   purchaseDate: string;
@@ -33,13 +35,14 @@ export type CreditCardPurchaseMutationInput = {
   installmentAmounts: number[];
   isRecurring: boolean;
   notes: string | null;
+  targetInvoiceId?: string | null;
 };
 
 const cardColumns =
   "id, user_id, name, issuer, brand, last_four_digits, credit_limit, closing_day, due_day, currency, linked_account_id, is_active, created_at, updated_at";
 const cardSummaryColumns = `${cardColumns}, used_limit, available_limit, current_balance_minor`;
 const purchaseColumns =
-  "id, user_id, credit_card_id, category_id, description, total_amount, purchase_date, installment_count, is_recurring, status, notes, created_at, updated_at";
+  "id, user_id, credit_card_id, category_id, entry_kind, description, total_amount, purchase_date, installment_count, is_recurring, status, notes, created_at, updated_at";
 const invoiceColumns =
   "id, user_id, credit_card_id, reference_month, closing_date, due_date, status, total_amount, paid_amount, closed_at, paid_at, payment_account_id, payment_transaction_id, created_at, updated_at";
 const installmentColumns =
@@ -67,6 +70,7 @@ function withCalculatedCommitment(
         totalAmountMinor: coerceMinorUnits(purchase.total_amount),
         purchaseDate: purchase.purchase_date,
         isRecurring: purchase.is_recurring,
+        entryKind: purchase.entry_kind,
       })),
     installments: installments
       .filter((installment) => installment.credit_card_id === card.id)
@@ -89,6 +93,12 @@ function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
   if (message.includes("invalid_purchase_category")) {
     return "Selecione uma categoria de despesa ativa.";
+  }
+  if (message.includes("invalid_credit_card_entry_kind")) {
+    return "Selecione compra, estorno ou cashback.";
+  }
+  if (message.includes("invalid_credit_card_credit")) {
+    return "Estornos e cashback devem ser lançamentos únicos em uma fatura aberta.";
   }
   if (message.includes("invalid_credit_card")) {
     return "O cartão não está disponível.";
@@ -150,27 +160,27 @@ export async function listCurrentUserCreditCards() {
   const { supabase, user } = await requireUser();
   const [cardsResult, invoicesResult, purchasesResult, installmentsResult] =
     await Promise.all([
-    supabase
-      .from("credit_card_summaries")
-      .select(cardSummaryColumns)
-      .eq("user_id", user.id)
-      .order("is_active", { ascending: false })
-      .order("name"),
-    supabase
-      .from("credit_card_invoices")
-      .select(invoiceColumns)
-      .eq("user_id", user.id)
-      .order("reference_month"),
-    supabase
-      .from("credit_card_purchases")
-      .select(purchaseColumns)
-      .eq("user_id", user.id)
-      .eq("status", "active"),
-    supabase
-      .from("credit_card_installments")
-      .select(installmentColumns)
-      .eq("user_id", user.id),
-  ]);
+      supabase
+        .from("credit_card_summaries")
+        .select(cardSummaryColumns)
+        .eq("user_id", user.id)
+        .order("is_active", { ascending: false })
+        .order("name"),
+      supabase
+        .from("credit_card_invoices")
+        .select(invoiceColumns)
+        .eq("user_id", user.id)
+        .order("reference_month"),
+      supabase
+        .from("credit_card_purchases")
+        .select(purchaseColumns)
+        .eq("user_id", user.id)
+        .eq("status", "active"),
+      supabase
+        .from("credit_card_installments")
+        .select(installmentColumns)
+        .eq("user_id", user.id),
+    ]);
 
   const invoices = invoicesResult.data ?? [];
   const purchases = purchasesResult.data ?? [];
@@ -292,9 +302,8 @@ export async function getCreditCardPurchaseFormOptions(cardId: string) {
       .maybeSingle(),
     supabase
       .from("categories")
-      .select("id, parent_id, name, context")
+      .select("id, parent_id, name, kind, context")
       .eq("user_id", user.id)
-      .eq("kind", "expense")
       .is("archived_at", null)
       .order("name"),
   ]);
@@ -340,8 +349,8 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
         .eq("credit_card_id", cardId)
         .order("reference_month"),
       supabase
-        .from("categories")
-        .select("id, parent_id, name")
+      .from("categories")
+        .select("id, parent_id, name, kind, context")
         .eq("user_id", user.id),
     ]);
   const purchases = purchasesResult.data ?? [];
@@ -413,6 +422,8 @@ export async function createCurrentUserCreditCardPurchase(
     target_installment_amounts: input.installmentAmounts,
     purchase_is_recurring: input.isRecurring,
     purchase_notes: input.notes,
+    purchase_entry_kind: input.entryKind,
+    target_invoice_id: input.targetInvoiceId ?? null,
   });
   return error
     ? { ok: false as const, message: mutationErrorMessage(error) }
@@ -434,6 +445,8 @@ export async function updateCurrentUserCreditCardPurchase(
     target_installment_amounts: input.installmentAmounts,
     purchase_is_recurring: input.isRecurring,
     purchase_notes: input.notes,
+    purchase_entry_kind: input.entryKind,
+    target_invoice_id: input.targetInvoiceId ?? null,
   });
   return error
     ? { ok: false as const, message: mutationErrorMessage(error) }
@@ -526,7 +539,7 @@ export async function getCurrentUserCreditCardInvoice(
         .order("installment_number"),
       supabase
         .from("credit_card_purchases")
-        .select("id, description, category_id, purchase_date, is_recurring")
+        .select("id, description, category_id, entry_kind, purchase_date, is_recurring")
         .eq("user_id", user.id)
         .eq("credit_card_id", cardId)
         .eq("status", "active"),

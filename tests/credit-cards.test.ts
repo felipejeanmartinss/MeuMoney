@@ -6,6 +6,7 @@ import {
   creditCardPurchaseFormSchema,
   effectiveInvoiceStatus,
   getInvoiceDueDate,
+  getInvoiceBillingMonth,
   getPurchaseReferenceMonth,
   splitInstallments,
 } from "../src/domain/credit-cards";
@@ -28,6 +29,10 @@ describe("credit card cycles", () => {
     expect(boundedDayDate(2028, 2, 31)).toBe("2028-02-29");
     expect(getInvoiceDueDate("2026-01-01", 20, 31)).toBe("2026-01-31");
     expect(getInvoiceDueDate("2026-01-01", 20, 10)).toBe("2026-02-10");
+  });
+
+  it("labels a statement by the month before its due date", () => {
+    expect(getInvoiceBillingMonth("2026-01-11")).toBe("2025-12-01");
   });
 });
 
@@ -76,6 +81,8 @@ describe("editable installment purchases", () => {
     installmentCount: "3",
     installmentAmounts: ["33,33", "33,33", "33,34"],
     isRecurring: false,
+    entryKind: "purchase",
+    targetInvoiceId: "",
     notes: "",
   };
 
@@ -110,6 +117,27 @@ describe("editable installment purchases", () => {
         .success,
     ).toBe(false);
   });
+
+  it("accepts only one-off refund and cashback credits", () => {
+    expect(
+      creditCardPurchaseFormSchema.safeParse({
+        ...purchase,
+        entryKind: "refund",
+        categoryId: "",
+        installmentCount: "1",
+        installmentAmounts: ["100,00"],
+      }).success,
+    ).toBe(true);
+    expect(
+      creditCardPurchaseFormSchema.safeParse({
+        ...purchase,
+        entryKind: "cashback",
+        categoryId: "",
+        installmentCount: "2",
+        installmentAmounts: ["50,00", "50,00"],
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("credit card invoice forecast", () => {
@@ -140,12 +168,14 @@ describe("credit card commitment horizon", () => {
       totalAmountMinor: 300_00,
       purchaseDate: "2026-09-07",
       isRecurring: false,
+      entryKind: "purchase" as const,
     },
     {
       id: "subscription",
       totalAmountMinor: 50_00,
       purchaseDate: "2026-09-07",
       isRecurring: true,
+      entryKind: "purchase" as const,
     },
   ];
 
@@ -199,6 +229,47 @@ describe("credit card commitment horizon", () => {
 
     expect(result.committedMinor).toBe(0);
     expect(result.availableMinor).toBe(210_00);
+  });
+
+  it("subtracts statement credits from the committed limit", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 1_000_00,
+      closingDay: 20,
+      invoices: [{ referenceMonth: "2026-09-01" }],
+      purchases: [
+        {
+          id: "expense",
+          totalAmountMinor: 300_00,
+          purchaseDate: "2026-09-01",
+          isRecurring: false,
+          entryKind: "purchase",
+        },
+        {
+          id: "refund",
+          totalAmountMinor: 80_00,
+          purchaseDate: "2026-09-02",
+          isRecurring: false,
+          entryKind: "refund",
+        },
+      ],
+      installments: [
+        {
+          purchaseId: "expense",
+          amountMinor: 300_00,
+          competenceDate: "2026-09-01",
+          status: "pending",
+        },
+        {
+          purchaseId: "refund",
+          amountMinor: 80_00,
+          competenceDate: "2026-09-01",
+          status: "pending",
+        },
+      ],
+    });
+
+    expect(result.committedMinor).toBe(220_00);
+    expect(result.availableMinor).toBe(780_00);
   });
 });
 

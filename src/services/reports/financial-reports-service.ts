@@ -120,7 +120,15 @@ async function loadCategoryMonthlyEntries(input: {
     }
   };
 
-  const [result, categoriesResult, conversionResult] = await Promise.all([
+  const [
+    result,
+    categoriesResult,
+    conversionResult,
+    cardCreditsResult,
+    cardCreditInstallmentsResult,
+    cardsResult,
+    accountsResult,
+  ] = await Promise.all([
     loadAllReportRows(),
     supabase
       .from("categories")
@@ -129,6 +137,27 @@ async function loadCategoryMonthlyEntries(input: {
       )
       .eq("user_id", user.id),
     loadCurrencyConversionSamples(supabase, user.id),
+    supabase
+      .from("credit_card_purchases")
+      .select("id, credit_card_id, entry_kind")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .in("entry_kind", ["refund", "cashback"]),
+    supabase
+      .from("credit_card_installments")
+      .select("purchase_id, competence_date, amount, status")
+      .eq("user_id", user.id)
+      .gte("competence_date", monthStart(input.startMonth))
+      .lte("competence_date", monthStart(input.endMonth))
+      .neq("status", "cancelled"),
+    supabase
+      .from("credit_cards")
+      .select("id, currency, linked_account_id")
+      .eq("user_id", user.id),
+    supabase
+      .from("accounts")
+      .select("id, context")
+      .eq("user_id", user.id),
   ]);
   const categories = new Map(
     ((categoriesResult.data ?? []) as CategoryDimension[]).map((category) => [
@@ -170,12 +199,63 @@ async function loadCategoryMonthlyEntries(input: {
       amountMinor: convertedAmount,
     }];
   });
+  const creditPurchaseById = new Map(
+    (cardCreditsResult.data ?? []).map((purchase) => [purchase.id, purchase]),
+  );
+  const cardById = new Map((cardsResult.data ?? []).map((card) => [card.id, card]));
+  const accountContextById = new Map(
+    (accountsResult.data ?? []).map((account) => [account.id, account.context]),
+  );
+  if (input.basis === "competence") {
+    for (const installment of cardCreditInstallmentsResult.data ?? []) {
+      const purchase = creditPurchaseById.get(installment.purchase_id);
+      if (!purchase) continue;
+      const card = cardById.get(purchase.credit_card_id);
+      if (!card || !input.sourceCurrencies.includes(card.currency)) continue;
+      const context = card.linked_account_id
+        ? accountContextById.get(card.linked_account_id) ?? "personal"
+        : "personal";
+      if (input.context !== "all" && input.context !== context) continue;
+      const convertedAmount = convertMinorUnits(
+        coerceMinorUnits(installment.amount),
+        card.currency,
+        input.currency,
+        `${installment.competence_date.slice(0, 7)}-31`,
+        conversionResult.samples,
+      );
+      if (convertedAmount === null) {
+        missingCurrencies.add(card.currency);
+        continue;
+      }
+      const isRefund = purchase.entry_kind === "refund";
+      const key = `card-credit:${purchase.entry_kind}`;
+      entries.push({
+        rowId: key,
+        section: "income",
+        groupLabel: "Créditos de cartão",
+        label: isRefund ? "Estornos" : "Cashback",
+        categoryKey: key,
+        categoryLabel: isRefund ? "Estornos" : "Cashback",
+        subcategoryKey: null,
+        subcategoryLabel: null,
+        isFixedExpense: false,
+        referenceMonth: installment.competence_date,
+        amountMinor: convertedAmount,
+      });
+    }
+  }
 
   return {
     entries,
     missingCurrencies: [...missingCurrencies],
     hasError: Boolean(
-      result.error || categoriesResult.error || conversionResult.hasError,
+      result.error ||
+        categoriesResult.error ||
+        conversionResult.hasError ||
+        cardCreditsResult.error ||
+        cardCreditInstallmentsResult.error ||
+        cardsResult.error ||
+        accountsResult.error,
     ),
   };
 }

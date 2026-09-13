@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCategoryDisplayName } from "@/domain/categories";
 import { cancelCreditCardPurchase } from "@/app/actions/credit-cards";
+import { CreditCardPurchaseForm } from "@/components/forms/credit-card-purchase-form";
 import {
+  CREDIT_CARD_ENTRY_KIND_LABELS,
   buildCreditCardInvoiceForecast,
+  getInvoiceBillingMonth,
+  getInvoiceDueDate,
   getPurchaseReferenceMonth,
 } from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
@@ -11,11 +15,12 @@ import { getCurrentUserCreditCardDetails } from "@/services/finance/credit-cards
 import {
   formatIsoDatePtBr,
   formatReferenceMonthPtBr,
+  toIsoDate,
 } from "@/utils/dates";
 
 const messages: Record<string, string> = {
   updated: "Cartão atualizado.",
-  "purchase-created": "Compra registrada e parcelas geradas.",
+  "purchase-created": "Lançamento registrado na fatura.",
   "purchase-updated": "Compra atualizada.",
   "purchase-cancelled": "Compra excluída das compras e das faturas abertas.",
   "purchase-error": "A compra não pôde ser excluída.",
@@ -38,6 +43,7 @@ export default async function CreditCardPage({
       getCategoryDisplayName(item, categories),
     ]),
   );
+  const purchaseById = new Map(purchases.map((purchase) => [purchase.id, purchase]));
   const pendingInstallments = installments.filter(
     (item) => item.status === "pending",
   );
@@ -54,7 +60,10 @@ export default async function CreditCardPage({
       totalAmountMinor: invoice.total_amount,
     })),
     subscriptions: purchases
-      .filter((purchase) => purchase.is_recurring)
+      .filter(
+        (purchase) =>
+          purchase.is_recurring && purchase.entry_kind === "purchase",
+      )
       .map((purchase) => ({
         amountMinor: purchase.total_amount,
         firstReferenceMonth: getPurchaseReferenceMonth(
@@ -124,15 +133,36 @@ export default async function CreditCardPage({
             >
               Importar
             </Link>
-            <Link
-              href={`/credit-cards/${card.id}/purchases/new`}
-              className="ml-auto inline-flex min-h-10 items-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white"
-            >
-              Nova compra
-            </Link>
           </>
         ) : null}
       </nav>
+
+      {card.is_active ? (
+        <details className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 marker:hidden">
+            <span className="font-extrabold text-slate-950">Novo lançamento</span>
+            <span className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white group-open:bg-slate-900">
+              <span className="group-open:hidden">Nova compra</span>
+              <span className="hidden group-open:inline">Fechar</span>
+            </span>
+          </summary>
+          <div className="border-t bg-slate-50/60 p-3 sm:p-4">
+            <CreditCardPurchaseForm
+              cardId={card.id}
+              closingDay={card.closing_day}
+              dueDay={card.due_day}
+              currency={card.currency}
+              categories={categories}
+              compact
+              values={{
+                entryKind: "purchase",
+                purchaseDate: toIsoDate(new Date()),
+                installmentCount: 1,
+              }}
+            />
+          </div>
+        </details>
+      ) : null}
 
       {query.message && messages[query.message] ? (
         <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900">
@@ -147,8 +177,8 @@ export default async function CreditCardPage({
 
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="font-extrabold text-slate-950">Extrato de compras</h2>
-          <span className="text-xs text-slate-500">{purchases.length} compras</span>
+          <h2 className="font-extrabold text-slate-950">Extrato do cartão</h2>
+          <span className="text-xs text-slate-500">{purchases.length} lançamentos</span>
         </div>
         {purchases.length ? (
           <div className="overflow-x-auto">
@@ -157,6 +187,7 @@ export default async function CreditCardPage({
                 <tr>
                   <th className="px-4 py-2">Data</th>
                   <th className="px-4 py-2">Descrição</th>
+                  <th className="px-4 py-2">Tipo</th>
                   <th className="px-4 py-2">Categoria</th>
                   <th className="px-4 py-2 text-center">Parcelas</th>
                   <th className="px-4 py-2 text-right">Valor</th>
@@ -182,15 +213,27 @@ export default async function CreditCardPage({
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-4 py-2 text-slate-600">
+                      {CREDIT_CARD_ENTRY_KIND_LABELS[purchase.entry_kind]}
+                    </td>
                     <td className="max-w-96 px-4 py-2 text-slate-600">
-                      {categoryById.get(purchase.category_id) ?? "Categoria"}
+                      {purchase.category_id
+                        ? categoryById.get(purchase.category_id) ?? "Categoria"
+                        : "—"}
                     </td>
                     <td className="px-4 py-2 text-center text-slate-600">
                       {purchase.is_recurring
                         ? "—"
                         : `${purchase.installment_count}x`}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right font-extrabold">
+                    <td
+                      className={`whitespace-nowrap px-4 py-2.5 text-right font-extrabold ${
+                        purchase.entry_kind === "purchase"
+                          ? "text-slate-950"
+                          : "text-emerald-700"
+                      }`}
+                    >
+                      {purchase.entry_kind === "purchase" ? "" : "+ "}
                       {formatMoney(purchase.total_amount, card.currency)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right">
@@ -244,10 +287,24 @@ export default async function CreditCardPage({
                 className="flex items-center justify-between gap-4 px-4 py-2.5"
               >
                 <span>
-                  {formatReferenceMonthPtBr(item.competence_date)} · parcela{" "}
+                  {formatReferenceMonthPtBr(
+                    getInvoiceBillingMonth(
+                      getInvoiceDueDate(
+                        item.competence_date,
+                        card.closing_day,
+                        card.due_day,
+                      ),
+                    ),
+                  )}{" "}
+                  · parcela{" "}
                   {item.installment_number}/{item.installment_count}
                 </span>
-                <strong>{formatMoney(item.amount, card.currency)}</strong>
+                <strong>
+                  {purchaseById.get(item.purchase_id)?.entry_kind === "purchase"
+                    ? ""
+                    : "− "}
+                  {formatMoney(item.amount, card.currency)}
+                </strong>
               </li>
             ))}
             {!pendingInstallments.length ? (
@@ -275,7 +332,18 @@ export default async function CreditCardPage({
                     className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-slate-50"
                   >
                     <span>
-                      {formatReferenceMonthPtBr(item.referenceMonth)}
+                      {formatReferenceMonthPtBr(
+                        getInvoiceBillingMonth(
+                          openInvoices.find(
+                            (invoice) => invoice.id === item.invoiceId,
+                          )?.due_date ??
+                            getInvoiceDueDate(
+                              item.referenceMonth,
+                              card.closing_day,
+                              card.due_day,
+                            ),
+                        ),
+                      )}
                       {item.projected ? (
                         <small className="ml-2 text-slate-500">projeção</small>
                       ) : null}
@@ -284,7 +352,18 @@ export default async function CreditCardPage({
                   </Link>
                 ) : (
                   <div className="flex items-center justify-between gap-4 px-4 py-2.5 text-slate-600">
-                    <span>{formatReferenceMonthPtBr(item.referenceMonth)} · projeção</span>
+                    <span>
+                      {formatReferenceMonthPtBr(
+                        getInvoiceBillingMonth(
+                          getInvoiceDueDate(
+                            item.referenceMonth,
+                            card.closing_day,
+                            card.due_day,
+                          ),
+                        ),
+                      )}{" "}
+                      · projeção
+                    </span>
                     <strong className="text-slate-900">
                       {formatMoney(item.amountMinor, card.currency)}
                     </strong>
