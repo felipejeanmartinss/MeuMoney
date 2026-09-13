@@ -10,7 +10,10 @@ import {
   type AccountRegisterEntryComposerProps,
 } from "@/components/accounts/account-register-entry-composer";
 import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
-import type { AccountRegisterEntry } from "@/domain/account-register";
+import {
+  canReconcileAccountEntry,
+  type AccountRegisterEntry,
+} from "@/domain/account-register";
 import { formatMoney } from "@/domain/money";
 import { TRANSACTION_STATUS_LABELS } from "@/domain/transactions";
 import type { AccountType, SupportedCurrency } from "@/types/database";
@@ -68,10 +71,13 @@ function ReconciliationControl({
   entry: AccountRegisterEntry;
   page: number;
 }) {
-  const canReconcile = entry.isActive && entry.status === "completed";
+  const canReconcile = canReconcileAccountEntry(entry);
   if (!canReconcile) {
     return (
-      <span className="text-xs font-bold text-slate-400" title="Somente itens realizados e ativos podem ser conciliados">
+      <span
+        className="text-xs font-bold text-slate-400"
+        title="Somente lançamentos e transferências realizadas podem ser conciliados"
+      >
         —
       </span>
     );
@@ -98,7 +104,13 @@ function ReconciliationControl({
             ? "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800"
             : "border-slate-300 bg-white text-slate-600 hover:border-emerald-600 hover:text-emerald-700"
         }`}
-        title={reconciled ? "Reconciliado" : "Pendente de conciliação"}
+        title={
+          reconciled
+            ? "Reconciliado"
+            : entry.status === "pending"
+              ? "Marcar como reconciliado e realizado"
+              : "Pendente de conciliação"
+        }
       >
         {reconciled ? "R" : "○"}
       </button>

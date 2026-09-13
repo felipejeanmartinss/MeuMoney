@@ -6,6 +6,7 @@ import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 import type {
   AccountBalance,
+  CreditCardInvoice,
   CreditCardSummary,
   SupportedCurrency,
 } from "@/types/database";
@@ -298,17 +299,29 @@ function AccountGroup({
 
 function CardsGroup({
   cards,
+  invoices,
 }: {
   cards: CreditCardSummary[];
+  invoices: CreditCardInvoice[];
 }) {
   const totals = totalsByCurrency(
     cards
       .filter((card) => card.is_active)
       .map((card) => ({
         currency: card.currency,
-        value: card.current_balance_minor,
+        value: card.used_limit,
       })),
   );
+  const nextOpenInvoiceByCard = new Map<string, CreditCardInvoice>();
+
+  for (const invoice of invoices) {
+    if (
+      invoice.status === "open" &&
+      !nextOpenInvoiceByCard.has(invoice.credit_card_id)
+    ) {
+      nextOpenInvoiceByCard.set(invoice.credit_card_id, invoice);
+    }
+  }
 
   return (
     <details open className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -318,11 +331,14 @@ function CardsGroup({
             Cartões de crédito
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Compras ativas menos transferências já realizadas para cada cartão.
+            Próxima fatura e total comprometido de cada cartão.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <CurrencyTotals totals={totals} emptyLabel="Nenhum cartão" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500">Comprometido</span>
+            <CurrencyTotals totals={totals} emptyLabel="Nenhum cartão" />
+          </div>
           <span aria-hidden="true" className="text-sm text-slate-400 transition group-open:rotate-90">▸</span>
         </div>
       </summary>
@@ -332,11 +348,13 @@ function CardsGroup({
         </p>
       ) : (
         <div className="grid divide-y divide-slate-100">
-          {cards.map((card) => (
+          {cards.map((card) => {
+            const nextInvoice = nextOpenInvoiceByCard.get(card.id);
+            return (
             <Link
               key={card.id}
               href={`/credit-cards/${card.id}`}
-              className="grid gap-2 px-5 py-4 hover:bg-emerald-50/40 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-6"
+              className="grid gap-2 px-5 py-4 hover:bg-emerald-50/40 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:gap-6"
             >
               <div>
                 <span className="font-extrabold text-slate-950">
@@ -348,17 +366,26 @@ function CardsGroup({
               </div>
               <div className="sm:text-right">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Saldo do cartão
+                  Próxima fatura
                 </p>
                 <p className="mt-1 font-extrabold text-rose-700">
-                  {formatMoney(card.current_balance_minor, card.currency)}
+                  {formatMoney(nextInvoice?.total_amount ?? 0, card.currency)}
+                </p>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Comprometido
+                </p>
+                <p className="mt-1 font-extrabold text-slate-950">
+                  {formatMoney(card.used_limit, card.currency)}
                 </p>
               </div>
               <span className="text-xs font-bold text-slate-500">
                 {card.is_active ? "Ativo" : "Inativo"}
               </span>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </details>
@@ -491,7 +518,7 @@ export default async function AccountsPage({
           description="Caixa físico e demais saldos transacionais."
           accounts={cashAndOther}
         />
-        <CardsGroup cards={visibleCards} />
+        <CardsGroup cards={visibleCards} invoices={cardResult.invoices} />
       </div>
     </main>
   );

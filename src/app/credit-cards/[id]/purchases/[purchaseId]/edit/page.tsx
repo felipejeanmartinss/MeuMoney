@@ -27,7 +27,7 @@ export default async function EditCreditCardPurchasePage({
           ← Voltar para {card.name}
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold text-slate-950">
-          Editar compra
+          Editar lançamento
         </h1>
         <p className="mt-2 text-slate-600">
           Alterações estruturais são bloqueadas se alguma fatura envolvida já
@@ -43,6 +43,7 @@ export default async function EditCreditCardPurchasePage({
           categories={categories}
           values={{
             purchaseId: purchase.id,
+            entryKind: purchase.entry_kind,
             categoryId: purchase.category_id,
             description: purchase.description,
             totalAmount: minorUnitsToInput(purchase.total_amount),
@@ -54,6 +55,16 @@ export default async function EditCreditCardPurchasePage({
             isRecurring: purchase.is_recurring,
             notes: purchase.notes,
           }}
+          targetInvoiceId={
+            purchase.entry_kind === "purchase"
+              ? null
+              : installments[0]?.invoice_id ?? null
+          }
+          entryKinds={
+            purchase.entry_kind === "purchase"
+              ? ["purchase", "refund", "cashback"]
+              : ["refund", "cashback"]
+          }
         />
       </section>
     </main>

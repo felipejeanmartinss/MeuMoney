@@ -16,7 +16,7 @@ import {
 } from "@/domain/file-imports";
 import {
   cancelCurrentUserImport,
-  clearCurrentUserCancelledImports,
+  clearCurrentUserImports,
   configureCurrentUserImport,
   configureCurrentUserCreditCardPurchaseImport,
   confirmCurrentUserImport,
@@ -374,10 +374,10 @@ export async function cancelFinancialImport(formData: FormData) {
   );
 }
 
-export async function clearCancelledFinancialImports() {
-  const result = await clearCurrentUserCancelledImports();
+export async function clearFinancialImportHistory() {
+  const result = await clearCurrentUserImports();
   revalidatePath("/imports");
   redirect(
-    `/imports?message=${result.ok ? "cancelled-cleared" : "clear-error"}`,
+    `/imports?message=${result.ok ? "history-cleared" : "clear-error"}`,
   );
 }

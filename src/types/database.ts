@@ -27,6 +27,7 @@ export type CreditCardBrand =
   | "hipercard"
   | "other";
 export type CreditCardPurchaseStatus = "active" | "cancelled";
+export type CreditCardEntryKind = "purchase" | "refund" | "cashback";
 export type CreditCardInstallmentStatus =
   | "pending"
   | "invoiced"
@@ -217,7 +218,8 @@ export type CreditCardPurchase = {
   id: string;
   user_id: string;
   credit_card_id: string;
-  category_id: string;
+  category_id: string | null;
+  entry_kind: CreditCardEntryKind;
   description: string;
   total_amount: number;
   purchase_date: string;
@@ -1406,7 +1408,7 @@ export type Database = {
       create_credit_card_purchase_custom: {
         Args: {
           target_credit_card_id: string;
-          target_category_id: string;
+          target_category_id: string | null;
           purchase_description: string;
           purchase_total_amount: number;
           target_purchase_date: string;
@@ -1414,13 +1416,15 @@ export type Database = {
           target_installment_amounts: number[];
           purchase_is_recurring?: boolean;
           purchase_notes?: string | null;
+          purchase_entry_kind?: CreditCardEntryKind;
+          target_invoice_id?: string | null;
         };
         Returns: string;
       };
       update_credit_card_purchase_custom: {
         Args: {
           target_purchase_id: string;
-          target_category_id: string;
+          target_category_id: string | null;
           purchase_description: string;
           purchase_total_amount: number;
           target_purchase_date: string;
@@ -1428,6 +1432,8 @@ export type Database = {
           target_installment_amounts: number[];
           purchase_is_recurring?: boolean;
           purchase_notes?: string | null;
+          purchase_entry_kind?: CreditCardEntryKind;
+          target_invoice_id?: string | null;
         };
         Returns: boolean;
       };
@@ -1631,6 +1637,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      clear_all_import_jobs: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
       record_critical_operation: {
         Args: {
           target_event_type: string;
@@ -1660,6 +1670,7 @@ export type Database = {
       transfer_direction: TransferDirection;
       credit_card_brand: CreditCardBrand;
       credit_card_purchase_status: CreditCardPurchaseStatus;
+      credit_card_entry_kind: CreditCardEntryKind;
       credit_card_installment_status: CreditCardInstallmentStatus;
       credit_card_invoice_status: CreditCardInvoiceStatus;
       transaction_origin_type: TransactionOriginType;

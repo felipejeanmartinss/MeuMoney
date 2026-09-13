@@ -24,11 +24,10 @@ export default async function NewCreditCardPurchasePage({
           ← Voltar para {card.name}
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold text-slate-950">
-          Nova compra
+          Novo lançamento
         </h1>
         <p className="mt-2 text-slate-600">
-          O consumo será categorizado agora; a conta só será movimentada no
-          pagamento da fatura.
+          Compras aumentam a fatura; estornos e cashback reduzem o valor devido.
         </p>
       </div>
       <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">
@@ -38,7 +37,11 @@ export default async function NewCreditCardPurchasePage({
           dueDay={card.due_day}
           currency={card.currency}
           categories={categories}
-          values={{ purchaseDate: toIsoDate(new Date()), installmentCount: 1 }}
+          values={{
+            entryKind: "purchase",
+            purchaseDate: toIsoDate(new Date()),
+            installmentCount: 1,
+          }}
         />
       </section>
     </main>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { clearCancelledFinancialImports } from "@/app/actions/file-imports";
+import { clearFinancialImportHistory } from "@/app/actions/file-imports";
 import { listCurrentUserImportJobs } from "@/services/finance/file-imports-service";
 
 export const metadata = { title: "Importações" };
@@ -17,9 +17,9 @@ const statusPresentation = {
 
 const messages: Record<string, string> = {
   cancelled: "Importação cancelada e dados temporários descartados.",
-  "cancelled-cleared": "Importações canceladas removidas da lista.",
+  "history-cleared": "Histórico de importações limpo.",
   "cancel-error": "Não foi possível cancelar a importação.",
-  "clear-error": "Não foi possível limpar as importações canceladas.",
+  "clear-error": "Não foi possível limpar o histórico de importações.",
   "configuration-error": "Não foi possível configurar a importação.",
   "confirmation-error": "Não foi possível confirmar a importação.",
   "row-error": "Não foi possível atualizar a linha.",
@@ -43,7 +43,7 @@ export default async function ImportsPage({
   ]);
   const feedback = params.message ? messages[params.message] : undefined;
   const feedbackIsError = params.message?.endsWith("error");
-  const hasCancelledJobs = jobs.some((job) => job.status === "cancelled");
+  const hasJobs = jobs.length > 0;
 
   return (
     <main className="mx-auto grid max-w-6xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
@@ -61,10 +61,10 @@ export default async function ImportsPage({
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          {hasCancelledJobs ? (
-            <form action={clearCancelledFinancialImports}>
-              <button className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-300 px-5 font-semibold text-slate-700 hover:bg-slate-100">
-                Limpar canceladas
+          {hasJobs ? (
+            <form action={clearFinancialImportHistory}>
+              <button className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-rose-200 px-5 font-semibold text-rose-700 hover:bg-rose-50">
+                Limpar histórico
               </button>
             </form>
           ) : null}

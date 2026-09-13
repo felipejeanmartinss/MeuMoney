@@ -73,6 +73,8 @@ O cliente só escreve diretamente na configuração do cartão. Compras e fatura
 
 `public.transactions.recurring_transaction_id` vincula cada previsão à recorrência de origem. Lançamentos gerados usam `origin_type = 'system'`, `status = 'pending'`, categoria obrigatória e o mesmo UUID em `origin_id`. O índice parcial único em `(recurring_transaction_id, transaction_date)` é a barreira de idempotência.
 
+`set_account_entry_reconciled` aceita lançamentos ativos previstos ou realizados. Ao reconciliar uma previsão, a função a promove para `completed` antes de gravar `reconciled_at`, na mesma transação; desmarcar a conciliação não restaura o estado previsto. Transferências previstas continuam indisponíveis para conciliação porque sua realização precisa preservar os dois lados do movimento.
+
 `generate_recurring_transactions(target_until)` processa somente recorrências ativas do usuário retornado por `auth.uid()`. A função bloqueia cada modelo com `FOR UPDATE SKIP LOCKED`, insere com `ON CONFLICT DO NOTHING`, avança `next_occurrence` e encerra calendários que ultrapassaram a data final, tudo na mesma transação PostgreSQL.
 
 `set_recurring_transaction_state` concentra as transições ativa, suspensa e encerrada. A fachada pública usa `security invoker`; a implementação interna usa `security definer`, `search_path` vazio, valida o usuário chamador e só pode ser alcançada pelo papel autenticado. A tabela mantém RLS por `user_id`, não expõe `DELETE` e restringe escrita a colunas do modelo.

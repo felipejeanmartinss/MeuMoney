@@ -65,7 +65,7 @@
 - O extrato pertence à conta e combina receitas, despesas e o lado correspondente de cada transferência em ordem cronológica. O saldo linha a linha usa o realizado até ontem e passa a representar a projeção a partir de hoje; uma divisória visual separa os dois períodos.
 - A conciliação confirma um item realizado e ativo contra o extrato externo. Cada lado de uma transferência possui estado próprio, porque contas diferentes podem ser conciliadas em momentos diferentes.
 - `reconciled_at` registra quando ocorreu a última conciliação. Alterar conta, tipo, direção, moeda, valor, data, status ou atividade remove automaticamente essa confirmação e exige nova conferência.
-- Itens previstos ou inativos permanecem visíveis no extrato, mas não podem ser marcados como reconciliados nem alterar o saldo realizado.
+- Itens inativos permanecem visíveis no extrato, mas não podem ser reconciliados nem alterar o saldo realizado. Um lançamento previsto e ativo pode ser marcado como reconciliado; a mesma operação o promove atomicamente para Realizado e remove a identificação de Previsto. Transferências previstas continuam bloqueadas para preservar a consistência entre seus dois lados.
 
 ## Cartões de crédito — Sprint 4
 
@@ -73,12 +73,15 @@
 - Compra não altera saldo de conta. Uma transferência realizada para o cartão reduz o saldo da conta de origem e o saldo devedor atual do cartão, sem exigir vínculo com uma fatura.
 - Valores são positivos e exatos em unidades menores; parcelas nunca possuem valor zero. Eventual resto da divisão fica na última parcela.
 - Compra realizada até o dia de fechamento pertence à competência atual; após esse dia, pertence à seguinte. Dias inexistentes em um mês são limitados ao último dia real.
+- A fatura mantém internamente o mês do ciclo de fechamento, mas é apresentada pelo mês imediatamente anterior ao vencimento. Assim, o ciclo que fecha e vence em janeiro aparece como fatura de dezembro, sem mover nem duplicar suas parcelas.
+- O extrato do cartão aceita somente três naturezas: compra, estorno e cashback. Estorno e cashback são créditos únicos, sem categoria, parcelamento ou recorrência; reduzem a fatura e o limite comprometido e aparecem como receita apenas no relatório por competência.
 - O limite comprometido soma parcelas pendentes ou faturadas de compras ativas somente até o último mês de fatura cadastrada. Assinaturas ativas completam os meses ainda não materializados dentro desse mesmo horizonte, sem recriar competências já pagas. O limite disponível é `limite total - comprometido` e não é artificialmente liberado por transferências sem baixa das parcelas. O saldo devedor pode deduzir transferências livres realizadas para o cartão.
 - Fechamento é idempotente. Uma fatura fechada ou paga impede mudanças estruturais nas compras que a compõem.
 - A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
 - Cartões e compras não são excluídos fisicamente pela interface.
 - Arquivos financeiros podem ser associados a um cartão ativo. Nesse modo, cada linha confirmada é uma compra de uma parcela, usa valor absoluto, exige categoria de Despesa e entra na fatura calculada pela data. Créditos, estornos e pagamentos não são inferidos como compras.
+- Limpar o histórico de importações remove todos os jobs e dados temporários do usuário. Lançamentos, compras e assinaturas de deduplicação já confirmados são preservados; apenas a referência ao job removido é descartada.
 
 ## Recorrências — feature/recurring-transactions
 

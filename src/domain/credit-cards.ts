@@ -3,6 +3,7 @@ import { isValidIsoDate } from "./dates";
 import { assertMinorUnits, parseMoneyInputToMinor } from "./money";
 import type {
   CreditCardBrand,
+  CreditCardEntryKind,
   CreditCardInvoiceStatus,
 } from "../types/database";
 
@@ -32,6 +33,12 @@ export const CREDIT_CARD_INVOICE_STATUS_LABELS: Record<
   closed: "Fechada",
   paid: "Paga",
   overdue: "Vencida",
+};
+
+export const CREDIT_CARD_ENTRY_KIND_LABELS: Record<CreditCardEntryKind, string> = {
+  purchase: "Compra",
+  refund: "Estorno",
+  cashback: "Cashback",
 };
 
 const moneyInput = (allowZero = false) =>
@@ -85,7 +92,11 @@ export const creditCardFormSchema = z.object({
 
 export const creditCardPurchaseFormSchema = z
   .object({
-    categoryId: z.uuid("Selecione uma categoria válida."),
+    entryKind: z.enum(["purchase", "refund", "cashback"]),
+    categoryId: z.preprocess(
+      (value) => (value === "" || value === null ? null : value),
+      z.uuid("Selecione uma categoria válida.").nullable(),
+    ),
     description: z
       .string()
       .trim()
@@ -102,8 +113,31 @@ export const creditCardPurchaseFormSchema = z
       .max(240),
     isRecurring: z.boolean(),
     notes: optionalText(1000),
+    targetInvoiceId: z.preprocess(
+      (value) => (value === "" || value === null ? null : value),
+      z.uuid("Fatura inválida.").nullable(),
+    ),
   })
   .superRefine((data, context) => {
+    if (data.entryKind === "purchase" && !data.categoryId) {
+      context.addIssue({
+        code: "custom",
+        path: ["categoryId"],
+        message: "Selecione uma categoria de despesa.",
+      });
+    }
+    if (
+      data.entryKind !== "purchase" &&
+      (data.installmentCount !== 1 ||
+        data.installmentAmounts.length !== 1 ||
+        data.isRecurring)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentCount"],
+        message: "Estornos e cashback são lançamentos únicos.",
+      });
+    }
     if (
       data.isRecurring &&
       (data.installmentCount !== 1 || data.installmentAmounts.length !== 1)
@@ -225,6 +259,12 @@ export function getInvoiceDueDate(
   return boundedDayDate(nextMonth.year, nextMonth.month, dueDay);
 }
 
+export function getInvoiceBillingMonth(dueDate: string) {
+  const due = parseIsoDate(dueDate);
+  const billing = shiftMonth(due.year, due.month, -1);
+  return boundedDayDate(billing.year, billing.month, 1);
+}
+
 export function splitInstallments(
   totalAmountMinor: number,
   installmentCount: number,
@@ -295,6 +335,7 @@ export function calculateCreditCardCommitment(input: {
     totalAmountMinor: number;
     purchaseDate: string;
     isRecurring: boolean;
+    entryKind: CreditCardEntryKind;
   }[];
   installments: readonly {
     purchaseId: string;
@@ -326,7 +367,8 @@ export function calculateCreditCardCommitment(input: {
   let committedMinor = 0;
 
   for (const installment of input.installments) {
-    if (!purchaseById.has(installment.purchaseId)) continue;
+    const purchase = purchaseById.get(installment.purchaseId);
+    if (!purchase) continue;
     if (installment.competenceDate > lastInvoiceMonth) continue;
 
     const months =
@@ -335,14 +377,16 @@ export function calculateCreditCardCommitment(input: {
     months.add(installment.competenceDate);
     registeredMonthsByPurchase.set(installment.purchaseId, months);
     if (installment.status === "pending" || installment.status === "invoiced") {
+      const direction = purchase.entryKind === "purchase" ? 1 : -1;
       committedMinor = assertMinorUnits(
-        committedMinor + Math.max(0, assertMinorUnits(installment.amountMinor)),
+        committedMinor +
+          direction * Math.max(0, assertMinorUnits(installment.amountMinor)),
       );
     }
   }
 
   for (const purchase of input.purchases) {
-    if (!purchase.isRecurring) continue;
+    if (!purchase.isRecurring || purchase.entryKind !== "purchase") continue;
     const amountMinor = Math.max(0, assertMinorUnits(purchase.totalAmountMinor));
     const firstReference = parseIsoDate(
       getPurchaseReferenceMonth(purchase.purchaseDate, input.closingDay),
@@ -359,10 +403,11 @@ export function calculateCreditCardCommitment(input: {
     }
   }
 
+  const normalizedCommitment = Math.max(0, committedMinor);
   return {
     lastInvoiceMonth,
-    committedMinor,
-    availableMinor: assertMinorUnits(creditLimitMinor - committedMinor),
+    committedMinor: normalizedCommitment,
+    availableMinor: assertMinorUnits(creditLimitMinor - normalizedCommitment),
   };
 }
 
