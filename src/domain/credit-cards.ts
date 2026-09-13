@@ -276,6 +276,96 @@ export type CreditCardInvoiceForecastRow = {
   projected: boolean;
 };
 
+export type CreditCardCommitment = {
+  lastInvoiceMonth: string | null;
+  committedMinor: number;
+  availableMinor: number;
+};
+
+/**
+ * Consolida o limite comprometido somente ate a ultima fatura cadastrada.
+ * Assinaturas ativas completam os meses ainda nao materializados, sem recriar
+ * meses pagos ou cancelados que ja possuam uma parcela registrada.
+ */
+export function calculateCreditCardCommitment(input: {
+  creditLimitMinor: number;
+  invoices: readonly { referenceMonth: string }[];
+  purchases: readonly {
+    id: string;
+    totalAmountMinor: number;
+    purchaseDate: string;
+    isRecurring: boolean;
+  }[];
+  installments: readonly {
+    purchaseId: string;
+    amountMinor: number;
+    competenceDate: string;
+    status: "pending" | "invoiced" | "paid" | "cancelled";
+  }[];
+  closingDay: number;
+}): CreditCardCommitment {
+  const creditLimitMinor = Math.max(0, assertMinorUnits(input.creditLimitMinor));
+  const lastInvoiceMonth = input.invoices
+    .map((invoice) => invoice.referenceMonth)
+    .filter((referenceMonth) => /^\d{4}-\d{2}-01$/.test(referenceMonth))
+    .sort()
+    .at(-1) ?? null;
+
+  if (!lastInvoiceMonth) {
+    return {
+      lastInvoiceMonth: null,
+      committedMinor: 0,
+      availableMinor: creditLimitMinor,
+    };
+  }
+
+  const purchaseById = new Map(
+    input.purchases.map((purchase) => [purchase.id, purchase]),
+  );
+  const registeredMonthsByPurchase = new Map<string, Set<string>>();
+  let committedMinor = 0;
+
+  for (const installment of input.installments) {
+    if (!purchaseById.has(installment.purchaseId)) continue;
+    if (installment.competenceDate > lastInvoiceMonth) continue;
+
+    const months =
+      registeredMonthsByPurchase.get(installment.purchaseId) ??
+      new Set<string>();
+    months.add(installment.competenceDate);
+    registeredMonthsByPurchase.set(installment.purchaseId, months);
+    if (installment.status === "pending" || installment.status === "invoiced") {
+      committedMinor = assertMinorUnits(
+        committedMinor + Math.max(0, assertMinorUnits(installment.amountMinor)),
+      );
+    }
+  }
+
+  for (const purchase of input.purchases) {
+    if (!purchase.isRecurring) continue;
+    const amountMinor = Math.max(0, assertMinorUnits(purchase.totalAmountMinor));
+    const firstReference = parseIsoDate(
+      getPurchaseReferenceMonth(purchase.purchaseDate, input.closingDay),
+    );
+    const registeredMonths = registeredMonthsByPurchase.get(purchase.id) ?? new Set<string>();
+
+    for (let offset = 1; offset <= 240; offset += 1) {
+      const month = shiftMonth(firstReference.year, firstReference.month, offset);
+      const referenceMonth = boundedDayDate(month.year, month.month, 1);
+      if (referenceMonth > lastInvoiceMonth) break;
+      if (!registeredMonths.has(referenceMonth)) {
+        committedMinor = assertMinorUnits(committedMinor + amountMinor);
+      }
+    }
+  }
+
+  return {
+    lastInvoiceMonth,
+    committedMinor,
+    availableMinor: assertMinorUnits(creditLimitMinor - committedMinor),
+  };
+}
+
 export function buildCreditCardInvoiceForecast(input: {
   referenceMonth: string;
   months?: number;

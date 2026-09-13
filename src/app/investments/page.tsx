@@ -129,7 +129,9 @@ const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
 };
 
 const INVESTMENT_MATRIX_GRID =
-  "grid gap-x-8 lg:grid-cols-[minmax(24rem,2.45fr)_repeat(6,minmax(7rem,1fr))_auto]";
+  "grid lg:grid-cols-[minmax(21rem,2.6fr)_repeat(6,minmax(8.25rem,1fr))_3rem]";
+const INVESTMENT_METRIC_CELL =
+  "min-w-0 text-center lg:border-l lg:border-slate-200 lg:px-3";
 
 function InvestmentCompositionChart({
   positions,
@@ -297,7 +299,7 @@ function InvestmentSubtotalMetrics({
   return (
     <>
       {metrics.map((metric) => (
-        <div key={metric.label} className="min-w-0 px-1 text-center lg:px-3">
+        <div key={metric.label} className={INVESTMENT_METRIC_CELL}>
           <span className="block whitespace-nowrap text-[0.68rem] font-bold text-slate-500 lg:sr-only">
             {metric.label}
           </span>
@@ -485,13 +487,13 @@ function PositionsView({
         className={`${INVESTMENT_MATRIX_GRID} sticky top-0 z-20 hidden items-center border border-slate-300 bg-slate-100/95 px-3 py-1.5 text-center text-[0.68rem] font-bold text-slate-600 shadow-sm backdrop-blur lg:grid`}
       >
         <span className="text-left">Ativo</span>
-        <span>Valor atual</span>
-        <span>Custo</span>
-        <span>Resultado</span>
-        <span>Retorno total</span>
-        <span>Mês anterior</span>
-        <span>Participação</span>
-        <span className="text-right">Detalhes</span>
+        <span className={INVESTMENT_METRIC_CELL}>Valor atual</span>
+        <span className={INVESTMENT_METRIC_CELL}>Custo</span>
+        <span className={INVESTMENT_METRIC_CELL}>Resultado</span>
+        <span className={INVESTMENT_METRIC_CELL}>Retorno total</span>
+        <span className={INVESTMENT_METRIC_CELL}>Mês anterior</span>
+        <span className={INVESTMENT_METRIC_CELL}>Participação</span>
+        <span className={INVESTMENT_METRIC_CELL}>Detalhes</span>
       </div>
 
       {[...groups.values()]
@@ -526,7 +528,10 @@ function PositionsView({
                   performanceInputs={performanceInputs}
                   showArchived={showArchived}
                 />
-                <span className="hidden lg:block" aria-hidden="true" />
+                <span
+                  className={`${INVESTMENT_METRIC_CELL} hidden lg:block`}
+                  aria-hidden="true"
+                />
               </summary>
 
               {typeGroups.map(([investmentType, typePositions]) => (
@@ -546,7 +551,10 @@ function PositionsView({
                       performanceInputs={performanceInputs}
                       showArchived={showArchived}
                     />
-                    <span className="hidden lg:block" aria-hidden="true" />
+                    <span
+                      className={`${INVESTMENT_METRIC_CELL} hidden lg:block`}
+                      aria-hidden="true"
+                    />
                   </summary>
 
                   <div className="divide-y divide-slate-100">
@@ -566,19 +574,19 @@ function PositionsView({
                                 {position.asset_name}
                               </h3>
                             </div>
-                            <div className="px-1 text-center lg:px-3">
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Valor atual</p>
                               <p className="text-xs font-extrabold text-slate-950">
                                 {formatMoney(position.current_value_minor, position.currency, CURRENCY_LOCALES[position.currency])}
                               </p>
                             </div>
-                            <div className="px-1 text-center lg:px-3">
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Custo</p>
                               <p className="text-xs font-bold text-slate-800">
                                 {formatMoney(position.accumulated_cost_minor, position.currency, CURRENCY_LOCALES[position.currency])}
                               </p>
                             </div>
-                            <div className="px-1 text-center lg:px-3">
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Resultado</p>
                               <p className={`text-xs font-bold ${position.performance_result_minor < 0 ? "text-rose-700" : "text-emerald-700"}`}>
                                 {formatMoney(position.performance_result_minor, position.currency, CURRENCY_LOCALES[position.currency])}
@@ -587,21 +595,26 @@ function PositionsView({
                                 ) : null}
                               </p>
                             </div>
-                            <div className="px-1 text-center lg:px-3">
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Retorno total</p>
                               <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.total_return_basis_points)}</p>
                             </div>
-                            <div className="px-1 text-center lg:px-3">
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Mês anterior</p>
                               <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.previous_month_return_basis_points)}</p>
                             </div>
-                            <div className="px-1 text-center lg:px-3">
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Participação</p>
                               <p className="text-xs font-bold text-slate-800">
                                 {archived ? "Arquivada" : percentage(position.current_value_minor, total)}
                               </p>
                             </div>
-                            <span aria-hidden="true" className="text-right text-slate-400">▾</span>
+                            <span
+                              aria-hidden="true"
+                              className={`${INVESTMENT_METRIC_CELL} text-slate-400`}
+                            >
+                              ▾
+                            </span>
                           </summary>
 
                           <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
@@ -698,7 +711,7 @@ function FinancingsView({
           Importar PDF do banco
         </Link>
         <Link
-          href="/net-worth/new?itemType=financing"
+          href="/investments/financings/new"
           className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
         >
           Cadastrar manualmente

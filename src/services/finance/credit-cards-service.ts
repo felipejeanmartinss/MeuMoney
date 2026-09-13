@@ -1,8 +1,13 @@
 import "server-only";
+import { calculateCreditCardCommitment } from "@/domain/credit-cards";
 import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   CreditCardBrand,
+  CreditCardInstallment,
+  CreditCardInvoice,
+  CreditCardPurchase,
+  CreditCardSummary,
   SupportedCurrency,
 } from "@/types/database";
 import type { CreditCardTransferDestination } from "@/domain/transfers";
@@ -39,6 +44,46 @@ const invoiceColumns =
   "id, user_id, credit_card_id, reference_month, closing_date, due_date, status, total_amount, paid_amount, closed_at, paid_at, payment_account_id, payment_transaction_id, created_at, updated_at";
 const installmentColumns =
   "id, user_id, purchase_id, credit_card_id, invoice_id, installment_number, installment_count, amount, competence_date, status, created_at, updated_at";
+
+function withCalculatedCommitment(
+  card: CreditCardSummary,
+  purchases: readonly CreditCardPurchase[],
+  installments: readonly CreditCardInstallment[],
+  invoices: readonly CreditCardInvoice[],
+): CreditCardSummary {
+  const commitment = calculateCreditCardCommitment({
+    creditLimitMinor: coerceMinorUnits(card.credit_limit),
+    closingDay: card.closing_day,
+    invoices: invoices
+      .filter((invoice) => invoice.credit_card_id === card.id)
+      .map((invoice) => ({ referenceMonth: invoice.reference_month })),
+    purchases: purchases
+      .filter(
+        (purchase) =>
+          purchase.credit_card_id === card.id && purchase.status === "active",
+      )
+      .map((purchase) => ({
+        id: purchase.id,
+        totalAmountMinor: coerceMinorUnits(purchase.total_amount),
+        purchaseDate: purchase.purchase_date,
+        isRecurring: purchase.is_recurring,
+      })),
+    installments: installments
+      .filter((installment) => installment.credit_card_id === card.id)
+      .map((installment) => ({
+        purchaseId: installment.purchase_id,
+        amountMinor: coerceMinorUnits(installment.amount),
+        competenceDate: installment.competence_date,
+        status: installment.status,
+      })),
+  });
+
+  return {
+    ...card,
+    used_limit: commitment.committedMinor,
+    available_limit: commitment.availableMinor,
+  };
+}
 
 function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -103,7 +148,8 @@ export async function listCurrentUserTransferCreditCardDestinations() {
 
 export async function listCurrentUserCreditCards() {
   const { supabase, user } = await requireUser();
-  const [cardsResult, invoicesResult] = await Promise.all([
+  const [cardsResult, invoicesResult, purchasesResult, installmentsResult] =
+    await Promise.all([
     supabase
       .from("credit_card_summaries")
       .select(cardSummaryColumns)
@@ -114,14 +160,34 @@ export async function listCurrentUserCreditCards() {
       .from("credit_card_invoices")
       .select(invoiceColumns)
       .eq("user_id", user.id)
-      .neq("status", "paid")
       .order("reference_month"),
+    supabase
+      .from("credit_card_purchases")
+      .select(purchaseColumns)
+      .eq("user_id", user.id)
+      .eq("status", "active"),
+    supabase
+      .from("credit_card_installments")
+      .select(installmentColumns)
+      .eq("user_id", user.id),
   ]);
 
+  const invoices = invoicesResult.data ?? [];
+  const purchases = purchasesResult.data ?? [];
+  const installments = installmentsResult.data ?? [];
+  const cards = (cardsResult.data ?? []).map((card) =>
+    withCalculatedCommitment(card, purchases, installments, invoices),
+  );
+
   return {
-    cards: cardsResult.data ?? [],
-    invoices: invoicesResult.data ?? [],
-    hasError: Boolean(cardsResult.error || invoicesResult.error),
+    cards,
+    invoices: invoices.filter((invoice) => invoice.status !== "paid"),
+    hasError: Boolean(
+      cardsResult.error ||
+        invoicesResult.error ||
+        purchasesResult.error ||
+        installmentsResult.error,
+    ),
   };
 }
 
@@ -278,11 +344,21 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
         .select("id, parent_id, name")
         .eq("user_id", user.id),
     ]);
+  const purchases = purchasesResult.data ?? [];
+  const installments = installmentsResult.data ?? [];
+  const invoices = invoicesResult.data ?? [];
   return {
-    card: cardResult.data,
-    purchases: purchasesResult.data ?? [],
-    installments: installmentsResult.data ?? [],
-    invoices: invoicesResult.data ?? [],
+    card: cardResult.data
+      ? withCalculatedCommitment(
+          cardResult.data,
+          purchases,
+          installments,
+          invoices,
+        )
+      : null,
+    purchases,
+    installments,
+    invoices,
     categories: categoriesResult.data ?? [],
     hasError: Boolean(
       cardResult.error ||

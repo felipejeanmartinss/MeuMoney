@@ -87,8 +87,8 @@ export default async function CreditCardPage({
           <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
             {[
               ["Próxima fatura", nextOpenInvoice?.total_amount ?? 0],
+              ["Comprometido", card.used_limit],
               ["Limite disponível", card.available_limit],
-              ["Limite total", card.credit_limit],
             ].map(([label, value]) => (
               <div key={String(label)} className="min-w-36 text-right">
                 <p className="text-xs font-bold uppercase text-slate-400">

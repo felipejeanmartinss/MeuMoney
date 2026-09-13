@@ -34,14 +34,14 @@ export default function NewFinancingImportPage() {
           Prefere informar o histórico manualmente?
         </h2>
         <p className="mt-1 text-slate-600">
-          Cadastre o saldo devedor atual no patrimônio e use as observações
-          para registrar principal, juros, taxas e condições do contrato.
+          Cadastre contrato, taxas, saldos e cada parcela em uma tabela,
+          incluindo principal, juros, encargos e pagamentos.
         </p>
         <Link
-          href="/net-worth/new?itemType=financing"
+          href="/investments/financings/new"
           className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
         >
-          Cadastrar resumo manual
+          Cadastrar histórico manual
         </Link>
       </section>
 
