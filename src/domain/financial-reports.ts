@@ -13,6 +13,8 @@ export const FINANCIAL_REPORT_TYPES = [
   "fixed-expenses",
   "period-comparison",
   "asset-performance",
+  "asset-performance-general",
+  "net-worth-evolution",
 ] as const;
 
 export type FinancialReportType = (typeof FINANCIAL_REPORT_TYPES)[number];
@@ -21,7 +23,9 @@ export const FINANCIAL_REPORT_LABELS: Record<FinancialReportType, string> = {
   "income-expense": "Receitas x despesas",
   "fixed-expenses": "Despesas fixas",
   "period-comparison": "Comparativo entre períodos",
-  "asset-performance": "Performance de ativos",
+  "asset-performance": "Performance (ativos)",
+  "asset-performance-general": "Performance (geral)",
+  "net-worth-evolution": "Evolução patrimonial",
 };
 
 export const financialReportTypeSchema = z.enum(FINANCIAL_REPORT_TYPES);
@@ -68,6 +72,13 @@ export type IncomeExpenseReportRow = {
   incomeAmountMinor: number;
   expenseAmountMinor: number;
   resultAmountMinor: number;
+};
+
+export type NetWorthEvolutionReportRow = {
+  referenceMonth: string;
+  assetsMinor: number;
+  liabilitiesMinor: number;
+  netWorthMinor: number;
 };
 
 export function fillIncomeExpenseReportYear(
@@ -159,23 +170,34 @@ function reportHierarchy(entry: CategoryMonthlyReportEntry) {
   };
 }
 
-function compareMinorAscending(left: number, right: number) {
+function compareMinorDescending(left: number, right: number) {
   if (left === right) return 0;
-  return left < right ? -1 : 1;
+  return left > right ? -1 : 1;
 }
 
 export function buildMonthlyCategoryMatrix(
   year: number,
   entries: readonly CategoryMonthlyReportEntry[],
 ): MonthlyReportMatrixRow[] {
+  return buildMonthlyCategoryMatrixForMonths(
+    Array.from({ length: 12 }, (_, index) =>
+      `${year}-${String(index + 1).padStart(2, "0")}`,
+    ),
+    entries,
+  );
+}
+
+export function buildMonthlyCategoryMatrixForMonths(
+  months: readonly string[],
+  entries: readonly CategoryMonthlyReportEntry[],
+): MonthlyReportMatrixRow[] {
   const rows = new Map<string, MonthlyReportMatrixRow>();
+  const monthIndexes = new Map(months.map((month, index) => [month, index]));
 
   for (const entry of entries) {
     const amount = assertMinorUnits(entry.amountMinor);
-    const match = entry.referenceMonth.match(/^(\d{4})-(\d{2})/);
-    if (!match || Number(match[1]) !== year) continue;
-    const monthIndex = Number(match[2]) - 1;
-    if (monthIndex < 0 || monthIndex > 11) continue;
+    const monthIndex = monthIndexes.get(entry.referenceMonth.slice(0, 7));
+    if (monthIndex === undefined) continue;
 
     const key = `${entry.section}:${entry.rowId}`;
     const hierarchy = reportHierarchy(entry);
@@ -185,7 +207,7 @@ export function buildMonthlyCategoryMatrix(
       groupLabel: entry.groupLabel,
       label: entry.label,
       ...hierarchy,
-      monthAmountsMinor: Array.from({ length: 12 }, () => 0),
+      monthAmountsMinor: Array.from({ length: months.length }, () => 0),
       totalAmountMinor: 0,
     };
     row.monthAmountsMinor[monthIndex] = assertMinorUnits(
@@ -200,7 +222,7 @@ export function buildMonthlyCategoryMatrix(
       return left.section === "income" ? -1 : 1;
     }
     return (
-      compareMinorAscending(left.totalAmountMinor, right.totalAmountMinor) ||
+      compareMinorDescending(left.totalAmountMinor, right.totalAmountMinor) ||
       left.groupLabel.localeCompare(right.groupLabel, "pt-BR") ||
       left.label.localeCompare(right.label, "pt-BR")
     );
@@ -361,7 +383,7 @@ export function buildPeriodComparison(
         return left.section === "income" ? -1 : 1;
       }
       return (
-        compareMinorAscending(left.secondAmountMinor, right.secondAmountMinor) ||
+        compareMinorDescending(left.secondAmountMinor, right.secondAmountMinor) ||
         left.groupLabel.localeCompare(right.groupLabel, "pt-BR") ||
         left.label.localeCompare(right.label, "pt-BR")
       );

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isValidIsoDate } from "./dates";
-import { parseMoneyInputToMinor } from "./money";
+import { assertMinorUnits, parseMoneyInputToMinor } from "./money";
 import type {
   CreditCardBrand,
   CreditCardInvoiceStatus,
@@ -104,6 +104,16 @@ export const creditCardPurchaseFormSchema = z
     notes: optionalText(1000),
   })
   .superRefine((data, context) => {
+    if (
+      data.isRecurring &&
+      (data.installmentCount !== 1 || data.installmentAmounts.length !== 1)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentCount"],
+        message: "Assinaturas não possuem quantidade fixa de parcelas.",
+      });
+    }
     if (data.installmentCount > data.totalAmount) {
       context.addIssue({
         code: "custom",
@@ -257,4 +267,147 @@ export function effectiveInvoiceStatus(
   today: string,
 ): CreditCardInvoiceStatus {
   return status === "closed" && dueDate < today ? "overdue" : status;
+}
+
+export type CreditCardInvoiceForecastRow = {
+  referenceMonth: string;
+  amountMinor: number;
+  invoiceId: string | null;
+  projected: boolean;
+};
+
+export type CreditCardCommitment = {
+  lastInvoiceMonth: string | null;
+  committedMinor: number;
+  availableMinor: number;
+};
+
+/**
+ * Consolida o limite comprometido somente ate a ultima fatura cadastrada.
+ * Assinaturas ativas completam os meses ainda nao materializados, sem recriar
+ * meses pagos ou cancelados que ja possuam uma parcela registrada.
+ */
+export function calculateCreditCardCommitment(input: {
+  creditLimitMinor: number;
+  invoices: readonly { referenceMonth: string }[];
+  purchases: readonly {
+    id: string;
+    totalAmountMinor: number;
+    purchaseDate: string;
+    isRecurring: boolean;
+  }[];
+  installments: readonly {
+    purchaseId: string;
+    amountMinor: number;
+    competenceDate: string;
+    status: "pending" | "invoiced" | "paid" | "cancelled";
+  }[];
+  closingDay: number;
+}): CreditCardCommitment {
+  const creditLimitMinor = Math.max(0, assertMinorUnits(input.creditLimitMinor));
+  const lastInvoiceMonth = input.invoices
+    .map((invoice) => invoice.referenceMonth)
+    .filter((referenceMonth) => /^\d{4}-\d{2}-01$/.test(referenceMonth))
+    .sort()
+    .at(-1) ?? null;
+
+  if (!lastInvoiceMonth) {
+    return {
+      lastInvoiceMonth: null,
+      committedMinor: 0,
+      availableMinor: creditLimitMinor,
+    };
+  }
+
+  const purchaseById = new Map(
+    input.purchases.map((purchase) => [purchase.id, purchase]),
+  );
+  const registeredMonthsByPurchase = new Map<string, Set<string>>();
+  let committedMinor = 0;
+
+  for (const installment of input.installments) {
+    if (!purchaseById.has(installment.purchaseId)) continue;
+    if (installment.competenceDate > lastInvoiceMonth) continue;
+
+    const months =
+      registeredMonthsByPurchase.get(installment.purchaseId) ??
+      new Set<string>();
+    months.add(installment.competenceDate);
+    registeredMonthsByPurchase.set(installment.purchaseId, months);
+    if (installment.status === "pending" || installment.status === "invoiced") {
+      committedMinor = assertMinorUnits(
+        committedMinor + Math.max(0, assertMinorUnits(installment.amountMinor)),
+      );
+    }
+  }
+
+  for (const purchase of input.purchases) {
+    if (!purchase.isRecurring) continue;
+    const amountMinor = Math.max(0, assertMinorUnits(purchase.totalAmountMinor));
+    const firstReference = parseIsoDate(
+      getPurchaseReferenceMonth(purchase.purchaseDate, input.closingDay),
+    );
+    const registeredMonths = registeredMonthsByPurchase.get(purchase.id) ?? new Set<string>();
+
+    for (let offset = 1; offset <= 240; offset += 1) {
+      const month = shiftMonth(firstReference.year, firstReference.month, offset);
+      const referenceMonth = boundedDayDate(month.year, month.month, 1);
+      if (referenceMonth > lastInvoiceMonth) break;
+      if (!registeredMonths.has(referenceMonth)) {
+        committedMinor = assertMinorUnits(committedMinor + amountMinor);
+      }
+    }
+  }
+
+  return {
+    lastInvoiceMonth,
+    committedMinor,
+    availableMinor: assertMinorUnits(creditLimitMinor - committedMinor),
+  };
+}
+
+export function buildCreditCardInvoiceForecast(input: {
+  referenceMonth: string;
+  months?: number;
+  invoices: readonly {
+    id: string;
+    referenceMonth: string;
+    totalAmountMinor: number;
+  }[];
+  subscriptions: readonly {
+    amountMinor: number;
+    firstReferenceMonth: string;
+  }[];
+}): CreditCardInvoiceForecastRow[] {
+  const months = input.months ?? 6;
+  const start = parseIsoDate(input.referenceMonth);
+  if (!Number.isInteger(months) || months < 1 || months > 24) {
+    throw new Error("Quantidade de meses da projeção inválida.");
+  }
+  const invoiceByMonth = new Map(
+    input.invoices.map((invoice) => [invoice.referenceMonth, invoice]),
+  );
+
+  return Array.from({ length: months }, (_, index) => {
+    const shifted = shiftMonth(start.year, start.month, index);
+    const referenceMonth = boundedDayDate(shifted.year, shifted.month, 1);
+    const invoice = invoiceByMonth.get(referenceMonth);
+    const recurringProjection = input.subscriptions.reduce(
+      (total, subscription) =>
+        referenceMonth > subscription.firstReferenceMonth
+          ? total + subscription.amountMinor
+          : total,
+      0,
+    );
+    const amountMinor = assertMinorUnits(
+      assertMinorUnits(invoice?.totalAmountMinor ?? 0) +
+        assertMinorUnits(recurringProjection),
+    );
+    return {
+      referenceMonth,
+      amountMinor,
+      invoiceId: invoice?.id ?? null,
+      projected: !invoice || recurringProjection > 0,
+    };
+  });
 }

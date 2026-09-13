@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   calculateFinancingIndicators,
   FinancingImportError,
+  manualFinancingContractSchema,
   parseSupportedFinancingPdf,
+  simulateFinancing,
 } from "../src/domain/financing-imports";
 import type { PdfTextDocument } from "../src/domain/pdf-imports";
 
@@ -166,5 +168,115 @@ describe("financing PDF imports", () => {
     );
     expect(indexes).toContain("financing_contracts_net_worth_owner_fk_idx");
     expect(indexes).toContain("financing_schedule_contract_owner_fk_idx");
+  });
+
+  it("validates a manual financing history using integer minor units", () => {
+    const parsed = manualFinancingContractSchema.parse({
+      name: "Imóvel",
+      institution: "Bradesco",
+      contractReference: "ABC-1234",
+      productType: "financing",
+      context: "personal",
+      currency: "BRL",
+      amortizationSystem: "SAC",
+      indexer: "TR",
+      originalPrincipalMinor: "234.000,00",
+      originalTermMonths: "360",
+      contractDate: "2021-10-04",
+      releaseDate: "2021-12-22",
+      currentBalanceMinor: "179.770,94",
+      balanceDate: "2026-08-14",
+      nominalAnnualRate: "7,07",
+      effectiveAnnualRate: "7,30",
+      cetAnnualRate: "7,92",
+      schedule: JSON.stringify([
+        {
+          installmentNumber: "1",
+          dueDate: "2021-11-05",
+          totalAmountMinor: "2.148,06",
+          principalMinor: "650,00",
+          interestMinor: "1.378,65",
+          correctionFactor: "1,000000",
+          chargesMinor: "119,41",
+          outstandingBalanceMinor: "233.350,00",
+          paymentStatus: "paid",
+          paymentDate: "2021-11-05",
+          paidAmountMinor: "2.148,06",
+        },
+      ]),
+    });
+
+    expect(parsed.originalPrincipalMinor).toBe(23_400_000);
+    expect(parsed.currentBalanceMinor).toBe(17_977_094);
+    expect(parsed.schedule[0]).toMatchObject({
+      principalMinor: 65_000,
+      interestMinor: 137_865,
+      chargesMinor: 11_941,
+      correctionFactor: "1.000000",
+    });
+  });
+
+  it("ships an authenticated RPC for atomic manual financing creation", () => {
+    const migration = readFileSync(
+      resolve(
+        "supabase",
+        "migrations",
+        "20260912214419_card_commitment_and_manual_financing.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "create or replace function public.create_manual_financing_contract",
+    );
+    expect(migration).toContain("with (security_invoker = true)");
+    expect(migration).toContain(
+      "grant execute on function public.create_manual_financing_contract",
+    );
+  });
+
+  it("keeps the native PDF canvas runtime in the production server bundle", () => {
+    const nextConfig = readFileSync(resolve("next.config.ts"), "utf8");
+    const extractor = readFileSync(
+      resolve("src", "services", "finance", "pdf-text-extractor.ts"),
+      "utf8",
+    );
+
+    expect(nextConfig).toContain('"@napi-rs/canvas"');
+    expect(nextConfig).toContain('"pdfjs-dist"');
+    expect(extractor).toContain('import("@napi-rs/canvas")');
+  });
+
+  it("simulates SAC with a decreasing balance and optional extra amortization", () => {
+    const result = simulateFinancing({
+      principalMinor: 120_000,
+      annualRatePercent: 12,
+      termMonths: 12,
+      method: "sac",
+      extraAmortizationMinor: 10_000,
+      extraAmortizationMode: "term",
+    });
+
+    expect(result.rows.length).toBeLessThan(12);
+    expect(result.rows[0].interestMinor).toBeGreaterThan(
+      result.rows.at(-1)?.interestMinor ?? 0,
+    );
+    expect(result.rows.at(-1)?.balanceMinor).toBe(0);
+    expect(result.totalExtraAmortizationMinor).toBeGreaterThan(0);
+    expect(result.totalPrincipalMinor).toBe(120_000);
+  });
+
+  it("simulates PRICE with stable payments when no extra is applied", () => {
+    const result = simulateFinancing({
+      principalMinor: 100_000,
+      annualRatePercent: 12,
+      termMonths: 12,
+      method: "price",
+    });
+
+    expect(result.rows).toHaveLength(12);
+    expect(result.rows[0].paymentMinor).toBe(result.rows[1].paymentMinor);
+    expect(result.rows.at(-1)?.balanceMinor).toBe(0);
+    expect(result.totalPrincipalMinor).toBe(100_000);
   });
 });

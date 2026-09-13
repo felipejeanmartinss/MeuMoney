@@ -10,7 +10,7 @@ export default function RecurringTransactionsError({
 }) {
   return (
     <FinancialRouteError
-      title="Suas contas a pagar estão temporariamente indisponíveis"
+      title="Suas recorrências estão temporariamente indisponíveis"
       description="Tente carregar novamente. Se o problema continuar, confirme se todas as migrations do Supabase foram aplicadas na ordem."
       reset={reset}
     />

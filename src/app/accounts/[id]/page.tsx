@@ -85,7 +85,7 @@ export default async function AccountDetailPage({
     : "statement";
   const tabs = [
     { id: "statement", label: "Extrato" },
-    { id: "recurrences", label: "Contas a Pagar" },
+    { id: "recurrences", label: "Recorrências" },
     { id: "import", label: "Importar" },
   ];
 
@@ -220,12 +220,12 @@ export default async function AccountDetailPage({
               href={`/recurring-transactions/new?accountId=${account.id}`}
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white"
             >
-              Nova conta a pagar
+              Nova recorrência
             </Link>
           </div>
           {result.recurrences.length === 0 ? (
             <p className="px-5 py-10 text-center text-slate-500">
-              Nenhuma conta a pagar vinculada a esta conta.
+              Nenhuma recorrência vinculada a esta conta.
             </p>
           ) : (
             <div className="divide-y divide-slate-100">

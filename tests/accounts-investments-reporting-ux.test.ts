@@ -27,15 +27,23 @@ describe("accounts, investments and reporting UX", () => {
 
   it("uses one collapsible investment matrix with a sticky header and no UI pagination", () => {
     const page = readSource("src", "app", "investments", "page.tsx");
+    const positionForm = readSource(
+      "src",
+      "components",
+      "forms",
+      "investment-position-form.tsx",
+    );
 
     expect(page).toContain("INVESTMENT_MATRIX_GRID");
     expect(page).toContain("sticky top-0");
     expect(page).toContain("InvestmentCompositionChart");
     expect(page).toContain("Composição da carteira");
-    expect(page).toContain("Custo unitário");
-    expect(page).toContain("Valor unitário");
-    expect(page).toContain('position.investment_type === "stock"');
-    expect(page).toContain('position.investment_type === "fii"');
+    expect(page).not.toContain("Custo unitário");
+    expect(page).not.toContain("Valor unitário");
+    expect(positionForm).toContain("Custo unitário");
+    expect(positionForm).toContain("Cotação atual");
+    expect(positionForm).toContain('investmentType === "stock"');
+    expect(positionForm).toContain('investmentType === "fii"');
     expect(page).not.toContain("requestedPage");
     expect(page).not.toContain("pageCount");
   });
@@ -51,9 +59,48 @@ describe("accounts, investments and reporting UX", () => {
 
     expect(page).toContain("getCurrentProfile");
     expect(page).toContain("preferred_currency");
-    expect(page).toContain("Moeda de referência");
+    expect(page).toContain("Todas as moedas");
+    expect(page).toContain('<input type="hidden" name="currency" value={currency} />');
+    expect(page).not.toContain("Moeda de referência");
     expect(page).toContain("missingCurrencies");
     expect(service).toContain("convertMinorUnits");
+    expect(service).toContain('from("credit_card_invoices")');
+    expect(service).toContain("invoice.paid_at");
     expect(service).not.toContain('.eq("currency", input.currency)');
+  });
+
+  it("uses the latest registered invoice as the card commitment horizon", () => {
+    const migration = readSource(
+      "supabase",
+      "migrations",
+      "20260911090000_card_commitment_horizon.sql",
+    );
+
+    expect(migration).toContain("max(invoices.reference_month)");
+    expect(migration).toContain("installments.competence_date <= horizon.last_invoice_month");
+    expect(migration).toContain("purchases.is_recurring");
+    expect(migration).toContain("generate_series");
+    expect(migration).toContain("cards.credit_limit - coalesce(committed.used_amount, 0)");
+  });
+
+  it("keeps investment header, subtotals and assets on one shared column grid", () => {
+    const page = readSource("src", "app", "investments", "page.tsx");
+
+    expect(page).toContain("INVESTMENT_METRIC_CELL");
+    expect(page).toContain("repeat(6,minmax(8.25rem,1fr))");
+    expect(page).not.toContain("gap-x-8 lg:grid-cols");
+  });
+
+  it("keeps recurrence filters compact and collapsible", () => {
+    const page = readSource(
+      "src",
+      "app",
+      "recurring-transactions",
+      "page.tsx",
+    );
+
+    expect(page).toContain("group rounded-xl border");
+    expect(page).toContain('className="h-8 rounded-md border');
+    expect(page).toContain("Aplicar");
   });
 });

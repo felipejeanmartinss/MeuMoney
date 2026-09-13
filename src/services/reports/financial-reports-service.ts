@@ -2,9 +2,10 @@ import "server-only";
 
 import {
   buildMonthlyCategoryMatrix,
+  buildMonthlyCategoryMatrixForMonths,
   buildPeriodComparison,
-  fillIncomeExpenseReportYear,
   type CategoryMonthlyReportEntry,
+  type NetWorthEvolutionReportRow,
 } from "@/domain/financial-reports";
 import {
   convertMinorUnits,
@@ -89,6 +90,7 @@ async function loadCategoryMonthlyEntries(input: {
   currency: SupportedCurrency;
   basis: FinancialReportBasis;
   context: ReportContext;
+  sourceCurrencies: SupportedCurrency[];
 }) {
   const { supabase, user } = await requireUser();
   const loadAllReportRows = async () => {
@@ -136,6 +138,7 @@ async function loadCategoryMonthlyEntries(input: {
   );
   const missingCurrencies = new Set<SupportedCurrency>();
   const entries = result.data.flatMap((row): CategoryMonthlyReportEntry[] => {
+    if (!input.sourceCurrencies.includes(row.currency)) return [];
     const convertedAmount = convertMinorUnits(
       coerceMinorUnits(row.amount_minor),
       row.currency,
@@ -177,20 +180,32 @@ async function loadCategoryMonthlyEntries(input: {
   };
 }
 
+function reportMonths(startMonth: string, endMonth: string) {
+  const months: string[] = [];
+  const [startYear, start] = startMonth.split("-").map(Number);
+  const [endYear, end] = endMonth.split("-").map(Number);
+  const cursor = new Date(Date.UTC(startYear, start - 1, 1));
+  const limit = new Date(Date.UTC(endYear, end - 1, 1));
+  while (cursor <= limit && months.length < 600) {
+    months.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return months;
+}
+
 function monthlySummary(
-  year: number,
+  months: readonly string[],
   entries: readonly CategoryMonthlyReportEntry[],
 ) {
-  const rows = Array.from({ length: 12 }, (_, index) => ({
-    referenceMonth: `${year}-${String(index + 1).padStart(2, "0")}-01`,
+  const rows = months.map((month) => ({
+    referenceMonth: `${month}-01`,
     incomeAmountMinor: 0,
     expenseAmountMinor: 0,
     resultAmountMinor: 0,
   }));
   for (const entry of entries) {
-    if (!entry.referenceMonth.startsWith(String(year))) continue;
-    const index = Number(entry.referenceMonth.slice(5, 7)) - 1;
-    if (index < 0 || index > 11) continue;
+    const index = months.indexOf(entry.referenceMonth.slice(0, 7));
+    if (index < 0) continue;
     const field =
       entry.section === "income"
         ? "incomeAmountMinor"
@@ -202,23 +217,29 @@ function monthlySummary(
       rows[index].incomeAmountMinor - rows[index].expenseAmountMinor,
     );
   }
-  return fillIncomeExpenseReportYear(year, rows);
+  return rows;
 }
 
 export async function getCurrentUserIncomeExpenseMatrix(input: {
-  year: number;
+  startMonth: string;
+  endMonth: string;
   currency: SupportedCurrency;
   basis: FinancialReportBasis;
   context: ReportContext;
+  sourceCurrencies: SupportedCurrency[];
+  allDates?: boolean;
 }) {
   const source = await loadCategoryMonthlyEntries({
     ...input,
-    startMonth: `${input.year}-01`,
-    endMonth: `${input.year}-12`,
   });
+  const populatedMonths = [...new Set(source.entries.map((entry) => entry.referenceMonth.slice(0, 7)))].sort();
+  const months = input.allDates && populatedMonths.length
+    ? reportMonths(populatedMonths[0], populatedMonths.at(-1)!)
+    : reportMonths(input.startMonth, input.endMonth);
   return {
-    rows: monthlySummary(input.year, source.entries),
-    matrix: buildMonthlyCategoryMatrix(input.year, source.entries),
+    rows: monthlySummary(months, source.entries),
+    matrix: buildMonthlyCategoryMatrixForMonths(months, source.entries),
+    months,
     missingCurrencies: source.missingCurrencies,
     hasError: source.hasError,
   };
@@ -232,6 +253,7 @@ export async function getCurrentUserPeriodComparisonReport(input: {
   currency: SupportedCurrency;
   basis: FinancialReportBasis;
   context: ReportContext;
+  sourceCurrencies: SupportedCurrency[];
 }) {
   const startMonth = [input.firstStart, input.secondStart].sort()[0];
   const endMonth = [input.firstEnd, input.secondEnd].sort().at(-1)!;
@@ -241,6 +263,7 @@ export async function getCurrentUserPeriodComparisonReport(input: {
     currency: input.currency,
     basis: input.basis,
     context: input.context,
+    sourceCurrencies: input.sourceCurrencies,
   });
   return {
     rows: buildPeriodComparison(source.entries, input),
@@ -254,6 +277,7 @@ export async function getCurrentUserFixedExpenseReport(input: {
   currency: SupportedCurrency;
   basis: FinancialReportBasis;
   context: ReportContext;
+  sourceCurrencies: SupportedCurrency[];
 }) {
   const source = await loadCategoryMonthlyEntries({
     ...input,
@@ -275,6 +299,7 @@ export async function getCurrentUserAssetPerformanceReport(input: {
   currency: SupportedCurrency;
   context: ReportContext;
   state: "active" | "all";
+  sourceCurrencies: SupportedCurrency[];
 }) {
   const [{ supabase, user }, result] = await Promise.all([
     requireUser(),
@@ -294,7 +319,8 @@ export async function getCurrentUserAssetPerformanceReport(input: {
   const positions = result.positions.flatMap((position) => {
     if (
       (input.context !== "all" && position.context !== input.context) ||
-      (input.state !== "all" && !position.is_active)
+      (input.state !== "all" && !position.is_active) ||
+      !input.sourceCurrencies.includes(position.currency)
     ) {
       return [];
     }
@@ -348,6 +374,16 @@ export async function getCurrentUserAssetPerformanceReport(input: {
       performanceInput,
       positionCashFlows,
     );
+    const convertedFlowTotal = (
+      type: InvestmentPerformanceCashFlow["type"],
+    ) =>
+      positionCashFlows.reduce(
+        (total, cashFlow) =>
+          cashFlow.type === type
+            ? coerceMinorUnits(total + cashFlow.amountMinor)
+            : total,
+        0,
+      );
     const convertCurrent = (value: number) =>
       convertMinorUnits(
         value,
@@ -361,9 +397,9 @@ export async function getCurrentUserAssetPerformanceReport(input: {
       currency: input.currency,
       current_value_minor: currentValueMinor,
       accumulated_cost_minor: accumulatedCostMinor,
-      contributions_minor: convertCurrent(position.contributions_minor),
-      redemptions_minor: convertCurrent(position.redemptions_minor),
-      income_minor: convertCurrent(position.income_minor),
+      contributions_minor: convertedFlowTotal("contribution"),
+      redemptions_minor: convertedFlowTotal("redemption"),
+      income_minor: convertedFlowTotal("income"),
       unrealized_appreciation_minor: convertCurrent(
         position.unrealized_appreciation_minor,
       ),
@@ -416,5 +452,167 @@ export async function getCurrentUserAssetPerformanceReport(input: {
     performanceByClass,
     missingCurrencies: [...missingCurrencies],
     hasError: result.hasError || conversionResult.hasError,
+  };
+}
+
+export async function getCurrentUserNetWorthEvolutionReport(input: {
+  startMonth: string;
+  endMonth: string;
+  currency: SupportedCurrency;
+  context: ReportContext;
+  sourceCurrencies: SupportedCurrency[];
+  allDates?: boolean;
+}) {
+  const { supabase, user } = await requireUser();
+  const [
+    accountsResult,
+    transactionsResult,
+    transfersResult,
+    itemsResult,
+    valuationsResult,
+    positionsResult,
+    snapshotsResult,
+    cardsResult,
+    invoicesResult,
+    conversionResult,
+  ] = await Promise.all([
+    supabase.from("accounts").select("id, currency, context, opening_balance_minor, opening_balance_date, archived_at").eq("user_id", user.id),
+    supabase.from("transactions").select("account_id, transaction_type, amount_minor, transaction_date, status, is_active").eq("user_id", user.id).eq("is_active", true),
+    supabase.from("transfer_entries").select("account_id, direction, amount_minor, transaction_date, status, is_active").eq("user_id", user.id).eq("is_active", true),
+    supabase.from("net_worth_items").select("id, kind, currency, context, archived_at").eq("user_id", user.id),
+    supabase.from("net_worth_valuations").select("item_id, value_minor, valuation_date").eq("user_id", user.id).order("valuation_date"),
+    supabase.from("investment_positions").select("id, currency, context, archived_at").eq("user_id", user.id),
+    supabase.from("investment_position_snapshots").select("position_id, current_value_minor, position_date").eq("user_id", user.id).order("position_date"),
+    supabase.from("credit_cards").select("id, currency, linked_account_id").eq("user_id", user.id).eq("is_active", true),
+    supabase.from("credit_card_invoices").select("credit_card_id, reference_month, total_amount, paid_at").eq("user_id", user.id).order("reference_month"),
+    loadCurrencyConversionSamples(supabase, user.id),
+  ]);
+  const accounts = (accountsResult.data ?? []).filter(
+    (row) => input.sourceCurrencies.includes(row.currency) && (input.context === "all" || row.context === input.context),
+  );
+  const items = (itemsResult.data ?? []).filter(
+    (row) => input.sourceCurrencies.includes(row.currency) && (input.context === "all" || row.context === input.context),
+  );
+  const positions = (positionsResult.data ?? []).filter(
+    (row) => input.sourceCurrencies.includes(row.currency) && (input.context === "all" || row.context === input.context),
+  );
+  const accountContext = new Map(
+    (accountsResult.data ?? []).map((row) => [row.id, row.context]),
+  );
+  const cards = (cardsResult.data ?? []).filter(
+    (row) =>
+      input.sourceCurrencies.includes(row.currency) &&
+      (input.context === "all" ||
+        (row.linked_account_id
+          ? accountContext.get(row.linked_account_id) === input.context
+          : input.context === "personal")),
+  );
+  const itemCurrency = new Map(items.map((row) => [row.id, row.currency]));
+  const positionCurrency = new Map(positions.map((row) => [row.id, row.currency]));
+  const accountIds = new Set(accounts.map((row) => row.id));
+  const itemIds = new Set(items.map((row) => row.id));
+  const positionIds = new Set(positions.map((row) => row.id));
+  const cardIds = new Set(cards.map((row) => row.id));
+  const missingCurrencies = new Set<SupportedCurrency>();
+  const today = currentIsoDate();
+  const convert = (amount: number, sourceCurrency: SupportedCurrency, date: string) => {
+    const value = convertMinorUnits(amount, sourceCurrency, input.currency, date, conversionResult.samples);
+    if (value === null) missingCurrencies.add(sourceCurrency);
+    return value ?? 0;
+  };
+  const datedMonths = [
+    ...accounts.map((row) => row.opening_balance_date.slice(0, 7)),
+    ...(transactionsResult.data ?? []).flatMap((row) =>
+      accountIds.has(row.account_id) ? [row.transaction_date.slice(0, 7)] : [],
+    ),
+    ...(transfersResult.data ?? []).flatMap((row) =>
+      accountIds.has(row.account_id) ? [row.transaction_date.slice(0, 7)] : [],
+    ),
+    ...(valuationsResult.data ?? []).flatMap((row) =>
+      itemIds.has(row.item_id) ? [row.valuation_date.slice(0, 7)] : [],
+    ),
+    ...(snapshotsResult.data ?? []).flatMap((row) =>
+      positionIds.has(row.position_id) ? [row.position_date.slice(0, 7)] : [],
+    ),
+    ...(invoicesResult.data ?? []).flatMap((row) =>
+      cardIds.has(row.credit_card_id) ? [row.reference_month.slice(0, 7)] : [],
+    ),
+  ].sort();
+  const months = input.allDates && datedMonths.length
+    ? reportMonths(datedMonths[0], datedMonths.at(-1)!)
+    : reportMonths(input.startMonth, input.endMonth);
+  const rows = months.map((month): NetWorthEvolutionReportRow => {
+    const endDate = `${month}-${String(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()).padStart(2, "0")}`;
+    let assetsMinor = 0;
+    let liabilitiesMinor = 0;
+    for (const account of accounts) {
+      if (account.opening_balance_date > endDate || (account.archived_at && account.archived_at.slice(0, 10) <= endDate)) continue;
+      let balance = coerceMinorUnits(account.opening_balance_minor);
+      for (const transaction of transactionsResult.data ?? []) {
+        if (
+          transaction.account_id !== account.id ||
+          transaction.transaction_date > endDate ||
+          (transaction.transaction_date < today &&
+            transaction.status !== "completed")
+        ) continue;
+        const amount = coerceMinorUnits(transaction.amount_minor);
+        balance = coerceMinorUnits(balance + (transaction.transaction_type === "income" ? amount : -amount));
+      }
+      for (const transfer of transfersResult.data ?? []) {
+        if (
+          transfer.account_id !== account.id ||
+          transfer.transaction_date > endDate ||
+          (transfer.transaction_date < today && transfer.status !== "completed")
+        ) continue;
+        const amount = coerceMinorUnits(transfer.amount_minor);
+        balance = coerceMinorUnits(balance + (transfer.direction === "inflow" ? amount : -amount));
+      }
+      assetsMinor = coerceMinorUnits(assetsMinor + convert(balance, account.currency, endDate));
+    }
+    for (const item of items) {
+      if (item.archived_at && item.archived_at.slice(0, 10) <= endDate) continue;
+      const valuation = (valuationsResult.data ?? []).filter((row) => row.item_id === item.id && row.valuation_date <= endDate).at(-1);
+      if (!valuation) continue;
+      const amount = convert(coerceMinorUnits(valuation.value_minor), itemCurrency.get(item.id)!, endDate);
+      if (item.kind === "asset") assetsMinor = coerceMinorUnits(assetsMinor + amount);
+      else liabilitiesMinor = coerceMinorUnits(liabilitiesMinor + amount);
+    }
+    for (const position of positions) {
+      if (position.archived_at && position.archived_at.slice(0, 10) <= endDate) continue;
+      const snapshot = (snapshotsResult.data ?? []).filter((row) => row.position_id === position.id && row.position_date <= endDate).at(-1);
+      if (!snapshot) continue;
+      assetsMinor = coerceMinorUnits(assetsMinor + convert(coerceMinorUnits(snapshot.current_value_minor), positionCurrency.get(position.id)!, endDate));
+    }
+    for (const card of cards) {
+      const outstanding = (invoicesResult.data ?? []).reduce((total, invoice) => {
+        if (
+          invoice.credit_card_id !== card.id ||
+          invoice.reference_month > endDate ||
+          (invoice.paid_at && invoice.paid_at.slice(0, 10) <= endDate)
+        ) {
+          return total;
+        }
+        return coerceMinorUnits(total + coerceMinorUnits(invoice.total_amount));
+      }, 0);
+      liabilitiesMinor = coerceMinorUnits(
+        liabilitiesMinor + convert(outstanding, card.currency, endDate),
+      );
+    }
+    return {
+      referenceMonth: month,
+      assetsMinor,
+      liabilitiesMinor,
+      netWorthMinor: coerceMinorUnits(assetsMinor - liabilitiesMinor),
+    };
+  });
+  return {
+    rows,
+    missingCurrencies: [...missingCurrencies],
+    hasError: Boolean(
+      accountsResult.error || transactionsResult.error || transfersResult.error ||
+      itemsResult.error || valuationsResult.error || positionsResult.error ||
+      snapshotsResult.error || cardsResult.error || invoicesResult.error ||
+      conversionResult.hasError,
+    ),
   };
 }

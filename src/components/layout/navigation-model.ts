@@ -98,7 +98,7 @@ export const SECONDARY_NAVIGATION: Record<
     },
     {
       href: "/recurring-transactions",
-      label: "Contas a Pagar",
+      label: "Recorrências",
       icon: "recurring",
       match: ["/recurring-transactions"],
     },

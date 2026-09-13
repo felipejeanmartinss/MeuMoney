@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   boundedDayDate,
+  buildCreditCardInvoiceForecast,
+  calculateCreditCardCommitment,
   creditCardPurchaseFormSchema,
   effectiveInvoiceStatus,
   getInvoiceDueDate,
@@ -73,7 +75,7 @@ describe("editable installment purchases", () => {
     purchaseDate: "2026-09-07",
     installmentCount: "3",
     installmentAmounts: ["33,33", "33,33", "33,34"],
-    isRecurring: true,
+    isRecurring: false,
     notes: "",
   };
 
@@ -82,7 +84,7 @@ describe("editable installment purchases", () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.installmentAmounts).toEqual([3333, 3333, 3334]);
-      expect(parsed.data.isRecurring).toBe(true);
+      expect(parsed.data.isRecurring).toBe(false);
     }
   });
 
@@ -92,6 +94,111 @@ describe("editable installment purchases", () => {
       installmentAmounts: ["33,33", "33,33", "33,33"],
     });
     expect(parsed.success).toBe(false);
+  });
+
+  it("keeps subscriptions without a fixed installment count", () => {
+    expect(
+      creditCardPurchaseFormSchema.safeParse({
+        ...purchase,
+        installmentCount: "1",
+        installmentAmounts: ["100,00"],
+        isRecurring: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      creditCardPurchaseFormSchema.safeParse({ ...purchase, isRecurring: true })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("credit card invoice forecast", () => {
+  it("keeps fixed installments and projects subscriptions for six months", () => {
+    const rows = buildCreditCardInvoiceForecast({
+      referenceMonth: "2026-09-01",
+      invoices: [
+        { id: "invoice", referenceMonth: "2026-09-01", totalAmountMinor: 150_00 },
+        { id: "installment", referenceMonth: "2026-10-01", totalAmountMinor: 50_00 },
+      ],
+      subscriptions: [{ amountMinor: 100_00, firstReferenceMonth: "2026-09-01" }],
+    });
+    expect(rows.map((row) => row.amountMinor)).toEqual([
+      150_00,
+      150_00,
+      100_00,
+      100_00,
+      100_00,
+      100_00,
+    ]);
+  });
+});
+
+describe("credit card commitment horizon", () => {
+  const purchases = [
+    {
+      id: "fixed",
+      totalAmountMinor: 300_00,
+      purchaseDate: "2026-09-07",
+      isRecurring: false,
+    },
+    {
+      id: "subscription",
+      totalAmountMinor: 50_00,
+      purchaseDate: "2026-09-07",
+      isRecurring: true,
+    },
+  ];
+
+  it("limits installments and subscriptions to the last registered invoice", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 1_000_00,
+      closingDay: 20,
+      invoices: [
+        { referenceMonth: "2026-09-01" },
+        { referenceMonth: "2026-11-01" },
+      ],
+      purchases,
+      installments: [
+        { purchaseId: "fixed", amountMinor: 100_00, competenceDate: "2026-09-01", status: "paid" },
+        { purchaseId: "fixed", amountMinor: 100_00, competenceDate: "2026-10-01", status: "pending" },
+        { purchaseId: "fixed", amountMinor: 100_00, competenceDate: "2026-11-01", status: "pending" },
+        { purchaseId: "subscription", amountMinor: 50_00, competenceDate: "2026-09-01", status: "pending" },
+        { purchaseId: "fixed", amountMinor: 100_00, competenceDate: "2026-12-01", status: "pending" },
+      ],
+    });
+
+    expect(result.lastInvoiceMonth).toBe("2026-11-01");
+    expect(result.committedMinor).toBe(350_00);
+    expect(result.availableMinor).toBe(650_00);
+  });
+
+  it("does not project a paid subscription month again", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 500_00,
+      closingDay: 20,
+      invoices: [{ referenceMonth: "2026-10-01" }],
+      purchases: [purchases[1]],
+      installments: [
+        { purchaseId: "subscription", amountMinor: 50_00, competenceDate: "2026-09-01", status: "paid" },
+        { purchaseId: "subscription", amountMinor: 50_00, competenceDate: "2026-10-01", status: "paid" },
+      ],
+    });
+
+    expect(result.committedMinor).toBe(0);
+    expect(result.availableMinor).toBe(500_00);
+  });
+
+  it("returns the full limit when no invoice horizon exists", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 210_00,
+      closingDay: 20,
+      invoices: [],
+      purchases,
+      installments: [],
+    });
+
+    expect(result.committedMinor).toBe(0);
+    expect(result.availableMinor).toBe(210_00);
   });
 });
 

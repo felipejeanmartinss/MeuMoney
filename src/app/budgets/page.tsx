@@ -10,12 +10,8 @@ import {
   toReferenceMonth,
 } from "@/domain/budgets";
 import { getCategoryDisplayName } from "@/domain/categories";
-import {
-  CURRENCY_LABELS,
-  CURRENCY_LOCALES,
-  SUPPORTED_CURRENCIES,
-} from "@/domain/currencies";
-import { formatMoney } from "@/domain/money";
+import { CURRENCY_LOCALES } from "@/domain/currencies";
+import { getCurrentProfile } from "@/services/auth/server-auth";
 import {
   getCurrentUserAnnualBudget,
   getCurrentUserMonthlyBudget,
@@ -28,6 +24,14 @@ const messages: Record<string, string> = {
   saved: "Orçamento atualizado com sucesso.",
   "copy-error": "Não foi possível copiar o orçamento anterior.",
 };
+
+function formatBudgetMoney(value: number, currency: string, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Math.round(value / 100));
+}
 
 function formatPercentage(value: number | null) {
   return value === null
@@ -60,18 +64,20 @@ export default async function BudgetsPage({
   }>;
 }) {
   const params = await searchParams;
+  const { profile } = await getCurrentProfile();
+  const preferredCurrency = profile?.preferred_currency ?? "BRL";
   const currentMonth = currentReferenceMonth();
   const parsedFilters = budgetFilterSchema.safeParse({
     month: params.month ?? currentMonth,
     context: params.context ?? "personal",
-    currency: params.currency ?? "BRL",
+    currency: preferredCurrency,
   });
   const filters = parsedFilters.success
     ? parsedFilters.data
     : {
         month: currentMonth,
         context: "personal" as const,
-        currency: "BRL" as const,
+        currency: preferredCurrency,
       };
   const parsedYear = Number(params.year ?? filters.month.slice(0, 4));
   const year =
@@ -120,7 +126,6 @@ export default async function BudgetsPage({
   const locale = CURRENCY_LOCALES[filters.currency];
   const commonQuery = {
     context: filters.context,
-    currency: filters.currency,
   };
   const monthlyHref = `/budgets?${new URLSearchParams({
     ...commonQuery,
@@ -173,8 +178,7 @@ export default async function BudgetsPage({
             Orçamentos
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Receitas e despesas planejadas, sempre separadas por contexto e
-            moeda.
+            Receitas e despesas planejadas na moeda preferencial do perfil.
           </p>
         </div>
         <nav
@@ -207,7 +211,7 @@ export default async function BudgetsPage({
       </header>
 
       <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <form method="get" className="grid gap-3 sm:grid-cols-4 sm:items-end">
+        <form method="get" className="grid gap-3 sm:grid-cols-3 sm:items-end">
           <input type="hidden" name="view" value={view} />
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             {view === "annual" ? "Ano" : "Mês"}
@@ -230,20 +234,6 @@ export default async function BudgetsPage({
               {FINANCIAL_CONTEXTS.map((context) => (
                 <option key={context} value={context}>
                   {CONTEXT_LABELS[context]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-semibold text-slate-700">
-            Moeda
-            <select
-              name="currency"
-              defaultValue={filters.currency}
-              className="min-h-10 rounded-lg border border-slate-300 px-3"
-            >
-              {SUPPORTED_CURRENCIES.map((currency) => (
-                <option key={currency} value={currency}>
-                  {CURRENCY_LABELS[currency]}
                 </option>
               ))}
             </select>
@@ -309,7 +299,7 @@ export default async function BudgetsPage({
                 <p
                   className={`mt-1 text-lg font-black tabular-nums ${color}`}
                 >
-                  {formatMoney(Number(amount), filters.currency, locale)}
+                  {formatBudgetMoney(Number(amount), filters.currency, locale)}
                 </p>
               </article>
             ))}
@@ -418,14 +408,14 @@ export default async function BudgetsPage({
                                 : "Despesa"}
                             </td>
                             <td className="px-3 py-2 text-right tabular-nums">
-                              {formatMoney(
+                              {formatBudgetMoney(
                                 row.planned_amount_minor,
                                 filters.currency,
                                 locale,
                               )}
                             </td>
                             <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                              {formatMoney(
+                              {formatBudgetMoney(
                                 row.realized_amount_minor,
                                 filters.currency,
                                 locale,
@@ -438,7 +428,7 @@ export default async function BudgetsPage({
                                   : "text-emerald-700"
                               }`}
                             >
-                              {formatMoney(
+                              {formatBudgetMoney(
                                 row.available_amount_minor,
                                 filters.currency,
                                 locale,

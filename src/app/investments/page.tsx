@@ -42,6 +42,7 @@ const messages: Record<string, string> = {
   "delete-error": "Não foi possível excluir a posição de investimento.",
   "import-cancelled": "Prévia de financiamento cancelada.",
   "import-error": "Não foi possível concluir a importação do financiamento.",
+  "prices-updated": "Cotações e valores atuais atualizados.",
 };
 
 function formatDate(value: string) {
@@ -90,11 +91,8 @@ function groupPositionsByType(
     rows.push(position);
     groups.set(position.investment_type, rows);
   }
-  return [...groups.entries()].sort(([left], [right]) =>
-    INVESTMENT_TYPE_LABELS[left].localeCompare(
-      INVESTMENT_TYPE_LABELS[right],
-      "pt-BR",
-    ),
+  return [...groups.entries()].sort(
+    ([, left], [, right]) => currentValueOf(right) - currentValueOf(left),
   );
 }
 
@@ -111,7 +109,9 @@ function groupPositionsByFamily(
     rows.push(position);
     groups.set(family, rows);
   }
-  return [...groups.entries()];
+  return [...groups.entries()].sort(
+    ([, left], [, right]) => currentValueOf(right) - currentValueOf(left),
+  );
 }
 
 const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
@@ -129,21 +129,9 @@ const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
 };
 
 const INVESTMENT_MATRIX_GRID =
-  "grid gap-x-5 lg:grid-cols-[minmax(30rem,2.5fr)_repeat(6,minmax(6.5rem,1fr))_auto]";
-
-function formatInvestmentUnitValue(
-  totalMinor: number,
-  quantity: string,
-  currency: SupportedCurrency,
-) {
-  const numericQuantity = Number(quantity);
-  if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return "—";
-  return formatMoney(
-    Math.round(totalMinor / numericQuantity),
-    currency,
-    CURRENCY_LOCALES[currency],
-  );
-}
+  "grid lg:grid-cols-[minmax(21rem,2.6fr)_repeat(6,minmax(8.25rem,1fr))_3rem]";
+const INVESTMENT_METRIC_CELL =
+  "min-w-0 text-center lg:border-l lg:border-slate-200 lg:px-3";
 
 function InvestmentCompositionChart({
   positions,
@@ -176,54 +164,41 @@ function InvestmentCompositionChart({
           {currency}
         </span>
       </div>
-      <div
-        role="img"
-        aria-label={`Composição percentual da carteira em ${currency}`}
-        className="mt-4 flex h-5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200"
-      >
-        {segments.map((segment) => (
-          <span
-            key={`${segment.family}:${segment.investmentType}`}
-            title={`${INVESTMENT_TYPE_LABELS[segment.investmentType]}: ${percentage(segment.value, total)}`}
-            className={`${INVESTMENT_TYPE_COLORS[segment.investmentType]} min-w-px border-r border-white/80 last:border-r-0`}
-            style={{
-              width: total === 0 ? "0%" : `${(segment.value / total) * 100}%`,
-            }}
-          />
-        ))}
-      </div>
-      <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-        {families.map(([family, familyPositions]) => (
-          <div key={family} className="min-w-0">
-            <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-900">
-              <span>{INVESTMENT_FAMILY_LABELS[family]}</span>
-              <span>{percentage(currentValueOf(familyPositions), total)}</span>
-            </div>
-            <ul className="mt-1.5 grid gap-1 text-[0.68rem] text-slate-600">
-              {groupPositionsByType(familyPositions).map(
-                ([investmentType, typePositions]) => (
-                  <li
-                    key={investmentType}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className={`size-2.5 shrink-0 rounded-sm ${INVESTMENT_TYPE_COLORS[investmentType]}`}
-                      />
-                      <span className="truncate">
-                        {INVESTMENT_TYPE_LABELS[investmentType]}
-                      </span>
-                    </span>
-                    <strong className="shrink-0 text-slate-800">
-                      {percentage(currentValueOf(typePositions), total)}
-                    </strong>
+      <div className="mt-3 grid items-center gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(13rem,0.8fr)]">
+        <div
+          role="img"
+          aria-label={`Composição percentual da carteira em ${currency}`}
+          className="flex h-8 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-inset ring-slate-200"
+        >
+          {segments.map((segment) => {
+            const share = total === 0 ? 0 : (segment.value / total) * 100;
+            return (
+              <span
+                key={`${segment.family}:${segment.investmentType}`}
+                title={`${INVESTMENT_TYPE_LABELS[segment.investmentType]}: ${percentage(segment.value, total)}`}
+                className={`${INVESTMENT_TYPE_COLORS[segment.investmentType]} flex min-w-px items-center justify-center border-r border-white/80 text-[0.62rem] font-black text-white last:border-r-0`}
+                style={{ width: `${share}%` }}
+              >
+                {share >= 5 ? percentage(segment.value, total) : null}
+              </span>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[0.7rem] text-slate-700">
+          {families.map(([family, familyPositions]) => (
+            <div key={family} className="min-w-0">
+              <p className="mb-1 font-black text-slate-900">{INVESTMENT_FAMILY_LABELS[family]}</p>
+              <ul className="grid gap-1">
+                {groupPositionsByType(familyPositions).map(([investmentType]) => (
+                  <li key={investmentType} className="flex min-w-0 items-center gap-2">
+                    <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm ${INVESTMENT_TYPE_COLORS[investmentType]}`} />
+                    <span className="truncate">{INVESTMENT_TYPE_LABELS[investmentType]}</span>
                   </li>
-                ),
-              )}
-            </ul>
-          </div>
-        ))}
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </div>
     </article>
   );
@@ -322,18 +297,18 @@ function InvestmentSubtotalMetrics({
   ];
 
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[0.66rem] sm:grid-cols-3 lg:col-span-6 lg:grid-cols-subgrid lg:gap-x-5">
+    <>
       {metrics.map((metric) => (
-        <div key={metric.label} className="min-w-0">
-          <dt className="whitespace-nowrap font-semibold text-slate-500 lg:sr-only">
+        <div key={metric.label} className={INVESTMENT_METRIC_CELL}>
+          <span className="block whitespace-nowrap text-[0.68rem] font-bold text-slate-500 lg:sr-only">
             {metric.label}
-          </dt>
-          <dd className={`truncate font-extrabold ${metric.tone}`}>
+          </span>
+          <span className={`block whitespace-nowrap truncate text-xs font-extrabold ${metric.tone}`}>
             {metric.value}
-          </dd>
+          </span>
         </div>
       ))}
-    </dl>
+    </>
   );
 }
 
@@ -508,26 +483,28 @@ function PositionsView({
         </section>
       ) : null}
 
-      {[...groups.values()].map((group) => {
+      <div
+        className={`${INVESTMENT_MATRIX_GRID} sticky top-0 z-20 hidden items-center border border-slate-300 bg-slate-100/95 px-3 py-1.5 text-center text-[0.68rem] font-bold text-slate-600 shadow-sm backdrop-blur lg:grid`}
+      >
+        <span className="text-left">Ativo</span>
+        <span className={INVESTMENT_METRIC_CELL}>Valor atual</span>
+        <span className={INVESTMENT_METRIC_CELL}>Custo</span>
+        <span className={INVESTMENT_METRIC_CELL}>Resultado</span>
+        <span className={INVESTMENT_METRIC_CELL}>Retorno total</span>
+        <span className={INVESTMENT_METRIC_CELL}>Mês anterior</span>
+        <span className={INVESTMENT_METRIC_CELL}>Participação</span>
+        <span className={INVESTMENT_METRIC_CELL}>Detalhes</span>
+      </div>
+
+      {[...groups.values()]
+        .sort((left, right) => currentValueOf(right.rows) - currentValueOf(left.rows))
+        .map((group) => {
         const typeGroups = groupPositionsByType(group.rows);
         return (
           <section
             key={`${group.currency}-${group.family}`}
             className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
           >
-            <div
-              className={`${INVESTMENT_MATRIX_GRID} sticky top-0 z-10 hidden items-center border-b border-slate-300 bg-slate-100/95 px-3 py-1.5 text-[0.66rem] font-bold text-slate-600 backdrop-blur lg:grid`}
-            >
-              <span>Ativo</span>
-              <span>Valor atual</span>
-              <span>Custo</span>
-              <span>Resultado</span>
-              <span>Retorno total</span>
-              <span>Mês anterior</span>
-              <span>Participação</span>
-              <span className="text-right">Detalhes</span>
-            </div>
-
             <details open>
               <summary
                 className={`${INVESTMENT_MATRIX_GRID} cursor-pointer list-none items-center gap-y-2 border-b border-slate-200 px-3 py-2 marker:hidden lg:grid`}
@@ -551,7 +528,10 @@ function PositionsView({
                   performanceInputs={performanceInputs}
                   showArchived={showArchived}
                 />
-                <span className="hidden lg:block" aria-hidden="true" />
+                <span
+                  className={`${INVESTMENT_METRIC_CELL} hidden lg:block`}
+                  aria-hidden="true"
+                />
               </summary>
 
               {typeGroups.map(([investmentType, typePositions]) => (
@@ -571,7 +551,10 @@ function PositionsView({
                       performanceInputs={performanceInputs}
                       showArchived={showArchived}
                     />
-                    <span className="hidden lg:block" aria-hidden="true" />
+                    <span
+                      className={`${INVESTMENT_METRIC_CELL} hidden lg:block`}
+                      aria-hidden="true"
+                    />
                   </summary>
 
                   <div className="divide-y divide-slate-100">
@@ -590,67 +573,20 @@ function PositionsView({
                               <h3 className="truncate text-sm font-extrabold text-slate-950">
                                 {position.asset_name}
                               </h3>
-                              {position.investment_type === "stock" ||
-                              position.investment_type === "fii" ? (
-                                <div className="mt-1 grid gap-0.5 text-[0.64rem] leading-tight text-slate-500">
-                                  <p className="truncate">
-                                    Custo unitário{" "}
-                                    <strong className="text-slate-700">
-                                      {formatInvestmentUnitValue(
-                                        position.accumulated_cost_minor,
-                                        position.quantity,
-                                        position.currency,
-                                      )}
-                                    </strong>{" "}
-                                    · Quantidade{" "}
-                                    <strong className="text-slate-700">
-                                      {formatInvestmentQuantity(
-                                        position.quantity,
-                                      )}
-                                    </strong>{" "}
-                                    · Custo acumulado{" "}
-                                    <strong className="text-slate-700">
-                                      {formatMoney(
-                                        position.accumulated_cost_minor,
-                                        position.currency,
-                                        CURRENCY_LOCALES[position.currency],
-                                      )}
-                                    </strong>
-                                  </p>
-                                  <p className="truncate">
-                                    Valor unitário{" "}
-                                    <strong className="text-slate-700">
-                                      {formatInvestmentUnitValue(
-                                        position.current_value_minor,
-                                        position.quantity,
-                                        position.currency,
-                                      )}
-                                    </strong>{" "}
-                                    · Valor atual{" "}
-                                    <strong className="text-slate-700">
-                                      {formatMoney(
-                                        position.current_value_minor,
-                                        position.currency,
-                                        CURRENCY_LOCALES[position.currency],
-                                      )}
-                                    </strong>
-                                  </p>
-                                </div>
-                              ) : null}
                             </div>
-                            <div>
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Valor atual</p>
                               <p className="text-xs font-extrabold text-slate-950">
                                 {formatMoney(position.current_value_minor, position.currency, CURRENCY_LOCALES[position.currency])}
                               </p>
                             </div>
-                            <div>
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Custo</p>
                               <p className="text-xs font-bold text-slate-800">
                                 {formatMoney(position.accumulated_cost_minor, position.currency, CURRENCY_LOCALES[position.currency])}
                               </p>
                             </div>
-                            <div>
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Resultado</p>
                               <p className={`text-xs font-bold ${position.performance_result_minor < 0 ? "text-rose-700" : "text-emerald-700"}`}>
                                 {formatMoney(position.performance_result_minor, position.currency, CURRENCY_LOCALES[position.currency])}
@@ -659,21 +595,26 @@ function PositionsView({
                                 ) : null}
                               </p>
                             </div>
-                            <div>
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Retorno total</p>
                               <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.total_return_basis_points)}</p>
                             </div>
-                            <div>
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Mês anterior</p>
                               <p className="text-xs font-bold text-slate-800">{formatBasisPoints(position.previous_month_return_basis_points)}</p>
                             </div>
-                            <div>
+                            <div className={INVESTMENT_METRIC_CELL}>
                               <p className="text-[0.68rem] font-bold text-slate-500 lg:sr-only">Participação</p>
                               <p className="text-xs font-bold text-slate-800">
                                 {archived ? "Arquivada" : percentage(position.current_value_minor, total)}
                               </p>
                             </div>
-                            <span aria-hidden="true" className="text-right text-slate-400">▾</span>
+                            <span
+                              aria-hidden="true"
+                              className={`${INVESTMENT_METRIC_CELL} text-slate-400`}
+                            >
+                              ▾
+                            </span>
                           </summary>
 
                           <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
@@ -770,7 +711,7 @@ function FinancingsView({
           Importar PDF do banco
         </Link>
         <Link
-          href="/net-worth/new?itemType=financing"
+          href="/investments/financings/new"
           className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
         >
           Cadastrar manualmente
@@ -974,6 +915,12 @@ export default async function InvestmentsPage({
           }`}
         >
           Posições
+        </Link>
+        <Link
+          href="/investments/prices"
+          className="min-h-9 rounded-lg px-4 py-2 text-sm font-extrabold text-slate-600 hover:bg-slate-100"
+        >
+          Cotações
         </Link>
         <Link
           href="/investments?tab=financing"

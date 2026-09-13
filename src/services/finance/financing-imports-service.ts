@@ -4,6 +4,7 @@ import {
   FINANCING_IMPORT_MAX_FILE_SIZE,
   FinancingImportError,
   parseSupportedFinancingPdf,
+  type ManualFinancingContractInput,
   type FinancingProductType,
 } from "@/domain/financing-imports";
 import { coerceMinorUnits } from "@/domain/money";
@@ -214,6 +215,69 @@ export async function cancelCurrentUserFinancingImport(id: string) {
   return error
     ? { ok: false as const, message: "Não foi possível cancelar a importação." }
     : { ok: true as const };
+}
+
+export async function createCurrentUserManualFinancingContract(
+  input: ManualFinancingContractInput,
+) {
+  const { supabase } = await requireUser();
+  const contract = {
+    name: input.name,
+    institution: input.institution,
+    contract_reference: input.contractReference,
+    product_type: input.productType,
+    context: input.context,
+    currency: input.currency,
+    amortization_system: input.amortizationSystem,
+    indexer: input.indexer,
+    original_principal_minor: input.originalPrincipalMinor,
+    original_term_months: input.originalTermMonths,
+    contract_date: input.contractDate,
+    release_date: input.releaseDate,
+    current_balance_minor: input.currentBalanceMinor,
+    balance_date: input.balanceDate,
+    nominal_annual_rate: input.nominalAnnualRate,
+    effective_annual_rate: input.effectiveAnnualRate,
+    cet_annual_rate: input.cetAnnualRate,
+  };
+  const schedule = input.schedule.map((row, index) => ({
+    source_sequence: index + 1,
+    installment_number: row.installmentNumber,
+    due_date: row.dueDate,
+    total_amount_minor: row.totalAmountMinor,
+    principal_minor: row.principalMinor,
+    interest_minor: row.interestMinor,
+    correction_factor: row.correctionFactor,
+    insurance_mip_minor: 0,
+    insurance_dfi_minor: 0,
+    service_fee_minor: row.chargesMinor,
+    penalty_minor: 0,
+    late_interest_minor: 0,
+    fgts_minor: 0,
+    balance_correction_factor: null,
+    outstanding_balance_minor: row.outstandingBalanceMinor,
+    payment_status: row.paymentStatus,
+    payment_date: row.paymentStatus === "paid" ? row.paymentDate : null,
+    paid_amount_minor: row.paidAmountMinor,
+    source_pages: [],
+  }));
+  const { data, error } = await supabase.rpc(
+    "create_manual_financing_contract",
+    {
+      target_contract: contract as unknown as Json,
+      target_schedule: schedule as unknown as Json,
+    },
+  );
+
+  return error || !data
+    ? {
+        ok: false as const,
+        message:
+          error?.code === "PGRST202" || error?.code === "42883"
+            ? "O cadastro histórico ainda não foi habilitado neste ambiente."
+            : "Não foi possível cadastrar o histórico do financiamento.",
+      }
+    : { ok: true as const, contractId: data };
 }
 
 export async function listCurrentUserFinancingContracts() {

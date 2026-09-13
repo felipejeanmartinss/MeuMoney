@@ -28,17 +28,9 @@ export function MonthlyEvolution({
   locale: string;
   basis?: FinancialReportBasis;
 }) {
-  const maximum = Math.max(
-    1,
-    ...rows.flatMap((row) => [
-      row.incomeAmountMinor,
-      row.expenseAmountMinor,
-    ]),
-  );
-
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="px-5 py-4">
         <h3 className="text-lg font-extrabold text-slate-950">
           Evolução em seis meses
         </h3>
@@ -46,76 +38,22 @@ export function MonthlyEvolution({
           Receitas e {basis === "cash" ? "saídas de caixa" : "despesas por competência"}.
         </p>
       </div>
-      <div
-        className="mt-6 grid grid-cols-6 gap-2"
-        role="img"
-        aria-label="Comparação de receitas e despesas dos últimos seis meses"
-      >
-        {rows.map((row) => (
-          <div
-            key={row.referenceMonth}
-            className="grid min-w-0 grid-rows-[8rem_auto_auto] gap-2"
-          >
-            <div className="flex items-end justify-center gap-1 border-b border-slate-200">
-              <span
-                className="w-2 rounded-t bg-emerald-500 sm:w-3"
-                style={{
-                  height: `${Math.max(
-                    row.incomeAmountMinor > 0 ? 4 : 0,
-                    (row.incomeAmountMinor / maximum) * 100,
-                  )}%`,
-                }}
-                title={`Receitas: ${formatMoney(
-                  row.incomeAmountMinor,
-                  currency,
-                  locale,
-                )}`}
-              />
-              <span
-                className="w-2 rounded-t bg-rose-400 sm:w-3"
-                style={{
-                  height: `${Math.max(
-                    row.expenseAmountMinor > 0 ? 4 : 0,
-                    (row.expenseAmountMinor / maximum) * 100,
-                  )}%`,
-                }}
-                title={`Despesas: ${formatMoney(
-                  row.expenseAmountMinor,
-                  currency,
-                  locale,
-                )}`}
-              />
-            </div>
-            <p className="truncate text-center text-[0.65rem] font-semibold uppercase text-slate-500 sm:text-xs">
-              {shortMonth(row.referenceMonth)}
-            </p>
-            <p
-              className={`truncate text-center text-[0.65rem] font-bold sm:text-xs ${
-                row.resultAmountMinor < 0
-                  ? "text-rose-700"
-                  : "text-emerald-700"
-              }`}
-              title={`Resultado: ${formatMoney(
-                row.resultAmountMinor,
-                currency,
-                locale,
-              )}`}
-            >
-              {formatMoney(row.resultAmountMinor, currency, locale)}
-            </p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-5 flex flex-wrap gap-4 text-xs text-slate-600">
-        <span className="inline-flex items-center gap-2">
-          <span className="size-2.5 rounded-sm bg-emerald-500" />
-          Receitas
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="size-2.5 rounded-sm bg-rose-400" />
-          Despesas
-        </span>
-        <span>Valor sob cada mês: resultado mensal</span>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse text-sm">
+          <thead className="bg-slate-50 text-xs text-slate-500">
+            <tr><th className="px-4 py-2 text-left">Mês</th><th className="px-4 py-2 text-right">Receitas</th><th className="px-4 py-2 text-right">Despesas</th><th className="px-4 py-2 text-right">Resultado</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row) => (
+              <tr key={row.referenceMonth}>
+                <td className="px-4 py-2 font-bold text-slate-800">{shortMonth(row.referenceMonth)}</td>
+                <td className="px-4 py-2 text-right text-emerald-700">{formatMoney(row.incomeAmountMinor, currency, locale)}</td>
+                <td className="px-4 py-2 text-right text-rose-700">{formatMoney(row.expenseAmountMinor, currency, locale)}</td>
+                <td className={`px-4 py-2 text-right font-extrabold ${row.resultAmountMinor < 0 ? "text-rose-700" : "text-emerald-700"}`}>{formatMoney(row.resultAmountMinor, currency, locale)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );

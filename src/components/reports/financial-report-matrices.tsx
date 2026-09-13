@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   calculateVariationBasisPoints,
   type MonthlyReportMatrixRow,
+  type NetWorthEvolutionReportRow,
   type PeriodComparisonRow,
 } from "@/domain/financial-reports";
 import {
@@ -36,18 +38,54 @@ const MONTHS = [
 
 function amount(value: number, currency: SupportedCurrency) {
   if (value === 0) return "—";
-  const absolute = Math.abs(assertMinorUnits(value));
-  const integer = Math.floor(absolute / 100);
-  const cents = String(absolute % 100).padStart(2, "0");
-  const sign = value < 0 ? "-" : "";
   const locale = CURRENCY_LOCALES[currency];
-  const decimalSeparator =
-    new Intl.NumberFormat(locale, { minimumFractionDigits: 1 })
-      .formatToParts(0)
-      .find((part) => part.type === "decimal")?.value ?? ",";
-  return `${sign}${new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
-  }).format(integer)}${decimalSeparator}${cents}`;
+  }).format(Math.round(assertMinorUnits(value) / 100));
+}
+
+function monthTransactionHref(monthKey: string, categoryKey?: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const query = new URLSearchParams({
+    dateFrom: `${monthKey}-01`,
+    dateTo: `${monthKey}-${String(lastDay).padStart(2, "0")}`,
+    activity: "active",
+  });
+  if (categoryKey && /^[0-9a-f-]{36}$/i.test(categoryKey)) {
+    query.set("categoryId", categoryKey);
+  }
+  return `/transactions?${query.toString()}`;
+}
+
+function MonthAmount({
+  value,
+  currency,
+  year,
+  monthIndex,
+  monthKey,
+  categoryKey,
+}: {
+  value: number;
+  currency: SupportedCurrency;
+  year?: number;
+  monthIndex: number;
+  monthKey?: string;
+  categoryKey?: string;
+}) {
+  const resolvedMonth = monthKey ?? (year ? `${year}-${String(monthIndex + 1).padStart(2, "0")}` : null);
+  if (!resolvedMonth || value === 0) return <>{amount(value, currency)}</>;
+  return (
+    <Link
+      href={monthTransactionHref(resolvedMonth, categoryKey)}
+      target="_blank"
+      rel="noreferrer"
+      title="Abrir lançamentos deste consolidado"
+      className="inline-flex min-h-6 items-center justify-center rounded px-1 underline-offset-2 hover:bg-white hover:underline"
+    >
+      {amount(value, currency)}
+    </Link>
+  );
 }
 
 function signedAmount(value: number, currency: SupportedCurrency) {
@@ -86,9 +124,9 @@ type MonthlyGroupNode = {
   totalAmountMinor: number;
 };
 
-function compareAmount(left: number, right: number) {
+function compareAmountDescending(left: number, right: number) {
   if (left === right) return 0;
-  return left < right ? -1 : 1;
+  return left > right ? -1 : 1;
 }
 
 function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
@@ -119,7 +157,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
                 label: childRows[0].categoryLabel,
                 rows: [...childRows].sort(
                   (left, right) =>
-                    compareAmount(
+                    compareAmountDescending(
                       left.totalAmountMinor,
                       right.totalAmountMinor,
                     ) || left.label.localeCompare(right.label, "pt-BR"),
@@ -131,7 +169,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
             })
             .sort(
               (left, right) =>
-                compareAmount(left.totalAmountMinor, right.totalAmountMinor) ||
+                compareAmountDescending(left.totalAmountMinor, right.totalAmountMinor) ||
                 left.label.localeCompare(right.label, "pt-BR"),
             );
           const monthAmountsMinor = sumMonths(
@@ -146,7 +184,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
         })
         .sort(
           (left, right) =>
-            compareAmount(left.totalAmountMinor, right.totalAmountMinor) ||
+            compareAmountDescending(left.totalAmountMinor, right.totalAmountMinor) ||
             left.label.localeCompare(right.label, "pt-BR"),
         ),
     ]),
@@ -154,7 +192,7 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
 }
 
 function sumMonths(rows: readonly MonthlyReportMatrixRow[]) {
-  return Array.from({ length: 12 }, (_, index) =>
+  return Array.from({ length: rows[0]?.monthAmountsMinor.length ?? 12 }, (_, index) =>
     rows.reduce(
       (total, row) =>
         assertMinorUnits(total + row.monthAmountsMinor[index]),
@@ -176,12 +214,16 @@ export function MonthlyFinancialMatrix({
   caption,
   emptyMessage,
   showSections = true,
+  drilldownYear,
+  months,
 }: {
   rows: readonly MonthlyReportMatrixRow[];
   currency: SupportedCurrency;
   caption: string;
   emptyMessage: string;
   showSections?: boolean;
+  drilldownYear?: number;
+  months?: readonly string[];
 }) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     () => new Set(),
@@ -195,6 +237,10 @@ export function MonthlyFinancialMatrix({
   }
 
   const sections = groupMonthlyRows(rows);
+  const columnMonths = months ?? MONTHS;
+  const spansMultipleYears = months
+    ? new Set(months.map((month) => month.slice(0, 4))).size > 1
+    : false;
   const incomeMonths = sumMonths(
     rows.filter((row) => row.section === "income"),
   );
@@ -215,29 +261,37 @@ export function MonthlyFinancialMatrix({
         Valores em {currency}, sem símbolo monetário. Categorias com seta podem
         ser abertas para exibir as subcategorias.
       </p>
-      <div className="overflow-x-auto">
-      <table className="w-full min-w-[1180px] border-collapse text-[0.75rem] tabular-nums">
+      <div>
+      <table className="w-full table-fixed border-collapse text-[0.63rem] tabular-nums xl:text-[0.68rem]">
         <caption className="sr-only">{caption}</caption>
         <thead className="sticky top-0 bg-slate-100 text-slate-700">
           <tr className="border-b border-slate-300">
             <th
               scope="col"
-              className="min-w-64 px-3 py-2 text-left font-extrabold"
+              className="w-[18%] px-2 py-2 text-left font-extrabold"
             >
               Categoria / subcategoria
             </th>
-            {MONTHS.map((month) => (
+            {columnMonths.map((month, index) => (
               <th
                 key={month}
                 scope="col"
-                className="min-w-24 px-2 py-2 text-center font-extrabold"
+                className="px-0.5 py-2 text-center font-extrabold"
               >
-                {month}
+                {months
+                  ? new Intl.DateTimeFormat("pt-BR", {
+                      month: "short",
+                      year: spansMultipleYears ? "2-digit" : undefined,
+                      timeZone: "UTC",
+                    })
+                      .format(new Date(`${month}-01T12:00:00Z`))
+                      .replace(".", "")
+                  : MONTHS[index]}
               </th>
             ))}
             <th
               scope="col"
-              className="min-w-28 bg-slate-200 px-3 py-2 text-center font-black"
+              className="w-[7%] bg-slate-200 px-1 py-2 text-center font-black"
             >
               Total
             </th>
@@ -258,6 +312,8 @@ export function MonthlyFinancialMatrix({
                 showSection={showSections}
                 expandedCategories={expandedCategories}
                 onToggleCategory={toggleCategory}
+                drilldownYear={drilldownYear}
+                months={months}
               />
             );
           })}
@@ -266,6 +322,8 @@ export function MonthlyFinancialMatrix({
               incomeMonths={incomeMonths}
               expenseMonths={expenseMonths}
               currency={currency}
+              drilldownYear={drilldownYear}
+              months={months}
             />
           ) : null}
         </tbody>
@@ -279,10 +337,14 @@ function MonthlyResultRow({
   incomeMonths,
   expenseMonths,
   currency,
+  drilldownYear,
+  months,
 }: {
   incomeMonths: number[];
   expenseMonths: number[];
   currency: SupportedCurrency;
+  drilldownYear?: number;
+  months?: readonly string[];
 }) {
   const results = incomeMonths.map((income, index) =>
     assertMinorUnits(income - expenseMonths[index]),
@@ -293,8 +355,8 @@ function MonthlyResultRow({
         Resultado
       </th>
       {results.map((value, index) => (
-        <td key={MONTHS[index]} className="px-2 py-2 text-center">
-          {amount(value, currency)}
+        <td key={index} className="px-2 py-2 text-center">
+          <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} />
         </td>
       ))}
       <td className="bg-slate-800 px-3 py-2 text-center">
@@ -312,6 +374,8 @@ function ReportSectionRows({
   showSection,
   expandedCategories,
   onToggleCategory,
+  drilldownYear,
+  months,
 }: {
   section: MonthlyReportMatrixRow["section"];
   groups: MonthlyGroupNode[];
@@ -320,6 +384,8 @@ function ReportSectionRows({
   showSection: boolean;
   expandedCategories: ReadonlySet<string>;
   onToggleCategory: (key: string) => void;
+  drilldownYear?: number;
+  months?: readonly string[];
 }) {
   const label = section === "income" ? "Receitas" : "Despesas";
   return (
@@ -327,7 +393,7 @@ function ReportSectionRows({
       {showSection ? (
         <tr className="border-b border-slate-300 bg-slate-800 text-white">
           <th
-            colSpan={14}
+            colSpan={sectionMonths.length + 2}
             className="px-3 py-2 text-left text-xs font-black uppercase tracking-[0.14em]"
           >
             {label}
@@ -341,6 +407,8 @@ function ReportSectionRows({
           currency={currency}
           expandedCategories={expandedCategories}
           onToggleCategory={onToggleCategory}
+          drilldownYear={drilldownYear}
+          months={months}
         />
       ))}
       <tr className="border-y border-slate-300 bg-slate-100 font-black text-slate-950">
@@ -348,7 +416,7 @@ function ReportSectionRows({
           Total {label.toLowerCase()}
         </th>
         {sectionMonths.map((value, index) => (
-          <td key={MONTHS[index]} className="px-2 py-2 text-center">
+          <td key={index} className="px-2 py-2 text-center">
             {amount(value, currency)}
           </td>
         ))}
@@ -365,11 +433,15 @@ function ReportGroupRows({
   currency,
   expandedCategories,
   onToggleCategory,
+  drilldownYear,
+  months,
 }: {
   group: MonthlyGroupNode;
   currency: SupportedCurrency;
   expandedCategories: ReadonlySet<string>;
   onToggleCategory: (key: string) => void;
+  drilldownYear?: number;
+  months?: readonly string[];
 }) {
   return (
     <>
@@ -378,8 +450,8 @@ function ReportGroupRows({
           {group.label}
         </th>
         {group.monthAmountsMinor.map((value, index) => (
-          <td key={MONTHS[index]} className="px-2 py-1.5 text-center">
-            {amount(value, currency)}
+          <td key={index} className="px-2 py-1.5 text-center">
+            <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} />
           </td>
         ))}
         <td className="bg-emerald-100 px-3 py-1.5 text-center">
@@ -413,10 +485,10 @@ function ReportGroupRows({
           </th>
           {category.monthAmountsMinor.map((value, index) => (
             <td
-              key={MONTHS[index]}
+              key={index}
               className="px-2 py-1.5 text-center text-slate-700"
             >
-              {amount(value, currency)}
+              <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} categoryKey={category.rows[0]?.categoryKey} />
             </td>
           ))}
           <td className="bg-slate-50 px-3 py-1.5 text-center font-bold text-slate-900">
@@ -434,8 +506,8 @@ function ReportGroupRows({
               {row.subcategoryLabel ?? "Sem subcategoria"}
             </th>
             {row.monthAmountsMinor.map((value, index) => (
-              <td key={MONTHS[index]} className="px-2 py-1 text-center">
-                {amount(value, currency)}
+              <td key={index} className="px-2 py-1 text-center">
+                <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} categoryKey={row.subcategoryKey ?? row.categoryKey} />
               </td>
             ))}
             <td className="bg-slate-100/80 px-3 py-1 text-center font-semibold">
@@ -498,7 +570,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
             label: childRows[0].categoryLabel,
             rows: [...childRows].sort(
               (left, right) =>
-                compareAmount(
+                compareAmountDescending(
                   left.secondAmountMinor,
                   right.secondAmountMinor,
                 ) || left.label.localeCompare(right.label, "pt-BR"),
@@ -513,7 +585,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
         })
         .sort(
           (left, right) =>
-            compareAmount(
+            compareAmountDescending(
               left.secondAmountMinor,
               right.secondAmountMinor,
             ) || left.label.localeCompare(right.label, "pt-BR"),
@@ -541,7 +613,7 @@ function groupComparisonRows(rows: readonly PeriodComparisonRow[]) {
         return left.section === "income" ? -1 : 1;
       }
       return (
-        compareAmount(left.secondAmountMinor, right.secondAmountMinor) ||
+        compareAmountDescending(left.secondAmountMinor, right.secondAmountMinor) ||
         left.label.localeCompare(right.label, "pt-BR")
       );
     });
@@ -780,10 +852,7 @@ export function AssetPerformanceMatrix({
               Ativo
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
-              Aportes
-            </th>
-            <th scope="col" className="px-2 py-1.5 text-right">
-              Resgates
+              Custo acumulado
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
               Rendimentos
@@ -792,22 +861,25 @@ export function AssetPerformanceMatrix({
               Valor atual
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
-              Custo acumulado
-            </th>
-            <th scope="col" className="px-2 py-1.5 text-right">
-              Lucro/perda realizado
+              Realizado
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
               Resultado
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
+              Resultado + rendimentos
+            </th>
+            <th scope="col" className="px-2 py-1.5 text-right">
+              Resultado total
+            </th>
+            <th scope="col" className="px-2 py-1.5 text-right">
               Retorno total
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
-              Retorno mensal
+              Taxa mensal
             </th>
             <th scope="col" className="px-2 py-1.5 text-right">
-              Retorno anualizado
+              Taxa anual
             </th>
           </tr>
         </thead>
@@ -838,11 +910,11 @@ function AssetGroupRows({
   performance: InvestmentPerformance | null;
   currency: SupportedCurrency;
 }) {
-  const contributions = sumMoney(rows.map((row) => row.contributions_minor));
-  const redemptions = sumMoney(rows.map((row) => row.redemptions_minor));
   const income = sumMoney(rows.map((row) => row.income_minor));
   const cost = sumMoney(rows.map((row) => row.accumulated_cost_minor));
   const current = sumMoney(rows.map((row) => row.current_value_minor));
+  const result = sumMoney(rows.map((row) => row.unrealized_appreciation_minor));
+  const resultWithIncome = assertMinorUnits(result + income);
   return (
     <>
       <tr className="border-b border-slate-200 bg-emerald-50 font-extrabold text-emerald-950">
@@ -850,10 +922,7 @@ function AssetGroupRows({
           {label}
         </th>
         <td className="px-2 py-1 text-right">
-          {amount(contributions, currency)}
-        </td>
-        <td className="px-2 py-1 text-right">
-          {amount(redemptions, currency)}
+          {amount(cost, currency)}
         </td>
         <td className="px-2 py-1 text-right">
           {amount(income, currency)}
@@ -861,16 +930,19 @@ function AssetGroupRows({
         <td className="px-2 py-1 text-right">
           {amount(current, currency)}
         </td>
-        <td className="px-2 py-1 text-right">{amount(cost, currency)}</td>
         <td className="px-2 py-1 text-right">
           {performance?.realizedGainLossMinor === null || !performance
             ? "—"
             : signedAmount(performance.realizedGainLossMinor, currency)}
         </td>
         <td className="px-2 py-1 text-right">
-          {performance
-            ? signedAmount(performance.resultMinor, currency)
-            : "—"}
+          {signedAmount(result, currency)}
+        </td>
+        <td className="px-2 py-1 text-right">
+          {signedAmount(resultWithIncome, currency)}
+        </td>
+        <td className="px-2 py-1 text-right">
+          {performance ? signedAmount(performance.resultMinor, currency) : "—"}
           {performance?.resultIsEstimated ? (
             <span className="ml-0.5 text-amber-700">*</span>
           ) : null}
@@ -900,10 +972,7 @@ function AssetGroupRows({
             </span>
           </th>
           <td className="px-2 py-1 text-right">
-            {amount(row.contributions_minor, currency)}
-          </td>
-          <td className="px-2 py-1 text-right">
-            {amount(row.redemptions_minor, currency)}
+            {amount(row.accumulated_cost_minor, currency)}
           </td>
           <td className="px-2 py-1 text-right">
             {amount(row.income_minor, currency)}
@@ -912,12 +981,15 @@ function AssetGroupRows({
             {amount(row.current_value_minor, currency)}
           </td>
           <td className="px-2 py-1 text-right">
-            {amount(row.accumulated_cost_minor, currency)}
-          </td>
-          <td className="px-2 py-1 text-right">
             {row.realized_gain_loss_minor === null
               ? "—"
               : signedAmount(row.realized_gain_loss_minor, currency)}
+          </td>
+          <td className="px-2 py-1 text-right font-bold">
+            {signedAmount(row.unrealized_appreciation_minor, currency)}
+          </td>
+          <td className="px-2 py-1 text-right font-bold">
+            {signedAmount(assertMinorUnits(row.unrealized_appreciation_minor + row.income_minor), currency)}
           </td>
           <td className="px-2 py-1 text-right font-bold">
             {signedAmount(row.performance_result_minor, currency)}
@@ -937,5 +1009,41 @@ function AssetGroupRows({
         </tr>
       ))}
     </>
+  );
+}
+
+export function NetWorthEvolutionMatrix({
+  rows,
+  currency,
+}: {
+  rows: readonly NetWorthEvolutionReportRow[];
+  currency: SupportedCurrency;
+}) {
+  return (
+    <div className="border-t border-slate-200">
+      <table className="w-full table-fixed border-collapse text-sm tabular-nums">
+        <caption className="sr-only">Evolução mensal do patrimônio líquido</caption>
+        <thead className="sticky top-0 bg-slate-100 text-slate-700">
+          <tr className="border-b border-slate-300">
+            <th className="px-3 py-2 text-left">Mês</th>
+            <th className="px-3 py-2 text-right">Ativos</th>
+            <th className="px-3 py-2 text-right">Passivos</th>
+            <th className="px-3 py-2 text-right">Patrimônio líquido</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.referenceMonth} className="border-b border-slate-100 hover:bg-slate-50">
+              <th className="px-3 py-2 text-left font-semibold text-slate-800">
+                {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${row.referenceMonth}-01T12:00:00Z`))}
+              </th>
+              <td className="px-3 py-2 text-right text-emerald-700">{amount(row.assetsMinor, currency)}</td>
+              <td className="px-3 py-2 text-right text-rose-700">{amount(row.liabilitiesMinor, currency)}</td>
+              <td className={`px-3 py-2 text-right font-black ${row.netWorthMinor < 0 ? "text-rose-700" : "text-slate-950"}`}>{amount(row.netWorthMinor, currency)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

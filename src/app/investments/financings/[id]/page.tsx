@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FinancingAmortizationSimulator } from "@/components/financing/financing-amortization-simulator";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserFinancingContract } from "@/services/finance/financing-imports-service";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
 const messages: Record<string, string> = {
   imported: "Financiamento criado a partir do PDF revisado.",
+  created: "Financiamento e histórico cadastrados.",
 };
+
+function formatRate(value: string | null, suffix = "a.a.") {
+  return value ? `${value.replace(".", ",")}% ${suffix}` : "Não informado";
+}
 
 export default async function FinancingDetailPage({
   params,
@@ -60,6 +66,55 @@ export default async function FinancingDetailPage({
         ))}
       </section>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-black text-slate-950">Condições do contrato</h2>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-slate-500">Taxa nominal</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.nominal_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Taxa efetiva</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.effective_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">CET</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.cet_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">CESH</dt>
+            <dd className="font-bold text-slate-950">{formatRate(contract.cesh_annual_rate)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Saldo inicial</dt>
+            <dd className="font-bold text-slate-950">{formatMoney(contract.original_principal_minor, contract.currency)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Saldo atual</dt>
+            <dd className="font-bold text-slate-950">{formatMoney(contract.current_balance_minor, contract.currency)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Prazo original</dt>
+            <dd className="font-bold text-slate-950">{contract.original_term_months ? `${contract.original_term_months} meses` : "Não informado"}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Indexador</dt>
+            <dd className="font-bold text-slate-950">{contract.indexer ?? "Não informado"}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Sistema de amortização</dt>
+            <dd className="font-bold text-slate-950">{contract.amortization_system ?? "Não informado"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <FinancingAmortizationSimulator
+        currency={contract.currency}
+        principalMinor={contract.current_balance_minor}
+        annualRate={contract.nominal_annual_rate}
+        termMonths={contract.original_term_months}
+      />
+
       {extraAmortizations.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-black text-slate-950">Amortizações extraordinárias</h2>
@@ -78,26 +133,29 @@ export default async function FinancingDetailPage({
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-black text-slate-950">Parcelas e projeção</h2>
-          <p className="mt-1 text-sm text-slate-600">Valores importados do extrato; nenhuma baixa bancária é criada automaticamente.</p>
+          <p className="mt-1 text-sm text-slate-600">Histórico do contrato; nenhuma baixa bancária é criada automaticamente.</p>
         </div>
         <div className="max-h-[38rem] overflow-auto">
-          <table className="min-w-[900px] w-full text-sm">
+          <table className="w-full min-w-[1480px] text-xs">
             <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="px-4 py-3">Nº</th><th className="px-4 py-3">Vencimento</th><th className="px-4 py-3">Principal</th><th className="px-4 py-3">Juros</th><th className="px-4 py-3">Encargos</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Saldo</th><th className="px-4 py-3">Situação</th></tr>
+              <tr><th className="px-3 py-2">Parcela</th><th className="px-3 py-2">Data</th><th className="px-3 py-2">Amortização</th><th className="px-3 py-2">Valor total</th><th className="px-3 py-2">Juros</th><th className="px-3 py-2">Correção</th><th className="px-3 py-2">Taxas/multas</th><th className="px-3 py-2">Saldo devedor</th><th className="px-3 py-2">Situação</th><th className="px-3 py-2">Data pagamento</th><th className="px-3 py-2">Valor pagamento</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {schedule.map((entry) => {
                 const charges = entry.insurance_mip_minor + entry.insurance_dfi_minor + entry.service_fee_minor + entry.penalty_minor + entry.late_interest_minor;
                 return (
                   <tr key={entry.id}>
-                    <td className="px-4 py-3 font-bold">{entry.installment_number}</td>
-                    <td className="px-4 py-3">{formatFinancialDate(entry.due_date)}</td>
-                    <td className="px-4 py-3">{formatMoney(entry.principal_minor, contract.currency)}</td>
-                    <td className="px-4 py-3">{formatMoney(entry.interest_minor, contract.currency)}</td>
-                    <td className="px-4 py-3">{formatMoney(charges, contract.currency)}</td>
-                    <td className="px-4 py-3 font-bold">{formatMoney(entry.total_amount_minor, contract.currency)}</td>
-                    <td className="px-4 py-3">{formatMoney(entry.outstanding_balance_minor, contract.currency)}</td>
-                    <td className="px-4 py-3">{entry.payment_status === "paid" ? "Paga" : "A vencer"}</td>
+                    <td className="px-3 py-2 font-bold">{entry.installment_number}</td>
+                    <td className="px-3 py-2">{formatFinancialDate(entry.due_date)}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}</td>
+                    <td className="px-3 py-2 font-bold">{formatMoney(entry.total_amount_minor, contract.currency)}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.interest_minor, contract.currency)}</td>
+                    <td className="px-3 py-2">{entry.correction_factor?.replace(".", ",") ?? "—"}</td>
+                    <td className="px-3 py-2">{formatMoney(charges, contract.currency)}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.outstanding_balance_minor, contract.currency)}</td>
+                    <td className="px-3 py-2">{entry.payment_status === "paid" ? "Paga" : "A vencer"}</td>
+                    <td className="px-3 py-2">{entry.payment_date ? formatFinancialDate(entry.payment_date) : "—"}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.paid_amount_minor, contract.currency)}</td>
                   </tr>
                 );
               })}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AssetPerformanceMatrix,
   MonthlyFinancialMatrix,
+  NetWorthEvolutionMatrix,
   PeriodComparisonMatrix,
 } from "@/components/reports/financial-report-matrices";
 import {
@@ -22,6 +23,7 @@ import {
   getCurrentUserAssetPerformanceReport,
   getCurrentUserFixedExpenseReport,
   getCurrentUserIncomeExpenseMatrix,
+  getCurrentUserNetWorthEvolutionReport,
   getCurrentUserPeriodComparisonReport,
 } from "@/services/reports/financial-reports-service";
 import type {
@@ -39,7 +41,11 @@ const REPORT_GROUPS = [
   },
   {
     label: "Investimentos",
-    reports: ["asset-performance"],
+    reports: ["asset-performance", "asset-performance-general"],
+  },
+  {
+    label: "Patrimônio",
+    reports: ["net-worth-evolution"],
   },
 ] as const satisfies ReadonlyArray<{
   label: string;
@@ -79,6 +85,54 @@ function previousMonth(value: string) {
   );
 }
 
+const REPORT_PERIODS = [
+  ["all", "Todas as datas"],
+  ["current-month", "Mês atual"],
+  ["current-year", "Ano atual"],
+  ["previous-month", "Mês anterior"],
+  ["previous-year", "Ano anterior"],
+  ["last-3", "Últimos 3 meses"],
+  ["last-6", "Últimos 6 meses"],
+  ["last-12", "Últimos 12 meses"],
+  ["next-3", "Próximos 3 meses"],
+  ["next-6", "Próximos 6 meses"],
+  ["next-12", "Próximos 12 meses"],
+  ["custom", "Período personalizado"],
+] as const;
+
+type ReportPeriod = (typeof REPORT_PERIODS)[number][0];
+
+function shiftMonth(value: string, offset: number) {
+  const [year, month] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function resolveReportPeriod(raw: Record<string, string | string[] | undefined>) {
+  const rawPeriod = typeof raw.period === "string" ? raw.period : "current-year";
+  const period = REPORT_PERIODS.some(([value]) => value === rawPeriod)
+    ? (rawPeriod as ReportPeriod)
+    : "current-year";
+  const now = currentMonth();
+  if (period === "all") return { period, startMonth: "2000-01", endMonth: shiftMonth(now, 12) };
+  if (period === "current-month") return { period, startMonth: now, endMonth: now };
+  if (period === "current-year") return { period, startMonth: `${now.slice(0, 4)}-01`, endMonth: `${now.slice(0, 4)}-12` };
+  if (period === "previous-month") return { period, startMonth: previousMonth(now), endMonth: previousMonth(now) };
+  if (period === "previous-year") {
+    const year = Number(now.slice(0, 4)) - 1;
+    return { period, startMonth: `${year}-01`, endMonth: `${year}-12` };
+  }
+  if (period === "custom") {
+    const customStart = typeof raw.startMonth === "string" && /^\d{4}-\d{2}$/.test(raw.startMonth) ? raw.startMonth : now;
+    const customEnd = typeof raw.endMonth === "string" && /^\d{4}-\d{2}$/.test(raw.endMonth) ? raw.endMonth : now;
+    return { period, startMonth: customStart <= customEnd ? customStart : customEnd, endMonth: customStart <= customEnd ? customEnd : customStart };
+  }
+  const count = Number(period.split("-")[1]);
+  return period.startsWith("last")
+    ? { period, startMonth: shiftMonth(now, -(count - 1)), endMonth: now }
+    : { period, startMonth: now, endMonth: shiftMonth(now, count - 1) };
+}
+
 function monthLabel(start: string, end: string) {
   const formatter = new Intl.DateTimeFormat("pt-BR", {
     month: "short",
@@ -97,6 +151,7 @@ function reportHref(
     currency: SupportedCurrency;
     basis: FinancialReportBasis;
     context: FinancialContext | "all";
+    sourceCurrencies: SupportedCurrency[];
   },
 ) {
   const query = new URLSearchParams({
@@ -106,6 +161,9 @@ function reportHref(
     basis: filters.basis,
     context: filters.context,
   });
+  for (const sourceCurrency of filters.sourceCurrencies) {
+    query.append("sourceCurrencies", sourceCurrency);
+  }
   return "/reports?" + query.toString();
 }
 
@@ -114,6 +172,7 @@ function CommonReportFields({
   currency,
   basis,
   context,
+  sourceCurrencies,
   includeYear = true,
   includeBasis = true,
 }: {
@@ -121,6 +180,7 @@ function CommonReportFields({
   currency: SupportedCurrency;
   basis: FinancialReportBasis;
   context: FinancialContext | "all";
+  sourceCurrencies: SupportedCurrency[];
   includeYear?: boolean;
   includeBasis?: boolean;
 }) {
@@ -139,16 +199,39 @@ function CommonReportFields({
           />
         </label>
       ) : null}
-      <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-        Moeda de referência
-        <select name="currency" defaultValue={currency} className={inputClass}>
-          {SUPPORTED_CURRENCIES.map((item) => (
-            <option key={item} value={item}>
-              {CURRENCY_LABELS[item]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <input type="hidden" name="currency" value={currency} />
+      <fieldset className="grid min-w-0 gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+        <legend>Moedas</legend>
+        <details className="relative">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-900 outline-none hover:bg-slate-50 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 marker:hidden">
+            <span className="truncate font-semibold">
+              {sourceCurrencies.length === SUPPORTED_CURRENCIES.length
+                ? "Todas as moedas"
+                : `${sourceCurrencies.length} moedas`}
+            </span>
+            <span className="shrink-0 text-[0.68rem] font-bold text-slate-500">
+              {sourceCurrencies.length}/{SUPPORTED_CURRENCIES.length}
+            </span>
+          </summary>
+          <div className="absolute left-0 top-full z-30 mt-1 grid min-w-64 gap-1 rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
+            {SUPPORTED_CURRENCIES.map((item) => (
+              <label
+                key={item}
+                className="flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  name="sourceCurrencies"
+                  value={item}
+                  defaultChecked={sourceCurrencies.includes(item)}
+                  className="size-4 accent-emerald-700"
+                />
+                {CURRENCY_LABELS[item]}
+              </label>
+            ))}
+          </div>
+        </details>
+      </fieldset>
       <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
         Contexto
         <select name="context" defaultValue={context} className={inputClass}>
@@ -206,8 +289,7 @@ export default async function ReportsPage({
     "income-expense";
   const common = financialReportFilterSchema.safeParse({
     year: value("year") ?? currentYear(),
-    currency:
-      value("currency") ?? profileResult.profile?.preferred_currency ?? "BRL",
+    currency: profileResult.profile?.preferred_currency ?? "BRL",
     basis: value("basis") ?? "competence",
   });
   const filters = common.success
@@ -221,7 +303,17 @@ export default async function ReportsPage({
     reportContextSchema.safeParse(value("context")).data ?? "all";
   const state =
     reportPositionStateSchema.safeParse(value("state")).data ?? "active";
-  const commonFilters = { ...filters, context };
+  const requestedSourceCurrencies = Array.isArray(raw.sourceCurrencies)
+    ? raw.sourceCurrencies
+    : typeof raw.sourceCurrencies === "string"
+      ? [raw.sourceCurrencies]
+      : [];
+  const sourceCurrencies = SUPPORTED_CURRENCIES.filter((currency) =>
+    requestedSourceCurrencies.length === 0
+      ? true
+      : requestedSourceCurrencies.includes(currency),
+  );
+  const commonFilters = { ...filters, context, sourceCurrencies };
 
   return (
     <main className="mx-auto grid max-w-[1700px] gap-5 px-3 py-6 sm:px-5 lg:px-7">
@@ -272,16 +364,25 @@ export default async function ReportsPage({
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {report === "income-expense" ? (
-          <IncomeExpenseReport filters={filters} context={context} />
+          <IncomeExpenseReport filters={filters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
         ) : report === "fixed-expenses" ? (
-          <FixedExpensesReport filters={filters} context={context} />
+          <FixedExpensesReport filters={filters} context={context} sourceCurrencies={sourceCurrencies} />
         ) : report === "period-comparison" ? (
-          <ComparisonReport filters={filters} context={context} raw={raw} />
+          <ComparisonReport filters={filters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
+        ) : report === "net-worth-evolution" ? (
+          <NetWorthEvolutionReport
+            filters={filters}
+            context={context}
+            sourceCurrencies={sourceCurrencies}
+            raw={raw}
+          />
         ) : (
           <AssetPerformanceReport
             filters={filters}
             context={context}
-            state={state}
+            state={report === "asset-performance-general" ? "all" : state}
+            general={report === "asset-performance-general"}
+            sourceCurrencies={sourceCurrencies}
           />
         )}
       </section>
@@ -289,9 +390,54 @@ export default async function ReportsPage({
   );
 }
 
+async function NetWorthEvolutionReport({
+  filters,
+  context,
+  sourceCurrencies,
+  raw,
+}: {
+  filters: { year: number; currency: SupportedCurrency; basis: FinancialReportBasis };
+  context: FinancialContext | "all";
+  sourceCurrencies: SupportedCurrency[];
+  raw: Record<string, string | string[] | undefined>;
+}) {
+  const period = resolveReportPeriod(raw);
+  const result = await getCurrentUserNetWorthEvolutionReport({
+    startMonth: period.startMonth,
+    endMonth: period.endMonth,
+    currency: filters.currency,
+    context,
+    sourceCurrencies,
+    allDates: period.period === "all",
+  });
+  return (
+    <>
+      <ReportHeading title="Evolução patrimonial" description="Ativos, passivos e patrimônio líquido consolidados mês a mês." />
+      <form method="get" className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_auto]">
+        <input type="hidden" name="report" value="net-worth-evolution" />
+        <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+          Período
+          <select name="period" defaultValue={period.period} className={inputClass}>
+            {REPORT_PERIODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <MonthField name="startMonth" label="Início personalizado" value={period.startMonth} />
+        <MonthField name="endMonth" label="Fim personalizado" value={period.endMonth} />
+        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeYear={false} includeBasis={false} />
+        <ApplyFiltersButton />
+      </form>
+      {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice currency={filters.currency} missingCurrencies={result.missingCurrencies} />
+      <NetWorthEvolutionMatrix rows={result.rows} currency={filters.currency} />
+    </>
+  );
+}
+
 async function IncomeExpenseReport({
   filters,
   context,
+  sourceCurrencies,
+  raw,
 }: {
   filters: {
     year: number;
@@ -299,10 +445,18 @@ async function IncomeExpenseReport({
     basis: FinancialReportBasis;
   };
   context: FinancialContext | "all";
+  sourceCurrencies: SupportedCurrency[];
+  raw: Record<string, string | string[] | undefined>;
 }) {
+  const period = resolveReportPeriod(raw);
   const result = await getCurrentUserIncomeExpenseMatrix({
-    ...filters,
+    startMonth: period.startMonth,
+    endMonth: period.endMonth,
+    currency: filters.currency,
+    basis: filters.basis,
     context,
+    sourceCurrencies,
+    allDates: period.period === "all",
   });
   const totals = summarizeIncomeExpenseReport(result.rows);
   return (
@@ -313,10 +467,18 @@ async function IncomeExpenseReport({
       />
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[120px_220px_170px_160px_auto]"
+        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_150px_auto]"
       >
         <input type="hidden" name="report" value="income-expense" />
-        <CommonReportFields {...filters} context={context} />
+        <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+          Período
+          <select name="period" defaultValue={period.period} className={inputClass}>
+            {REPORT_PERIODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <MonthField name="startMonth" label="Início personalizado" value={period.startMonth} />
+        <MonthField name="endMonth" label="Fim personalizado" value={period.endMonth} />
+        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeYear={false} />
         <ApplyFiltersButton />
       </form>
       <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
@@ -354,8 +516,10 @@ async function IncomeExpenseReport({
       <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
-        caption={"Receitas e despesas mensais de " + String(filters.year)}
+        drilldownYear={filters.year}
+        caption={`Receitas e despesas mensais de ${monthLabel(period.startMonth, period.endMonth)}`}
         emptyMessage="Nenhuma receita ou despesa encontrada neste recorte."
+        months={result.months}
       />
     </>
   );
@@ -364,6 +528,7 @@ async function IncomeExpenseReport({
 async function FixedExpensesReport({
   filters,
   context,
+  sourceCurrencies,
 }: {
   filters: {
     year: number;
@@ -371,12 +536,14 @@ async function FixedExpensesReport({
     basis: FinancialReportBasis;
   };
   context: FinancialContext | "all";
+  sourceCurrencies: SupportedCurrency[];
 }) {
   const result = await getCurrentUserFixedExpenseReport({
     year: filters.year,
     currency: filters.currency,
     basis: filters.basis,
     context,
+    sourceCurrencies,
   });
   return (
     <>
@@ -389,7 +556,7 @@ async function FixedExpensesReport({
         className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[120px_220px_170px_160px_auto]"
       >
         <input type="hidden" name="report" value="fixed-expenses" />
-        <CommonReportFields {...filters} context={context} />
+        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} />
         <ApplyFiltersButton />
       </form>
       {result.hasError ? <ReportError /> : null}
@@ -400,6 +567,7 @@ async function FixedExpensesReport({
       <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
+        drilldownYear={filters.year}
         caption={"Despesas fixas realizadas em " + String(filters.year)}
         emptyMessage="Nenhum lançamento foi encontrado em subcategorias marcadas como fixas."
         showSections={false}
@@ -411,6 +579,7 @@ async function FixedExpensesReport({
 async function ComparisonReport({
   filters,
   context,
+  sourceCurrencies,
   raw,
 }: {
   filters: {
@@ -419,6 +588,7 @@ async function ComparisonReport({
     basis: FinancialReportBasis;
   };
   context: FinancialContext | "all";
+  sourceCurrencies: SupportedCurrency[];
   raw: Record<string, string | string[] | undefined>;
 }) {
   const text = (key: string) =>
@@ -444,6 +614,7 @@ async function ComparisonReport({
     currency: filters.currency,
     basis: filters.basis,
     context,
+    sourceCurrencies,
   });
   return (
     <>
@@ -479,6 +650,7 @@ async function ComparisonReport({
         <CommonReportFields
           {...filters}
           context={context}
+          sourceCurrencies={sourceCurrencies}
           includeYear={false}
         />
         <ApplyFiltersButton />
@@ -508,6 +680,8 @@ async function AssetPerformanceReport({
   filters,
   context,
   state,
+  general,
+  sourceCurrencies,
 }: {
   filters: {
     year: number;
@@ -516,36 +690,34 @@ async function AssetPerformanceReport({
   };
   context: FinancialContext | "all";
   state: "active" | "all";
+  general: boolean;
+  sourceCurrencies: SupportedCurrency[];
 }) {
   const result = await getCurrentUserAssetPerformanceReport({
     currency: filters.currency,
     context,
     state,
+    sourceCurrencies,
   });
   return (
     <>
       <ReportHeading
-        title="Performance de ativos"
-        description="Valor, resultado e retorno das posições por classe de ativo."
+        title={general ? "Performance geral" : "Performance de ativos"}
+        description={general ? "Inclui posições ativas e investimentos já liquidados." : "Posições ativas por classe, com resultados e taxas de retorno."}
       />
       <form
         method="get"
         className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[220px_170px_190px_auto]"
       >
-        <input type="hidden" name="report" value="asset-performance" />
+        <input type="hidden" name="report" value={general ? "asset-performance-general" : "asset-performance"} />
         <CommonReportFields
           {...filters}
           context={context}
+          sourceCurrencies={sourceCurrencies}
           includeYear={false}
           includeBasis={false}
         />
-        <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-          Posições
-          <select name="state" defaultValue={state} className={inputClass}>
-            <option value="active">Somente ativas</option>
-            <option value="all">Ativas e arquivadas</option>
-          </select>
-        </label>
+        <input type="hidden" name="state" value={general ? "all" : "active"} />
         <ApplyFiltersButton />
       </form>
       {result.hasError ? <ReportError /> : null}

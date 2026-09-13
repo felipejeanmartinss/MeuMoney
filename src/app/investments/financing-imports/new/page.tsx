@@ -29,6 +29,22 @@ export default function NewFinancingImportPage() {
         <FinancingImportUploadForm />
       </section>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
+        <h2 className="font-extrabold text-slate-950">
+          Prefere informar o histórico manualmente?
+        </h2>
+        <p className="mt-1 text-slate-600">
+          Cadastre contrato, taxas, saldos e cada parcela em uma tabela,
+          incluindo principal, juros, encargos e pagamentos.
+        </p>
+        <Link
+          href="/investments/financings/new"
+          className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-800 hover:bg-slate-50"
+        >
+          Cadastrar histórico manual
+        </Link>
+      </section>
+
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
         <h2 className="font-extrabold">Suporte validado nesta versão</h2>
         <p className="mt-2 leading-6">

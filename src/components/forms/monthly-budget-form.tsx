@@ -25,7 +25,14 @@ const initialState: BudgetFormState = { status: "idle" };
 
 function compareAmount(left: number, right: number) {
   if (left === right) return 0;
-  return left < right ? -1 : 1;
+  return left > right ? -1 : 1;
+}
+
+function formatBudgetAmount(value: number) {
+  if (value === 0) return "—";
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(
+    Math.round(value / 100),
+  );
 }
 
 function buildHierarchy(categories: BudgetCategory[]) {
@@ -105,7 +112,7 @@ export function MonthlyBudgetForm({ referenceMonth, context, currency, categorie
               ) : null}
               <button type="button" aria-expanded={expanded} onClick={() => toggleCategory(node.key)} className="flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-100 bg-emerald-50/50 px-3 text-left font-semibold text-slate-900 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-600">
                 <span><span aria-hidden="true" className="mr-2">{expanded ? "▾" : "▸"}</span>{node.category.name}</span>
-                <span className="tabular-nums text-slate-600">{minorUnitsToInput(node.totalAmountMinor)}</span>
+                <span className="tabular-nums text-slate-600">{formatBudgetAmount(node.totalAmountMinor)}</span>
               </button>
               <div className={expanded ? "block" : "hidden"}>
                 <BudgetInput category={node.category} label="Sem subcategoria" nested />

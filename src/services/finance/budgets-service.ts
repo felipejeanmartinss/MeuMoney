@@ -12,6 +12,10 @@ export type MonthlyBudgetMutationInput = {
   plannedAmountMinor: number;
 };
 
+type AnnualBudgetMutationInput = MonthlyBudgetMutationInput & {
+  referenceMonth: string;
+};
+
 const progressColumns =
   "budget_id, user_id, category_id, category_name, context, currency, reference_month, planned_amount_minor, realized_amount_minor, available_amount_minor, percentage_consumed, category_kind";
 
@@ -95,25 +99,16 @@ export async function getCurrentUserAnnualBudget(input: {
 
 export async function upsertCurrentUserAnnualBudgets(
   currency: SupportedCurrency,
-  rows: Array<MonthlyBudgetMutationInput & { referenceMonth: string }>,
+  rows: AnnualBudgetMutationInput[],
 ) {
   const { supabase, user } = await requireUser();
   if (rows.length === 0) return { ok: true as const };
-
-  const { error } = await supabase.from("monthly_budgets").upsert(
-    rows.map((row) => ({
-      user_id: user.id,
-      category_id: row.categoryId,
-      reference_month: row.referenceMonth,
-      currency,
-      planned_amount_minor: row.plannedAmountMinor,
-    })),
-    { onConflict: "user_id,reference_month,currency,category_id" },
-  );
-
-  return error
-    ? { ok: false as const, message: "Não foi possível salvar o orçamento anual." }
-    : { ok: true as const };
+  return saveCurrentUserBudgetRows({
+    supabase,
+    userId: user.id,
+    currency,
+    rows,
+  });
 }
 
 export async function upsertCurrentUserMonthlyBudgets(
@@ -123,25 +118,94 @@ export async function upsertCurrentUserMonthlyBudgets(
 ) {
   const { supabase, user } = await requireUser();
   if (rows.length === 0) return { ok: true as const };
+  return saveCurrentUserBudgetRows({
+    supabase,
+    userId: user.id,
+    currency,
+    rows: rows.map((row) => ({ ...row, referenceMonth })),
+  });
+}
 
-  const { error } = await supabase.from("monthly_budgets").upsert(
-    rows.map((row) => ({
-      user_id: user.id,
-      category_id: row.categoryId,
-      reference_month: referenceMonth,
-      currency,
-      planned_amount_minor: row.plannedAmountMinor,
-    })),
-    {
-      onConflict: "user_id,reference_month,currency,category_id",
-    },
+async function saveCurrentUserBudgetRows({
+  supabase,
+  userId,
+  currency,
+  rows,
+}: {
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"];
+  userId: string;
+  currency: SupportedCurrency;
+  rows: AnnualBudgetMutationInput[];
+}) {
+  const referenceMonths = [...new Set(rows.map((row) => row.referenceMonth))];
+  const { data: existingRows, error: readError } = await supabase
+    .from("monthly_budgets")
+    .select("id, category_id, reference_month, planned_amount_minor")
+    .eq("user_id", userId)
+    .eq("currency", currency)
+    .in("reference_month", referenceMonths);
+
+  if (readError) {
+    return {
+      ok: false as const,
+      message: "Não foi possível conferir os valores já planejados.",
+    };
+  }
+
+  const existingByCell = new Map(
+    (existingRows ?? []).map((row) => [
+      `${row.category_id}|${row.reference_month}`,
+      row,
+    ]),
   );
+  const inserts: Array<{
+    user_id: string;
+    category_id: string;
+    reference_month: string;
+    currency: SupportedCurrency;
+    planned_amount_minor: number;
+  }> = [];
+  const updates: Array<{ id: string; plannedAmountMinor: number }> = [];
 
-  return error
+  for (const row of rows) {
+    const existing = existingByCell.get(
+      `${row.categoryId}|${row.referenceMonth}`,
+    );
+    if (existing) {
+      if (Number(existing.planned_amount_minor) !== row.plannedAmountMinor) {
+        updates.push({ id: existing.id, plannedAmountMinor: row.plannedAmountMinor });
+      }
+    } else if (row.plannedAmountMinor > 0) {
+      inserts.push({
+        user_id: userId,
+        category_id: row.categoryId,
+        reference_month: row.referenceMonth,
+        currency,
+        planned_amount_minor: row.plannedAmountMinor,
+      });
+    }
+  }
+
+  const operations: Array<PromiseLike<{ error: { message?: string } | null }>> = [];
+  if (inserts.length) {
+    operations.push(supabase.from("monthly_budgets").insert(inserts));
+  }
+  for (const update of updates) {
+    operations.push(
+      supabase
+        .from("monthly_budgets")
+        .update({ planned_amount_minor: update.plannedAmountMinor })
+        .eq("user_id", userId)
+        .eq("id", update.id),
+    );
+  }
+
+  const results = await Promise.all(operations);
+  return results.some((result) => result.error)
     ? {
         ok: false as const,
         message:
-          "Não foi possível salvar o orçamento. Verifique as categorias e tente novamente.",
+          "Não foi possível salvar todos os valores planejados. Tente novamente.",
       }
     : { ok: true as const };
 }
@@ -151,17 +215,43 @@ export async function copyCurrentUserPreviousMonthBudgets(input: {
   context: FinancialContext;
   currency: SupportedCurrency;
 }) {
-  const { supabase } = await requireUser();
-  const { data, error } = await supabase.rpc("copy_previous_month_budgets", {
-    target_reference_month: input.referenceMonth,
-    target_context: input.context,
-    target_currency: input.currency,
+  const { supabase, user } = await requireUser();
+  const target = new Date(`${input.referenceMonth}T12:00:00Z`);
+  target.setUTCMonth(target.getUTCMonth() - 1);
+  const previousReferenceMonth = `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const { data: categories, error: categoriesError } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("context", input.context);
+  if (categoriesError) {
+    return { ok: false as const, message: "Não foi possível localizar as categorias do orçamento." };
+  }
+  const categoryIds = (categories ?? []).map((category) => category.id);
+  if (categoryIds.length === 0) return { ok: true as const, copiedCount: 0 };
+  const { data: previousRows, error: previousError } = await supabase
+    .from("monthly_budgets")
+    .select("category_id, planned_amount_minor")
+    .eq("user_id", user.id)
+    .eq("reference_month", previousReferenceMonth)
+    .eq("currency", input.currency)
+    .in("category_id", categoryIds);
+  if (previousError) {
+    return { ok: false as const, message: "Não foi possível ler o orçamento do mês anterior." };
+  }
+  const rows = (previousRows ?? []).map((row) => ({
+    categoryId: row.category_id,
+    referenceMonth: input.referenceMonth,
+    plannedAmountMinor: coerceMinorUnits(row.planned_amount_minor),
+  }));
+  if (rows.length === 0) return { ok: true as const, copiedCount: 0 };
+  const result = await saveCurrentUserBudgetRows({
+    supabase,
+    userId: user.id,
+    currency: input.currency,
+    rows,
   });
-
-  return error
-    ? {
-        ok: false as const,
-        message: "Não foi possível copiar o orçamento do mês anterior.",
-      }
-    : { ok: true as const, copiedCount: data };
+  return result.ok
+    ? { ok: true as const, copiedCount: rows.length }
+    : result;
 }

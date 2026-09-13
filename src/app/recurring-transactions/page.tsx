@@ -21,15 +21,15 @@ import type {
 import { toIsoDate } from "@/utils/dates";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
-export const metadata = { title: "Contas a Pagar" };
+export const metadata = { title: "Recorrências" };
 
 const messages: Record<string, string> = {
-  created: "Conta a pagar criada com sucesso.",
-  updated: "Conta a pagar atualizada com sucesso.",
-  "state-active": "Conta a pagar reativada.",
-  "state-suspended": "Conta a pagar suspensa.",
-  "state-ended": "Conta a pagar encerrada definitivamente.",
-  "status-error": "Não foi possível alterar o estado da conta a pagar.",
+  created: "Recorrência criada com sucesso.",
+  updated: "Recorrência atualizada com sucesso.",
+  "state-active": "Recorrência reativada.",
+  "state-suspended": "Recorrência suspensa.",
+  "state-ended": "Recorrência encerrada definitivamente.",
+  "status-error": "Não foi possível alterar o estado da recorrência.",
   "generation-error": "Não foi possível gerar os lançamentos previstos.",
 };
 
@@ -138,7 +138,13 @@ export default async function RecurringTransactionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const rawParams = await searchParams;
-  const { recurrences, accounts, categories, groups, hasError } =
+  const {
+    recurrences,
+    accounts,
+    categories,
+    groups,
+    hasError,
+  } =
     await listCurrentUserRecurringTransactions();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
@@ -215,7 +221,7 @@ export default async function RecurringTransactionsPage({
             Agenda financeira
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Contas a Pagar
+            Recorrências
           </h1>
           <p className="mt-2 max-w-2xl text-slate-600">
             Acompanhe compromissos futuros e gere previsões sem alterar o saldo
@@ -226,7 +232,7 @@ export default async function RecurringTransactionsPage({
           href="/recurring-transactions/new"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
-          Nova conta a pagar
+          Nova recorrência
         </Link>
       </header>
 
@@ -269,35 +275,33 @@ export default async function RecurringTransactionsPage({
         </article>
       </section>
 
-      <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-extrabold text-slate-950">Filtros</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Refine a agenda sem alterar os compromissos.
-            </p>
-          </div>
-          <Link
-            href="/recurring-transactions"
-            className="text-sm font-bold text-emerald-700 hover:underline"
-          >
-            Limpar
-          </Link>
-        </div>
-        <form method="get" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+      <details
+        open={Boolean(period || accountFilter || typeFilter || stateFilter)}
+        className="group rounded-xl border border-slate-200 bg-white shadow-sm"
+      >
+        <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-extrabold text-slate-800 marker:hidden">
+          <span>Filtros</span>
+          <span className="text-slate-400 transition group-open:rotate-180" aria-hidden="true">
+            ▾
+          </span>
+        </summary>
+        <form
+          method="get"
+          className="grid gap-2 border-t border-slate-100 p-2 sm:grid-cols-2 xl:grid-cols-5"
+        >
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Período
             <input
-              className={inputClass()}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="period"
               type="month"
               defaultValue={period}
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Conta
             <select
-              className={inputClass()}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="accountId"
               defaultValue={accountFilter}
             >
@@ -309,10 +313,10 @@ export default async function RecurringTransactionsPage({
               ))}
             </select>
           </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Tipo
             <select
-              className={inputClass()}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="type"
               defaultValue={typeFilter}
             >
@@ -321,10 +325,10 @@ export default async function RecurringTransactionsPage({
               <option value="expense">Despesa</option>
             </select>
           </label>
-          <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+          <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
             Situação
             <select
-              className={inputClass()}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-600"
               name="state"
               defaultValue={stateFilter}
             >
@@ -333,15 +337,19 @@ export default async function RecurringTransactionsPage({
               <option value="suspended">Suspensa</option>
             </select>
           </label>
-          <button className="min-h-11 self-end rounded-xl bg-slate-950 px-4 font-bold text-white hover:bg-slate-800">
-            Aplicar filtros
-          </button>
+          <div className="flex h-8 self-end gap-2">
+            <Link
+              href="/recurring-transactions"
+              className="inline-flex flex-1 items-center justify-center rounded-md border border-slate-300 px-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Limpar
+            </Link>
+            <button className="flex-1 rounded-md bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800">
+              Aplicar
+            </button>
+          </div>
         </form>
-        <p className="text-xs text-slate-500">
-          Contas encerradas saem da agenda, mas permanecem preservadas no
-          histórico para auditoria.
-        </p>
-      </section>
+      </details>
 
       <section className="grid gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:grid-cols-[1fr_auto] sm:items-end">
         <div>
@@ -376,14 +384,14 @@ export default async function RecurringTransactionsPage({
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
         >
-          Não foi possível carregar as contas a pagar. Tente novamente.
+          Não foi possível carregar as recorrências. Tente novamente.
         </p>
       ) : null}
 
       {!hasError && filtered.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <h2 className="text-xl font-extrabold text-slate-950">
-            Nenhuma conta a pagar encontrada
+            Nenhuma recorrência encontrada
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-slate-600">
             Ajuste os filtros ou cadastre um novo compromisso.

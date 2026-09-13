@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  calculateInvestmentValueFromUnitPrice,
   calculateInvestmentPerformance,
   calculatePreviousMonthInvestmentPerformance,
   summarizeInvestmentPeriodPerformance,
@@ -398,6 +399,67 @@ export async function updateCurrentUserInvestmentPosition(
         message:
           "Não foi possível atualizar a posição. Use uma data igual ou posterior à posição atual.",
       }
+    : { ok: true as const };
+}
+
+export async function listCurrentUserMarketPricedInvestmentPositions() {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("investment_positions")
+    .select(positionColumns)
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .in("investment_type", ["stock", "fii"])
+    .order("currency")
+    .order("asset_name");
+  return {
+    positions: (data ?? []).map((position) => ({
+      ...position,
+      accumulated_cost_minor: coerceMinorUnits(position.accumulated_cost_minor),
+      current_value_minor: coerceMinorUnits(position.current_value_minor),
+    })),
+    hasError: Boolean(error),
+  };
+}
+
+export async function updateCurrentUserInvestmentUnitPrices(
+  rows: { positionId: string; unitPriceMinor: number }[],
+) {
+  const { supabase, user } = await requireUser();
+  const positionIds = [...new Set(rows.map((row) => row.positionId))];
+  if (positionIds.length !== rows.length) {
+    return { ok: false as const, message: "Existem posições repetidas." };
+  }
+  const { data: positions, error: readError } = await supabase
+    .from("investment_positions")
+    .select("id, quantity, investment_type")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .in("id", positionIds);
+  if (readError || (positions?.length ?? 0) !== rows.length) {
+    return { ok: false as const, message: "Não foi possível conferir todas as posições." };
+  }
+  const positionById = new Map((positions ?? []).map((position) => [position.id, position]));
+  const positionDate = currentIsoDate();
+  const results = await Promise.all(
+    rows.map((row) => {
+      const position = positionById.get(row.positionId)!;
+      if (position.investment_type !== "stock" && position.investment_type !== "fii") {
+        return Promise.resolve({ error: { message: "invalid_market_priced_position" } });
+      }
+      const currentValueMinor = calculateInvestmentValueFromUnitPrice(
+        position.quantity,
+        row.unitPriceMinor,
+      );
+      return supabase
+        .from("investment_positions")
+        .update({ current_value_minor: currentValueMinor, position_date: positionDate })
+        .eq("user_id", user.id)
+        .eq("id", row.positionId);
+    }),
+  );
+  return results.some((result) => result.error)
+    ? { ok: false as const, message: "Não foi possível atualizar todas as cotações." }
     : { ok: true as const };
 }
 
