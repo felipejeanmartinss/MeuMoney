@@ -65,7 +65,7 @@
 - O extrato pertence à conta e combina receitas, despesas e o lado correspondente de cada transferência em ordem cronológica. O saldo linha a linha usa o realizado até ontem e passa a representar a projeção a partir de hoje; uma divisória visual separa os dois períodos.
 - A conciliação confirma um item realizado e ativo contra o extrato externo. Cada lado de uma transferência possui estado próprio, porque contas diferentes podem ser conciliadas em momentos diferentes.
 - `reconciled_at` registra quando ocorreu a última conciliação. Alterar conta, tipo, direção, moeda, valor, data, status ou atividade remove automaticamente essa confirmação e exige nova conferência.
-- Itens previstos ou inativos permanecem visíveis no extrato, mas não podem ser marcados como reconciliados nem alterar o saldo realizado.
+- Itens inativos permanecem visíveis no extrato, mas não podem ser reconciliados nem alterar o saldo realizado. Um lançamento previsto e ativo pode ser marcado como reconciliado; a mesma operação o promove atomicamente para Realizado e remove a identificação de Previsto. Transferências previstas continuam bloqueadas para preservar a consistência entre seus dois lados.
 
 ## Cartões de crédito — Sprint 4
 

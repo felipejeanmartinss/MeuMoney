@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountRegisterReconciliationSchema,
   buildAccountRegister,
+  canReconcileAccountEntry,
   summarizeAccountRegisterBalances,
   type AccountRegisterSourceEntry,
 } from "../src/domain/account-register";
@@ -18,6 +19,24 @@ const migration = readFileSync(
     "supabase",
     "migrations",
     "20260731000100_account_register_subcategories_reconciliation.sql",
+  ),
+  "utf8",
+);
+
+const pendingReconciliationMigration = readFileSync(
+  resolve(
+    "supabase",
+    "migrations",
+    "20260913182753_reconcile_pending_transactions.sql",
+  ),
+  "utf8",
+);
+
+const completedRecurringMigration = readFileSync(
+  resolve(
+    "supabase",
+    "migrations",
+    "20260913183348_allow_completed_recurring_transactions.sql",
   ),
   "utf8",
 );
@@ -230,5 +249,51 @@ describe("account register and subcategories", () => {
     });
 
     expect(parsed.page).toBe(4);
+  });
+
+  it("allows an active pending transaction to be reconciled, but not a pending transfer", () => {
+    expect(
+      canReconcileAccountEntry({
+        entryType: "transaction",
+        isActive: true,
+        status: "pending",
+      }),
+    ).toBe(true);
+    expect(
+      canReconcileAccountEntry({
+        entryType: "transfer_entry",
+        isActive: true,
+        status: "pending",
+      }),
+    ).toBe(false);
+    expect(
+      canReconcileAccountEntry({
+        entryType: "transaction",
+        isActive: false,
+        status: "pending",
+      }),
+    ).toBe(false);
+  });
+
+  it("promotes a pending transaction before recording its reconciliation", () => {
+    const promotion = pendingReconciliationMigration.indexOf(
+      "set status = 'completed'",
+    );
+    const reconciliation = pendingReconciliationMigration.indexOf(
+      "set reconciled_at = now()",
+    );
+
+    expect(promotion).toBeGreaterThan(-1);
+    expect(reconciliation).toBeGreaterThan(promotion);
+    expect(pendingReconciliationMigration).toContain("and status = 'pending'");
+    expect(pendingReconciliationMigration).toContain(
+      "target_entry_type = 'transfer_entry'",
+    );
+    expect(completedRecurringMigration).toContain(
+      "status in ('pending', 'completed')",
+    );
+    expect(completedRecurringMigration).toContain(
+      "origin_id = recurring_transaction_id",
+    );
   });
 });

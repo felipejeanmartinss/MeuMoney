@@ -53,6 +53,15 @@ export const accountRegisterReconciliationSchema = z.object({
   page: z.coerce.number().int().min(1).max(100_000),
 });
 
+export function canReconcileAccountEntry(
+  entry: Pick<AccountRegisterSourceEntry, "entryType" | "isActive" | "status">,
+) {
+  return (
+    entry.isActive &&
+    (entry.status === "completed" || entry.entryType === "transaction")
+  );
+}
+
 export function accountRegisterSignedAmount(
   direction: AccountRegisterDirection,
   amountMinor: number,
