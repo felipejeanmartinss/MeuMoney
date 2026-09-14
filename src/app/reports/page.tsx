@@ -1,9 +1,15 @@
 import Link from "next/link";
 import {
+  deleteSavedFinancialReport,
+  saveFinancialReport,
+} from "@/app/actions/reports";
+import {
   AssetPerformanceMatrix,
   MonthlyFinancialMatrix,
   NetWorthEvolutionMatrix,
   PeriodComparisonMatrix,
+  type ReportCategoryGrouping,
+  type ReportTimeGrouping,
 } from "@/components/reports/financial-report-matrices";
 import {
   FINANCIAL_REPORT_LABELS,
@@ -19,6 +25,9 @@ import {
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
 import { formatMoney } from "@/domain/money";
 import { getCurrentProfile } from "@/services/auth/server-auth";
+import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
+import { listCurrentUserCategories } from "@/services/finance/categories-service";
+import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 import {
   getCurrentUserAssetPerformanceReport,
   getCurrentUserFixedExpenseReport,
@@ -26,6 +35,7 @@ import {
   getCurrentUserNetWorthEvolutionReport,
   getCurrentUserPeriodComparisonReport,
 } from "@/services/reports/financial-reports-service";
+import { listCurrentUserSavedFinancialReports } from "@/services/reports/saved-financial-reports-service";
 import type {
   FinancialContext,
   FinancialReportBasis,
@@ -102,6 +112,32 @@ const REPORT_PERIODS = [
 
 type ReportPeriod = (typeof REPORT_PERIODS)[number][0];
 
+type ReportFilterOptions = {
+  sources: Array<{ value: string; label: string }>;
+  categories: Array<{ value: string; label: string }>;
+  subcategories: Array<{ value: string; label: string }>;
+};
+
+type AppliedReportFilters = {
+  year: number;
+  currency: SupportedCurrency;
+  basis: FinancialReportBasis;
+  sourceKeys: string[];
+  categoryIds: string[];
+  subcategoryIds: string[];
+  timeGrouping: ReportTimeGrouping;
+  categoryGrouping: ReportCategoryGrouping;
+  filterOptions: ReportFilterOptions;
+};
+
+function arrayParam(
+  raw: Record<string, string | string[] | undefined>,
+  key: string,
+) {
+  const value = raw[key];
+  return Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+}
+
 function shiftMonth(value: string, offset: number) {
   const [year, month] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1 + offset, 1));
@@ -152,6 +188,11 @@ function reportHref(
     basis: FinancialReportBasis;
     context: FinancialContext | "all";
     sourceCurrencies: SupportedCurrency[];
+    sourceKeys?: string[];
+    categoryIds?: string[];
+    subcategoryIds?: string[];
+    timeGrouping?: ReportTimeGrouping;
+    categoryGrouping?: ReportCategoryGrouping;
   },
 ) {
   const query = new URLSearchParams({
@@ -164,7 +205,30 @@ function reportHref(
   for (const sourceCurrency of filters.sourceCurrencies) {
     query.append("sourceCurrencies", sourceCurrency);
   }
+  for (const sourceKey of filters.sourceKeys ?? []) query.append("sourceKeys", sourceKey);
+  for (const categoryId of filters.categoryIds ?? []) query.append("categoryIds", categoryId);
+  for (const subcategoryId of filters.subcategoryIds ?? []) query.append("subcategoryIds", subcategoryId);
+  if (filters.timeGrouping) query.set("timeGrouping", filters.timeGrouping);
+  if (filters.categoryGrouping) query.set("categoryGrouping", filters.categoryGrouping);
   return "/reports?" + query.toString();
+}
+
+function savedReportHref(
+  reportType: FinancialReportType,
+  filters: unknown,
+) {
+  const query = new URLSearchParams({ report: reportType });
+  if (filters && typeof filters === "object" && !Array.isArray(filters)) {
+    for (const [key, value] of Object.entries(filters)) {
+      if (typeof value === "string") query.set(key, value);
+      else if (Array.isArray(value)) {
+        for (const item of value) {
+          if (typeof item === "string") query.append(key, item);
+        }
+      }
+    }
+  }
+  return `/reports?${query.toString()}`;
 }
 
 function CommonReportFields({
@@ -175,6 +239,16 @@ function CommonReportFields({
   sourceCurrencies,
   includeYear = true,
   includeBasis = true,
+  sourceKeys = [],
+  categoryIds = [],
+  subcategoryIds = [],
+  filterOptions,
+  timeGrouping = "month",
+  categoryGrouping = "category",
+  includeTimeGrouping = false,
+  includeCategoryGrouping = false,
+  includeSourceFilter = true,
+  includeCategoryFilters = true,
 }: {
   year: number;
   currency: SupportedCurrency;
@@ -183,6 +257,16 @@ function CommonReportFields({
   sourceCurrencies: SupportedCurrency[];
   includeYear?: boolean;
   includeBasis?: boolean;
+  sourceKeys?: string[];
+  categoryIds?: string[];
+  subcategoryIds?: string[];
+  filterOptions: ReportFilterOptions;
+  timeGrouping?: ReportTimeGrouping;
+  categoryGrouping?: ReportCategoryGrouping;
+  includeTimeGrouping?: boolean;
+  includeCategoryGrouping?: boolean;
+  includeSourceFilter?: boolean;
+  includeCategoryFilters?: boolean;
 }) {
   return (
     <>
@@ -232,6 +316,49 @@ function CommonReportFields({
           </div>
         </details>
       </fieldset>
+      {includeSourceFilter ? (
+        <CheckboxFilter
+          label="Contas e cartões"
+          name="sourceKeys"
+          options={filterOptions.sources}
+          selected={sourceKeys}
+        />
+      ) : null}
+      {includeCategoryFilters ? (
+        <>
+          <CheckboxFilter
+            label="Categorias"
+            name="categoryIds"
+            options={filterOptions.categories}
+            selected={categoryIds}
+          />
+          <CheckboxFilter
+            label="Subcategorias"
+            name="subcategoryIds"
+            options={filterOptions.subcategories}
+            selected={subcategoryIds}
+          />
+        </>
+      ) : null}
+      {includeTimeGrouping ? (
+        <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+          Visualizar período por
+          <select name="timeGrouping" defaultValue={timeGrouping} className={inputClass}>
+            <option value="month">Mês</option>
+            <option value="quarter">Trimestre</option>
+            <option value="year">Ano</option>
+          </select>
+        </label>
+      ) : null}
+      {includeCategoryGrouping ? (
+        <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+          Detalhamento
+          <select name="categoryGrouping" defaultValue={categoryGrouping} className={inputClass}>
+            <option value="category">Categorias</option>
+            <option value="subcategory">Subcategorias</option>
+          </select>
+        </label>
+      ) : null}
       <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
         Contexto
         <select name="context" defaultValue={context} className={inputClass}>
@@ -250,6 +377,46 @@ function CommonReportFields({
         </label>
       ) : null}
     </>
+  );
+}
+
+function CheckboxFilter({
+  label,
+  name,
+  options,
+  selected,
+}: {
+  label: string;
+  name: string;
+  options: Array<{ value: string; label: string }>;
+  selected: string[];
+}) {
+  return (
+    <fieldset className="grid min-w-0 gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+      <legend>{label}</legend>
+      <details className="relative">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-900 marker:hidden">
+          <span className="truncate font-semibold">
+            {selected.length === 0 ? "Todos" : `${selected.length} selecionados`}
+          </span>
+          <span aria-hidden="true" className="text-slate-400">▾</span>
+        </summary>
+        <div className="absolute left-0 top-full z-30 mt-1 grid max-h-72 min-w-72 gap-1 overflow-auto rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
+          {options.length ? options.map((option) => (
+            <label key={option.value} className="flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              <input
+                type="checkbox"
+                name={name}
+                value={option.value}
+                defaultChecked={selected.length === 0 || selected.includes(option.value)}
+                className="size-4 accent-emerald-700"
+              />
+              <span className="truncate">{option.label}</span>
+            </label>
+          )) : <span className="px-2 py-1 text-sm font-normal text-slate-500">Nenhuma opção</span>}
+        </div>
+      </details>
+    </fieldset>
   );
 }
 
@@ -278,9 +445,20 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [raw, profileResult] = await Promise.all([
+  const [
+    raw,
+    profileResult,
+    savedReportsResult,
+    accountsResult,
+    cardsResult,
+    categoriesResult,
+  ] = await Promise.all([
     searchParams,
     getCurrentProfile(),
+    listCurrentUserSavedFinancialReports(),
+    listCurrentUserAccounts(),
+    listCurrentUserCreditCards(),
+    listCurrentUserCategories(),
   ]);
   const value = (key: string) =>
     typeof raw[key] === "string" ? raw[key] : undefined;
@@ -313,7 +491,66 @@ export default async function ReportsPage({
       ? true
       : requestedSourceCurrencies.includes(currency),
   );
-  const commonFilters = { ...filters, context, sourceCurrencies };
+  const filterOptions: ReportFilterOptions = {
+    sources: [
+      ...accountsResult.accounts
+        .filter((account) => !account.archived_at)
+        .map((account) => ({
+          value: `account:${account.id}`,
+          label: `${account.name} · ${account.currency}`,
+        })),
+      ...cardsResult.cards
+        .filter((card) => card.is_active)
+        .map((card) => ({
+          value: `card:${card.id}`,
+          label: `${card.name} · cartão ${card.currency}`,
+        })),
+    ],
+    categories: categoriesResult.categories
+      .filter((category) => !category.parent_id && !category.archived_at)
+      .map((category) => ({ value: category.id, label: category.name })),
+    subcategories: categoriesResult.categories
+      .filter((category) => Boolean(category.parent_id) && !category.archived_at)
+      .map((category) => ({ value: category.id, label: category.name })),
+  };
+  const normalizeSelection = (key: string, options: Array<{ value: string }>) => {
+    const requested = arrayParam(raw, key).filter((item) =>
+      options.some((option) => option.value === item),
+    );
+    return requested.length === options.length ? [] : requested;
+  };
+  const sourceKeys = normalizeSelection("sourceKeys", filterOptions.sources);
+  const categoryIds = normalizeSelection("categoryIds", filterOptions.categories);
+  const subcategoryIds = normalizeSelection("subcategoryIds", filterOptions.subcategories);
+  const timeGrouping: ReportTimeGrouping = ["month", "quarter", "year"].includes(
+    value("timeGrouping") ?? "",
+  )
+    ? (value("timeGrouping") as ReportTimeGrouping)
+    : "month";
+  const categoryGrouping: ReportCategoryGrouping = value("categoryGrouping") === "subcategory"
+    ? "subcategory"
+    : "category";
+  const appliedFilters = {
+    ...filters,
+    sourceKeys,
+    categoryIds,
+    subcategoryIds,
+    timeGrouping,
+    categoryGrouping,
+    filterOptions,
+  };
+  const commonFilters = { ...appliedFilters, context, sourceCurrencies };
+  const savedFilters = Object.fromEntries(
+    Object.entries(raw).filter(([key, item]) => key !== "message" && item !== undefined),
+  );
+  const reportMessage =
+    value("message") === "saved"
+      ? "Relatório salvo e fixado nas opções."
+      : value("message") === "saved-deleted"
+        ? "Relatório salvo excluído."
+        : value("message")
+          ? "Não foi possível concluir a alteração do relatório salvo."
+          : null;
 
   return (
     <main className="mx-auto grid max-w-[1700px] gap-5 px-3 py-6 sm:px-5 lg:px-7">
@@ -357,28 +594,74 @@ export default async function ReportsPage({
                   </Link>
                 );
               })}
+              {savedReportsResult.reports
+                .filter((saved) =>
+                  (group.reports as readonly string[]).includes(saved.report_type),
+                )
+                .map((saved) => (
+                  <span key={saved.id} className="inline-flex min-h-9 items-center overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50">
+                    <Link
+                      href={savedReportHref(saved.report_type, saved.filters)}
+                      className="px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+                    >
+                      {saved.name}
+                    </Link>
+                    <form action={deleteSavedFinancialReport}>
+                      <input type="hidden" name="id" value={saved.id} />
+                      <button
+                        type="submit"
+                        aria-label={`Excluir relatório salvo ${saved.name}`}
+                        className="min-h-9 border-l border-emerald-200 px-2 text-sm font-black text-rose-700 hover:bg-rose-50"
+                      >
+                        ×
+                      </button>
+                    </form>
+                  </span>
+                ))}
             </div>
           </div>
         ))}
+        <details className="self-end rounded-xl border border-slate-200 bg-slate-50">
+          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-black text-slate-700 marker:hidden">
+            + Salvar visualização atual
+          </summary>
+          <form action={saveFinancialReport} className="flex flex-col gap-2 border-t border-slate-200 p-3">
+            <input type="hidden" name="reportType" value={report} />
+            <input type="hidden" name="filters" value={JSON.stringify(savedFilters)} />
+            <label className="grid gap-1 text-xs font-bold text-slate-600">
+              Nome do relatório
+              <input name="name" maxLength={80} required className={inputClass} placeholder="Ex.: Gastos da casa" />
+            </label>
+            <button className="min-h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">
+              Salvar e fixar
+            </button>
+          </form>
+        </details>
       </nav>
+
+      {reportMessage ? (
+        <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+          {reportMessage}
+        </p>
+      ) : null}
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {report === "income-expense" ? (
-          <IncomeExpenseReport filters={filters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
+          <IncomeExpenseReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
         ) : report === "fixed-expenses" ? (
-          <FixedExpensesReport filters={filters} context={context} sourceCurrencies={sourceCurrencies} />
+          <FixedExpensesReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} />
         ) : report === "period-comparison" ? (
-          <ComparisonReport filters={filters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
+          <ComparisonReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
         ) : report === "net-worth-evolution" ? (
           <NetWorthEvolutionReport
-            filters={filters}
+            filters={appliedFilters}
             context={context}
             sourceCurrencies={sourceCurrencies}
             raw={raw}
           />
         ) : (
           <AssetPerformanceReport
-            filters={filters}
+            filters={appliedFilters}
             context={context}
             state={report === "asset-performance-general" ? "all" : state}
             general={report === "asset-performance-general"}
@@ -396,7 +679,7 @@ async function NetWorthEvolutionReport({
   sourceCurrencies,
   raw,
 }: {
-  filters: { year: number; currency: SupportedCurrency; basis: FinancialReportBasis };
+  filters: AppliedReportFilters;
   context: FinancialContext | "all";
   sourceCurrencies: SupportedCurrency[];
   raw: Record<string, string | string[] | undefined>;
@@ -408,12 +691,17 @@ async function NetWorthEvolutionReport({
     currency: filters.currency,
     context,
     sourceCurrencies,
+    sourceKeys: filters.sourceKeys,
     allDates: period.period === "all",
   });
   return (
     <>
       <ReportHeading title="Evolução patrimonial" description="Ativos, passivos e patrimônio líquido consolidados mês a mês." />
-      <form method="get" className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_auto]">
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
+      <form method="get" className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_auto]">
         <input type="hidden" name="report" value="net-worth-evolution" />
         <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
           Período
@@ -423,9 +711,10 @@ async function NetWorthEvolutionReport({
         </label>
         <MonthField name="startMonth" label="Início personalizado" value={period.startMonth} />
         <MonthField name="endMonth" label="Fim personalizado" value={period.endMonth} />
-        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeYear={false} includeBasis={false} />
+        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeYear={false} includeBasis={false} includeCategoryFilters={false} />
         <ApplyFiltersButton />
       </form>
+      </details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice currency={filters.currency} missingCurrencies={result.missingCurrencies} />
       <NetWorthEvolutionMatrix rows={result.rows} currency={filters.currency} />
@@ -439,11 +728,7 @@ async function IncomeExpenseReport({
   sourceCurrencies,
   raw,
 }: {
-  filters: {
-    year: number;
-    currency: SupportedCurrency;
-    basis: FinancialReportBasis;
-  };
+  filters: AppliedReportFilters;
   context: FinancialContext | "all";
   sourceCurrencies: SupportedCurrency[];
   raw: Record<string, string | string[] | undefined>;
@@ -456,6 +741,9 @@ async function IncomeExpenseReport({
     basis: filters.basis,
     context,
     sourceCurrencies,
+    sourceKeys: filters.sourceKeys,
+    categoryIds: filters.categoryIds,
+    subcategoryIds: filters.subcategoryIds,
     allDates: period.period === "all",
   });
   const totals = summarizeIncomeExpenseReport(result.rows);
@@ -465,9 +753,13 @@ async function IncomeExpenseReport({
         title="Receitas x despesas"
         description="Valores anuais por grupo, categoria e subcategoria, com totais mensais."
       />
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_150px_auto]"
+        className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_150px_auto]"
       >
         <input type="hidden" name="report" value="income-expense" />
         <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
@@ -478,9 +770,10 @@ async function IncomeExpenseReport({
         </label>
         <MonthField name="startMonth" label="Início personalizado" value={period.startMonth} />
         <MonthField name="endMonth" label="Fim personalizado" value={period.endMonth} />
-        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeYear={false} />
+        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeYear={false} includeTimeGrouping includeCategoryGrouping />
         <ApplyFiltersButton />
       </form>
+      </details>
       <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
         <strong>
           {filters.basis === "competence" ? "Competência" : "Caixa"}:
@@ -520,6 +813,8 @@ async function IncomeExpenseReport({
         caption={`Receitas e despesas mensais de ${monthLabel(period.startMonth, period.endMonth)}`}
         emptyMessage="Nenhuma receita ou despesa encontrada neste recorte."
         months={result.months}
+        timeGrouping={filters.timeGrouping}
+        categoryGrouping={filters.categoryGrouping}
       />
     </>
   );
@@ -530,11 +825,7 @@ async function FixedExpensesReport({
   context,
   sourceCurrencies,
 }: {
-  filters: {
-    year: number;
-    currency: SupportedCurrency;
-    basis: FinancialReportBasis;
-  };
+  filters: AppliedReportFilters;
   context: FinancialContext | "all";
   sourceCurrencies: SupportedCurrency[];
 }) {
@@ -544,6 +835,9 @@ async function FixedExpensesReport({
     basis: filters.basis,
     context,
     sourceCurrencies,
+    sourceKeys: filters.sourceKeys,
+    categoryIds: filters.categoryIds,
+    subcategoryIds: filters.subcategoryIds,
   });
   return (
     <>
@@ -551,14 +845,19 @@ async function FixedExpensesReport({
         title="Despesas fixas"
         description="Lançamentos reais classificados em subcategorias marcadas como despesa fixa."
       />
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[120px_220px_170px_160px_auto]"
+        className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-[120px_220px_170px_160px_auto]"
       >
         <input type="hidden" name="report" value="fixed-expenses" />
-        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} />
+        <CommonReportFields {...filters} context={context} sourceCurrencies={sourceCurrencies} includeTimeGrouping includeCategoryGrouping />
         <ApplyFiltersButton />
       </form>
+      </details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice
         currency={filters.currency}
@@ -571,6 +870,8 @@ async function FixedExpensesReport({
         caption={"Despesas fixas realizadas em " + String(filters.year)}
         emptyMessage="Nenhum lançamento foi encontrado em subcategorias marcadas como fixas."
         showSections={false}
+        timeGrouping={filters.timeGrouping}
+        categoryGrouping={filters.categoryGrouping}
       />
     </>
   );
@@ -582,11 +883,7 @@ async function ComparisonReport({
   sourceCurrencies,
   raw,
 }: {
-  filters: {
-    year: number;
-    currency: SupportedCurrency;
-    basis: FinancialReportBasis;
-  };
+  filters: AppliedReportFilters;
   context: FinancialContext | "all";
   sourceCurrencies: SupportedCurrency[];
   raw: Record<string, string | string[] | undefined>;
@@ -615,6 +912,7 @@ async function ComparisonReport({
     basis: filters.basis,
     context,
     sourceCurrencies,
+    sourceKeys: filters.sourceKeys,
   });
   return (
     <>
@@ -622,9 +920,13 @@ async function ComparisonReport({
         title="Comparativo entre períodos"
         description="Compare categorias entre dois intervalos mensais. A diferença é o segundo período menos o primeiro."
       />
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 xl:grid-cols-[150px_150px_150px_150px_180px_150px_150px_auto]"
+        className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[150px_150px_150px_150px_180px_150px_150px_auto]"
       >
         <input type="hidden" name="report" value="period-comparison" />
         <MonthField
@@ -652,9 +954,11 @@ async function ComparisonReport({
           context={context}
           sourceCurrencies={sourceCurrencies}
           includeYear={false}
+          includeCategoryGrouping
         />
         <ApplyFiltersButton />
       </form>
+      </details>
       <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
         <strong>
           {filters.basis === "competence" ? "Competência" : "Caixa"}:
@@ -671,6 +975,7 @@ async function ComparisonReport({
         currency={filters.currency}
         firstLabel={monthLabel(periods.firstStart, periods.firstEnd)}
         secondLabel={monthLabel(periods.secondStart, periods.secondEnd)}
+        categoryGrouping={filters.categoryGrouping}
       />
     </>
   );
@@ -683,11 +988,7 @@ async function AssetPerformanceReport({
   general,
   sourceCurrencies,
 }: {
-  filters: {
-    year: number;
-    currency: SupportedCurrency;
-    basis: FinancialReportBasis;
-  };
+  filters: AppliedReportFilters;
   context: FinancialContext | "all";
   state: "active" | "all";
   general: boolean;
@@ -705,9 +1006,13 @@ async function AssetPerformanceReport({
         title={general ? "Performance geral" : "Performance de ativos"}
         description={general ? "Inclui posições ativas e investimentos já liquidados." : "Posições ativas por classe, com resultados e taxas de retorno."}
       />
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-[220px_170px_190px_auto]"
+        className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-[220px_170px_190px_auto]"
       >
         <input type="hidden" name="report" value={general ? "asset-performance-general" : "asset-performance"} />
         <CommonReportFields
@@ -716,10 +1021,13 @@ async function AssetPerformanceReport({
           sourceCurrencies={sourceCurrencies}
           includeYear={false}
           includeBasis={false}
+          includeSourceFilter={false}
+          includeCategoryFilters={false}
         />
         <input type="hidden" name="state" value={general ? "all" : "active"} />
         <ApplyFiltersButton />
       </form>
+      </details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice
         currency={filters.currency}

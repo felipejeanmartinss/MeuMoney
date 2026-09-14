@@ -142,7 +142,7 @@ export default async function CreditCardPage({
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 marker:hidden">
             <span className="font-extrabold text-slate-950">Novo lançamento</span>
             <span className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white group-open:bg-slate-900">
-              <span className="group-open:hidden">Nova compra</span>
+              <span className="group-open:hidden">Novo lançamento</span>
               <span className="hidden group-open:inline">Fechar</span>
             </span>
           </summary>

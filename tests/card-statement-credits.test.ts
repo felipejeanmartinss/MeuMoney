@@ -22,8 +22,11 @@ const importsPage = fs.readFileSync(
   path.join(root, "src/app/imports/page.tsx"),
   "utf8",
 );
-const reportsService = fs.readFileSync(
-  path.join(root, "src/services/reports/financial-reports-service.ts"),
+const reportsMigration = fs.readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20260913235156_flexible_card_dates_and_saved_reports.sql",
+  ),
   "utf8",
 );
 
@@ -38,7 +41,7 @@ describe("credit-card statement refinements", () => {
   it("keeps new entries inline and opens installment review only when needed", () => {
     expect(cardPage).toContain("<CreditCardPurchaseForm");
     expect(cardPage).toContain("compact");
-    expect(cardPage).toContain("Nova compra");
+    expect(cardPage).toContain("Novo lançamento");
   });
 
   it("shows next invoice and commitment in the accounts hub", () => {
@@ -54,7 +57,19 @@ describe("credit-card statement refinements", () => {
   });
 
   it("adds card credits as income only in competence reports", () => {
-    expect(reportsService).toContain('input.basis === "competence"');
-    expect(reportsService).toContain('groupLabel: "Créditos de cartão"');
+    const viewStart = reportsMigration.indexOf(
+      "create view public.financial_report_entries_by_source",
+    );
+    const cardFrom = reportsMigration.indexOf(
+      "from public.credit_card_installments installments",
+      viewStart,
+    );
+    const cardEntries = reportsMigration.slice(
+      reportsMigration.lastIndexOf("select", cardFrom),
+      reportsMigration.indexOf("union all", cardFrom),
+    );
+    expect(cardEntries).toContain("'competence'::text");
+    expect(cardEntries).toContain("'income'::public.transaction_kind");
+    expect(cardEntries).toContain("'Créditos de cartão'");
   });
 });

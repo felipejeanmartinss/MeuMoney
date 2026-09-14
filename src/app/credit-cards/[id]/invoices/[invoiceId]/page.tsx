@@ -22,7 +22,7 @@ import {
 } from "@/utils/dates";
 
 const messages: Record<string, string> = {
-  "invoice-closed": "Fatura fechada. As parcelas não podem mais ser alteradas.",
+  "invoice-closed": "Fatura fechada. Enquanto não houver pagamento, os lançamentos ainda podem ser corrigidos.",
   "invoice-paid": "Pagamento registrado e saldo da conta atualizado.",
   "payment-reversed": "Pagamento estornado com segurança.",
   "installment-updated": "Valor da parcela atualizado.",
@@ -152,7 +152,7 @@ export default async function CreditCardInvoicePage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          <table data-sortable="false" className="w-full min-w-[900px] border-collapse text-sm">
             <thead className="bg-slate-100 text-left text-xs uppercase text-slate-600">
               <tr>
                 <th className="px-4 py-2">Data</th>
@@ -262,7 +262,8 @@ export default async function CreditCardInvoicePage({
         </form>
       ) : null}
 
-      {invoice.status === "closed" || invoice.status === "overdue" ? (
+      {(invoice.status === "closed" || invoice.status === "overdue") &&
+      invoice.total_amount > 0 ? (
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="font-extrabold text-slate-950">Pagar fatura</h2>
           <div className="mt-4">
@@ -275,6 +276,13 @@ export default async function CreditCardInvoicePage({
             />
           </div>
         </section>
+      ) : null}
+
+      {(invoice.status === "closed" || invoice.status === "overdue") &&
+      invoice.total_amount === 0 ? (
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900">
+          Fatura encerrada sem saldo. Nenhum lançamento foi criado na conta.
+        </p>
       ) : null}
     </main>
   );

@@ -36,6 +36,62 @@ const MONTHS = [
   "Dez",
 ] as const;
 
+export type ReportTimeGrouping = "month" | "quarter" | "year";
+export type ReportCategoryGrouping = "category" | "subcategory";
+
+function aggregateMonthlyColumns(
+  rows: readonly MonthlyReportMatrixRow[],
+  monthKeys: readonly string[],
+  grouping: ReportTimeGrouping,
+) {
+  if (grouping === "month") {
+    return {
+      rows,
+      labels: monthKeys.map((month) =>
+        new Intl.DateTimeFormat("pt-BR", {
+          month: "short",
+          year:
+            new Set(monthKeys.map((item) => item.slice(0, 4))).size > 1
+              ? "2-digit"
+              : undefined,
+          timeZone: "UTC",
+        })
+          .format(new Date(`${month}-01T12:00:00Z`))
+          .replace(".", ""),
+      ),
+      drilldownMonths: monthKeys,
+    };
+  }
+
+  const buckets = new Map<string, { label: string; indexes: number[] }>();
+  monthKeys.forEach((month, index) => {
+    const year = month.slice(0, 4);
+    const quarter = Math.floor((Number(month.slice(5, 7)) - 1) / 3) + 1;
+    const key = grouping === "quarter" ? `${year}-T${quarter}` : year;
+    const bucket = buckets.get(key) ?? {
+      label: grouping === "quarter" ? `${quarter}º tri/${year.slice(2)}` : year,
+      indexes: [],
+    };
+    bucket.indexes.push(index);
+    buckets.set(key, bucket);
+  });
+  const grouped = [...buckets.values()];
+  return {
+    rows: rows.map((row) => {
+      const monthAmountsMinor = grouped.map((bucket) =>
+        sumMoney(bucket.indexes.map((index) => row.monthAmountsMinor[index] ?? 0)),
+      );
+      return {
+        ...row,
+        monthAmountsMinor,
+        totalAmountMinor: sumMoney(monthAmountsMinor),
+      };
+    }),
+    labels: grouped.map((bucket) => bucket.label),
+    drilldownMonths: undefined,
+  };
+}
+
 function amount(value: number, currency: SupportedCurrency) {
   if (value === 0) return "—";
   const locale = CURRENCY_LOCALES[currency];
@@ -216,6 +272,8 @@ export function MonthlyFinancialMatrix({
   showSections = true,
   drilldownYear,
   months,
+  timeGrouping = "month",
+  categoryGrouping = "category",
 }: {
   rows: readonly MonthlyReportMatrixRow[];
   currency: SupportedCurrency;
@@ -224,6 +282,8 @@ export function MonthlyFinancialMatrix({
   showSections?: boolean;
   drilldownYear?: number;
   months?: readonly string[];
+  timeGrouping?: ReportTimeGrouping;
+  categoryGrouping?: ReportCategoryGrouping;
 }) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     () => new Set(),
@@ -236,16 +296,23 @@ export function MonthlyFinancialMatrix({
     );
   }
 
-  const sections = groupMonthlyRows(rows);
-  const columnMonths = months ?? MONTHS;
-  const spansMultipleYears = months
-    ? new Set(months.map((month) => month.slice(0, 4))).size > 1
-    : false;
+  const monthKeys =
+    months ??
+    (drilldownYear
+      ? MONTHS.map((_, index) =>
+          `${drilldownYear}-${String(index + 1).padStart(2, "0")}`,
+        )
+      : []);
+  const aggregation = monthKeys.length
+    ? aggregateMonthlyColumns(rows, monthKeys, timeGrouping)
+    : { rows, labels: [...MONTHS], drilldownMonths: undefined };
+  const sections = groupMonthlyRows(aggregation.rows);
+  const columnLabels = aggregation.labels;
   const incomeMonths = sumMonths(
-    rows.filter((row) => row.section === "income"),
+    aggregation.rows.filter((row) => row.section === "income"),
   );
   const expenseMonths = sumMonths(
-    rows.filter((row) => row.section === "expense"),
+    aggregation.rows.filter((row) => row.section === "expense"),
   );
   function toggleCategory(key: string) {
     setExpandedCategories((current) => {
@@ -258,11 +325,10 @@ export function MonthlyFinancialMatrix({
   return (
     <div>
       <p className="border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        Valores em {currency}, sem símbolo monetário. Categorias com seta podem
-        ser abertas para exibir as subcategorias.
+        Valores em {currency}, sem símbolo monetário. Visualização por {timeGrouping === "month" ? "mês" : timeGrouping === "quarter" ? "trimestre" : "ano"} e por {categoryGrouping === "category" ? "categoria" : "subcategoria"}.
       </p>
       <div>
-      <table className="w-full table-fixed border-collapse text-[0.63rem] tabular-nums xl:text-[0.68rem]">
+      <table data-sortable="false" className="w-full table-fixed border-collapse text-[0.63rem] tabular-nums xl:text-[0.68rem]">
         <caption className="sr-only">{caption}</caption>
         <thead className="sticky top-0 bg-slate-100 text-slate-700">
           <tr className="border-b border-slate-300">
@@ -272,21 +338,13 @@ export function MonthlyFinancialMatrix({
             >
               Categoria / subcategoria
             </th>
-            {columnMonths.map((month, index) => (
+            {columnLabels.map((label, index) => (
               <th
-                key={month}
+                key={`${label}-${index}`}
                 scope="col"
                 className="px-0.5 py-2 text-center font-extrabold"
               >
-                {months
-                  ? new Intl.DateTimeFormat("pt-BR", {
-                      month: "short",
-                      year: spansMultipleYears ? "2-digit" : undefined,
-                      timeZone: "UTC",
-                    })
-                      .format(new Date(`${month}-01T12:00:00Z`))
-                      .replace(".", "")
-                  : MONTHS[index]}
+                {label}
               </th>
             ))}
             <th
@@ -313,7 +371,8 @@ export function MonthlyFinancialMatrix({
                 expandedCategories={expandedCategories}
                 onToggleCategory={toggleCategory}
                 drilldownYear={drilldownYear}
-                months={months}
+                months={aggregation.drilldownMonths}
+                showSubcategories={categoryGrouping === "subcategory"}
               />
             );
           })}
@@ -323,7 +382,7 @@ export function MonthlyFinancialMatrix({
               expenseMonths={expenseMonths}
               currency={currency}
               drilldownYear={drilldownYear}
-              months={months}
+              months={aggregation.drilldownMonths}
             />
           ) : null}
         </tbody>
@@ -376,6 +435,7 @@ function ReportSectionRows({
   onToggleCategory,
   drilldownYear,
   months,
+  showSubcategories,
 }: {
   section: MonthlyReportMatrixRow["section"];
   groups: MonthlyGroupNode[];
@@ -386,6 +446,7 @@ function ReportSectionRows({
   onToggleCategory: (key: string) => void;
   drilldownYear?: number;
   months?: readonly string[];
+  showSubcategories: boolean;
 }) {
   const label = section === "income" ? "Receitas" : "Despesas";
   return (
@@ -409,6 +470,7 @@ function ReportSectionRows({
           onToggleCategory={onToggleCategory}
           drilldownYear={drilldownYear}
           months={months}
+          showSubcategories={showSubcategories}
         />
       ))}
       <tr className="border-y border-slate-300 bg-slate-100 font-black text-slate-950">
@@ -435,6 +497,7 @@ function ReportGroupRows({
   onToggleCategory,
   drilldownYear,
   months,
+  showSubcategories,
 }: {
   group: MonthlyGroupNode;
   currency: SupportedCurrency;
@@ -442,6 +505,7 @@ function ReportGroupRows({
   onToggleCategory: (key: string) => void;
   drilldownYear?: number;
   months?: readonly string[];
+  showSubcategories: boolean;
 }) {
   return (
     <>
@@ -459,7 +523,7 @@ function ReportGroupRows({
         </td>
       </tr>
       {group.categories.flatMap((category) => {
-        const expanded = expandedCategories.has(category.key);
+        const expanded = showSubcategories || expandedCategories.has(category.key);
         const summaryRow = (
         <tr
           key={category.key}
@@ -469,7 +533,7 @@ function ReportGroupRows({
             scope="row"
             className="px-3 py-1.5 text-left font-semibold text-slate-800"
           >
-            {category.expandable ? (
+            {category.expandable && !showSubcategories ? (
               <button
                 type="button"
                 aria-expanded={expanded}
@@ -624,11 +688,13 @@ export function PeriodComparisonMatrix({
   currency,
   firstLabel,
   secondLabel,
+  categoryGrouping = "category",
 }: {
   rows: readonly PeriodComparisonRow[];
   currency: SupportedCurrency;
   firstLabel: string;
   secondLabel: string;
+  categoryGrouping?: ReportCategoryGrouping;
 }) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     () => new Set(),
@@ -656,7 +722,7 @@ export function PeriodComparisonMatrix({
         ser abertas para exibir as subcategorias.
       </p>
       <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-sm tabular-nums">
+      <table data-sortable="false" className="w-full min-w-[760px] border-collapse text-sm tabular-nums">
         <caption className="sr-only">
           Comparativo financeiro entre dois períodos
         </caption>
@@ -687,6 +753,7 @@ export function PeriodComparisonMatrix({
               currency={currency}
               expandedCategories={expandedCategories}
               onToggleCategory={toggleCategory}
+              showSubcategories={categoryGrouping === "subcategory"}
             />
           ))}
         </tbody>
@@ -701,11 +768,13 @@ function ComparisonGroupRows({
   currency,
   expandedCategories,
   onToggleCategory,
+  showSubcategories,
 }: {
   group: ComparisonGroupNode;
   currency: SupportedCurrency;
   expandedCategories: ReadonlySet<string>;
   onToggleCategory: (key: string) => void;
+  showSubcategories: boolean;
 }) {
   return (
     <>
@@ -733,7 +802,7 @@ function ComparisonGroupRows({
         </td>
       </tr>
       {group.categories.flatMap((category) => {
-        const expanded = expandedCategories.has(category.key);
+        const expanded = showSubcategories || expandedCategories.has(category.key);
         const categoryRow = (
         <tr
           key={category.key}
@@ -743,7 +812,7 @@ function ComparisonGroupRows({
             scope="row"
             className="px-3 py-1.5 text-left font-semibold text-slate-800"
           >
-            {category.expandable ? (
+            {category.expandable && !showSubcategories ? (
               <button
                 type="button"
                 aria-expanded={expanded}
@@ -842,7 +911,7 @@ export function AssetPerformanceMatrix({
   );
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1180px] border-collapse text-[0.68rem] tabular-nums">
+      <table data-sortable="false" className="w-full min-w-[1180px] border-collapse text-[0.68rem] tabular-nums">
         <caption className="sr-only">
           Performance atual das posições de investimento
         </caption>
@@ -1021,7 +1090,7 @@ export function NetWorthEvolutionMatrix({
 }) {
   return (
     <div className="border-t border-slate-200">
-      <table className="w-full table-fixed border-collapse text-sm tabular-nums">
+      <table data-sortable="false" className="w-full table-fixed border-collapse text-sm tabular-nums">
         <caption className="sr-only">Evolução mensal do patrimônio líquido</caption>
         <thead className="sticky top-0 bg-slate-100 text-slate-700">
           <tr className="border-b border-slate-300">

@@ -72,7 +72,7 @@ export function InvestmentUnitPriceForm({ positions }: { positions: Position[] }
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
+          <table data-sortable="false" className="w-full min-w-[760px] border-collapse text-sm">
             <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-4 py-3">Ativo</th>

@@ -219,7 +219,7 @@ export async function deleteCurrentUserTransaction(id: string) {
     .delete()
     .eq("user_id", user.id)
     .eq("id", id)
-    .eq("origin_type", "manual")
+    .in("origin_type", ["manual", "system"])
     .select("id")
     .maybeSingle();
 
