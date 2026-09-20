@@ -104,7 +104,7 @@ function mutationErrorMessage(error: { message?: string } | null) {
     return "O cartão não está disponível.";
   }
   if (message.includes("purchase_structure_locked")) {
-    return "Valor, data e parcelas não podem mudar após o fechamento da fatura.";
+    return "Valor, data e parcelas não podem mudar depois que a fatura foi paga.";
   }
   if (message.includes("invalid_installment_distribution")) {
     return "A soma e a quantidade das parcelas devem corresponder à compra.";

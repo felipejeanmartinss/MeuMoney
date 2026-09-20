@@ -28,6 +28,13 @@ export type CreditCardBrand =
   | "other";
 export type CreditCardPurchaseStatus = "active" | "cancelled";
 export type CreditCardEntryKind = "purchase" | "refund" | "cashback";
+export type SavedFinancialReportType =
+  | "income-expense"
+  | "fixed-expenses"
+  | "period-comparison"
+  | "asset-performance"
+  | "asset-performance-general"
+  | "net-worth-evolution";
 export type CreditCardInstallmentStatus =
   | "pending"
   | "invoiced"
@@ -793,6 +800,20 @@ export type CriticalOperationEvent = {
   created_at: string;
 };
 
+export type FinancialReportEntryBySource = FinancialReportCategoryMonthly & {
+  source_key: string;
+};
+
+export type SavedFinancialReport = {
+  id: string;
+  user_id: string;
+  name: string;
+  report_type: SavedFinancialReportType;
+  filters: Json;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -808,6 +829,25 @@ export type Database = {
         Update: {
           full_name?: string;
           preferred_currency?: SupportedCurrency;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      saved_financial_reports: {
+        Row: SavedFinancialReport;
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          report_type: SavedFinancialReportType;
+          filters?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          report_type?: SavedFinancialReportType;
+          filters?: Json;
           updated_at?: string;
         };
         Relationships: [];
@@ -1212,6 +1252,10 @@ export type Database = {
       };
       financial_report_category_monthly: {
         Row: FinancialReportCategoryMonthly;
+        Relationships: [];
+      };
+      financial_report_entries_by_source: {
+        Row: FinancialReportEntryBySource;
         Relationships: [];
       };
       financial_dashboard_upcoming_recurrences: {

@@ -72,12 +72,13 @@ export function classifyPdfExtractionError(error: unknown) {
 export async function extractSearchablePdfText(
   bytes: Uint8Array,
 ): Promise<PdfTextDocument> {
-  // Keep the optional native canvas runtime in the deployed server trace.
-  await import("@napi-rs/canvas");
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(bytes),
-    stopAtErrors: true,
+    // Bank statements commonly contain harmless malformed glyph metadata.
+    // Text extraction remains reliable even when those rendering-only errors
+    // are ignored, and does not require the optional native canvas runtime.
+    stopAtErrors: false,
     useSystemFonts: true,
     verbosity: pdfjs.VerbosityLevel.ERRORS,
   });

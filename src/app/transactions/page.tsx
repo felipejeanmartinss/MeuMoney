@@ -300,12 +300,22 @@ export default async function TransactionsPage({
                 </p>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                {isTechnical ? (
+                {isTechnical && transaction.origin_type !== "system" ? (
                   <span className="text-sm font-semibold text-slate-500">
                     {isRecurring
                       ? "Gerenciado pela recorrência"
                       : "Gerenciado pela fatura"}
                   </span>
+                ) : transaction.origin_type === "system" ? (
+                  <form action={deleteTransaction}>
+                    <input type="hidden" name="id" value={transaction.id} />
+                    <ConfirmSubmitButton
+                      confirmation={`Excluir definitivamente o lançamento automático “${transaction.description}”?`}
+                      className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Excluir automático
+                    </ConfirmSubmitButton>
+                  </form>
                 ) : (
                   <>
                     <Link

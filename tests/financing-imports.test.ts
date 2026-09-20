@@ -244,7 +244,8 @@ describe("financing PDF imports", () => {
 
     expect(nextConfig).toContain('"@napi-rs/canvas"');
     expect(nextConfig).toContain('"pdfjs-dist"');
-    expect(extractor).toContain('import("@napi-rs/canvas")');
+    expect(extractor).not.toContain('import("@napi-rs/canvas")');
+    expect(extractor).toContain("stopAtErrors: false");
   });
 
   it("simulates SAC with a decreasing balance and optional extra amortization", () => {

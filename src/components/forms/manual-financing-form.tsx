@@ -6,6 +6,8 @@ import {
   type FinancingImportFormState,
 } from "@/app/actions/financing-imports";
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
+import { simulateFinancing } from "@/domain/financing-imports";
+import { minorUnitsToInput, parseMoneyInputToMinor } from "@/domain/money";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 
 type EditableScheduleRow = {
@@ -64,12 +66,28 @@ function serializeRow(row: EditableScheduleRow) {
   };
 }
 
+function monthlyDueDate(contractDate: string, installment: number) {
+  const [year, month, day] = contractDate.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + installment, 1));
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const boundedDay = Math.min(day, lastDay);
+  return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}-${String(boundedDay).padStart(2, "0")}`;
+}
+
 export function ManualFinancingForm() {
   const [state, formAction, pending] = useActionState(
     createManualFinancingContract,
     initialState,
   );
   const [rows, setRows] = useState<EditableScheduleRow[]>([emptyRow(1)]);
+  const [amortizationSystem, setAmortizationSystem] = useState<"SAC" | "PRICE">("SAC");
+  const [originalPrincipal, setOriginalPrincipal] = useState("");
+  const [originalTerm, setOriginalTerm] = useState("");
+  const [contractDate, setContractDate] = useState("");
+  const [annualRate, setAnnualRate] = useState("");
+  const [projectionMessage, setProjectionMessage] = useState<string | null>(null);
   const nextRowKey = useRef(2);
 
   function updateRow<K extends keyof EditableScheduleRow>(
@@ -103,6 +121,49 @@ export function ManualFinancingForm() {
   }
 
   const serializedSchedule = rows.map(serializeRow);
+
+  function projectSchedule() {
+    try {
+      const principalMinor = parseMoneyInputToMinor(originalPrincipal);
+      const termMonths = Number(originalTerm);
+      const annualRatePercent = Number(annualRate.replace(",", "."));
+      if (!contractDate) throw new Error("Informe a data do contrato.");
+      if (!annualRate.trim() || !Number.isFinite(annualRatePercent)) {
+        throw new Error("Informe a taxa nominal anual para projetar as parcelas.");
+      }
+      const simulation = simulateFinancing({
+        principalMinor,
+        annualRatePercent,
+        termMonths,
+        method: amortizationSystem.toLowerCase() as "sac" | "price",
+      });
+      setRows(
+        simulation.rows.map((row) => {
+          const dueDate = monthlyDueDate(contractDate, row.installment);
+          return {
+            key: `projection-${row.installment}`,
+            installmentNumber: String(row.installment),
+            dueDate,
+            totalAmountMinor: minorUnitsToInput(row.paymentMinor),
+            principalMinor: minorUnitsToInput(row.principalMinor),
+            interestMinor: minorUnitsToInput(row.interestMinor),
+            correctionFactor: "",
+            chargesMinor: "0,00",
+            outstandingBalanceMinor: minorUnitsToInput(row.balanceMinor),
+            paymentStatus: "scheduled" as const,
+            paymentDate: "",
+            paidAmountMinor: "0,00",
+          };
+        }),
+      );
+      nextRowKey.current = simulation.rows.length + 1;
+      setProjectionMessage(`${simulation.rows.length} parcelas projetadas. Você pode ajustar qualquer célula antes de salvar.`);
+    } catch (error) {
+      setProjectionMessage(
+        error instanceof Error ? error.message : "Não foi possível projetar as parcelas.",
+      );
+    }
+  }
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -144,7 +205,7 @@ export function ManualFinancingForm() {
             </select>
           </Field>
           <Field label="Sistema de amortização" error={state.fieldErrors?.amortizationSystem?.[0]} compact>
-            <select className={inputClass(Boolean(state.fieldErrors?.amortizationSystem))} name="amortizationSystem" defaultValue="SAC">
+            <select className={inputClass(Boolean(state.fieldErrors?.amortizationSystem))} name="amortizationSystem" value={amortizationSystem} onChange={(event) => setAmortizationSystem(event.target.value as "SAC" | "PRICE")}>
               <option value="SAC">SAC</option>
               <option value="PRICE">PRICE</option>
             </select>
@@ -166,16 +227,16 @@ export function ManualFinancingForm() {
         <h2 className="font-extrabold text-slate-950">Valores e taxas</h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Saldo devedor inicial" error={state.fieldErrors?.originalPrincipalMinor?.[0]} compact>
-            <input className={inputClass(Boolean(state.fieldErrors?.originalPrincipalMinor))} name="originalPrincipalMinor" inputMode="decimal" required />
+            <input className={inputClass(Boolean(state.fieldErrors?.originalPrincipalMinor))} name="originalPrincipalMinor" inputMode="decimal" value={originalPrincipal} onChange={(event) => setOriginalPrincipal(event.target.value)} required />
           </Field>
           <Field label="Saldo devedor atual" error={state.fieldErrors?.currentBalanceMinor?.[0]} compact>
             <input className={inputClass(Boolean(state.fieldErrors?.currentBalanceMinor))} name="currentBalanceMinor" inputMode="decimal" required />
           </Field>
           <Field label="Prazo original (meses)" error={state.fieldErrors?.originalTermMonths?.[0]} compact>
-            <input className={inputClass(Boolean(state.fieldErrors?.originalTermMonths))} name="originalTermMonths" type="number" min="1" max="1200" required />
+            <input className={inputClass(Boolean(state.fieldErrors?.originalTermMonths))} name="originalTermMonths" type="number" min="1" max="1200" value={originalTerm} onChange={(event) => setOriginalTerm(event.target.value)} required />
           </Field>
           <Field label="Data do contrato" error={state.fieldErrors?.contractDate?.[0]} compact>
-            <input className={inputClass(Boolean(state.fieldErrors?.contractDate))} name="contractDate" type="date" required />
+            <input className={inputClass(Boolean(state.fieldErrors?.contractDate))} name="contractDate" type="date" value={contractDate} onChange={(event) => setContractDate(event.target.value)} required />
           </Field>
           <Field label="Data de liberação" error={state.fieldErrors?.releaseDate?.[0]} compact>
             <input className={inputClass(Boolean(state.fieldErrors?.releaseDate))} name="releaseDate" type="date" />
@@ -184,7 +245,7 @@ export function ManualFinancingForm() {
             <input className={inputClass(Boolean(state.fieldErrors?.balanceDate))} name="balanceDate" type="date" required />
           </Field>
           <Field label="Taxa nominal anual (%)" error={state.fieldErrors?.nominalAnnualRate?.[0]} compact>
-            <input className={inputClass(Boolean(state.fieldErrors?.nominalAnnualRate))} name="nominalAnnualRate" inputMode="decimal" />
+            <input className={inputClass(Boolean(state.fieldErrors?.nominalAnnualRate))} name="nominalAnnualRate" inputMode="decimal" value={annualRate} onChange={(event) => setAnnualRate(event.target.value)} />
           </Field>
           <Field label="Taxa efetiva anual (%)" error={state.fieldErrors?.effectiveAnnualRate?.[0]} compact>
             <input className={inputClass(Boolean(state.fieldErrors?.effectiveAnnualRate))} name="effectiveAnnualRate" inputMode="decimal" />
@@ -193,6 +254,23 @@ export function ManualFinancingForm() {
             <input className={inputClass(Boolean(state.fieldErrors?.cetAnnualRate))} name="cetAnnualRate" inputMode="decimal" />
           </Field>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-extrabold text-emerald-950">Projeção automática</h2>
+          <p className="mt-1 text-xs text-emerald-900">
+            Usa saldo inicial, prazo, data do contrato, taxa nominal e o sistema {amortizationSystem}.
+          </p>
+          {projectionMessage ? <p className="mt-2 text-xs font-bold text-emerald-950">{projectionMessage}</p> : null}
+        </div>
+        <button
+          type="button"
+          onClick={projectSchedule}
+          className="min-h-10 shrink-0 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"
+        >
+          Projetar parcelas
+        </button>
       </section>
 
       <section className="overflow-hidden rounded-xl border border-slate-200">
@@ -224,7 +302,7 @@ export function ManualFinancingForm() {
           </p>
         ) : null}
         <div className="overflow-x-auto">
-          <table className="min-w-[1320px] table-fixed text-left text-xs">
+          <table data-sortable="false" className="min-w-[1320px] table-fixed text-left text-xs">
             <thead className="bg-slate-100 text-[0.68rem] uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="w-16 px-2 py-2">Parcela</th>

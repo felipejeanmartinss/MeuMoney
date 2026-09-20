@@ -31,7 +31,8 @@ export default async function EditCreditCardPurchasePage({
         </h1>
         <p className="mt-2 text-slate-600">
           Alterações estruturais são bloqueadas se alguma fatura envolvida já
-          estiver fechada ou paga.
+          já tiver sido paga. Em faturas ainda não pagas, a data pode ser
+          corrigida e o lançamento será realocado para o ciclo correto.
         </p>
       </div>
       <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-8">

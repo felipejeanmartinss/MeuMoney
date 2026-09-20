@@ -292,6 +292,26 @@ export async function setCurrentUserCategoryArchived(id: string, archived: boole
     : { ok: true as const };
 }
 
+export async function setCurrentUserCategoryFixedExpense(
+  id: string,
+  fixed: boolean,
+) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("categories")
+    .update({ is_fixed_expense: fixed })
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .eq("kind", "expense")
+    .not("parent_id", "is", null)
+    .select("id")
+    .maybeSingle();
+
+  return error || !data
+    ? { ok: false as const, message: "Não foi possível atualizar a despesa fixa." }
+    : { ok: true as const };
+}
+
 export async function getCurrentUserCategoryGroup(id: string) {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
