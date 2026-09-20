@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { deleteTransaction } from "@/app/actions/transactions";
+import {
+  clearInactiveAutomaticTransactions,
+  deleteTransaction,
+} from "@/app/actions/transactions";
 import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
@@ -26,6 +29,7 @@ const messages: Record<string, string> = {
   updated: "Lançamento atualizado com sucesso.",
   deleted: "Lançamento excluído com sucesso.",
   "delete-error": "Não foi possível excluir o lançamento.",
+  "inactive-automatic-cleared": "Lançamentos automáticos inativos removidos.",
 };
 
 export default async function TransactionsPage({
@@ -96,6 +100,27 @@ export default async function TransactionsPage({
         >
           {feedback}
         </p>
+      ) : null}
+
+      {(filters.activity === "inactive" || filters.activity === "all") &&
+      transactions.some(
+        (transaction) =>
+          !transaction.is_active && transaction.origin_type === "system",
+      ) ? (
+        <form
+          action={clearInactiveAutomaticTransactions}
+          className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <p className="text-sm text-amber-950">
+            Há previsões automáticas inativas que já não afetam saldos.
+          </p>
+          <ConfirmSubmitButton
+            confirmation="Excluir definitivamente todos os lançamentos automáticos inativos?"
+            className="min-h-9 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold text-amber-900"
+          >
+            Limpar automáticos inativos
+          </ConfirmSubmitButton>
+        </form>
       ) : null}
 
       <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">

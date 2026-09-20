@@ -30,6 +30,11 @@ export const RECURRENCE_STATE_LABELS: Record<
   ended: "Encerrada",
 };
 
+export const RECURRENCE_AMOUNT_MODE_LABELS = {
+  fixed: "Valor fixo",
+  approximate: "Valor aproximado",
+} as const;
+
 const positiveMoneyInput = z.string().trim().transform((value, context) => {
   try {
     const amount = parseMoneyInputToMinor(value);
@@ -78,6 +83,7 @@ export const recurringTransactionFormSchema = z
       .min(1, "Informe a descrição.")
       .max(180, "Use até 180 caracteres."),
     amountMinor: positiveMoneyInput,
+    isAmountFixed: z.boolean().default(true),
     frequency: z.enum(RECURRENCE_FREQUENCIES, {
       error: "Selecione a frequência.",
     }),
@@ -127,6 +133,13 @@ export const recurringTransactionStateSchema = z.enum([
 export const recurringGenerationDateSchema = z
   .string()
   .refine(isValidIsoDate, "Informe uma data limite válida.");
+
+export const recurringGenerationReviewSchema = z.object({
+  recurringId: z.uuid("Recorrência inválida."),
+  scheduledDate: z.string().refine(isValidIsoDate, "Data prevista inválida."),
+  transactionDate: z.string().refine(isValidIsoDate, "Data revisada inválida."),
+  amountMinor: positiveMoneyInput,
+});
 
 function parseIsoDate(value: string) {
   if (!isValidIsoDate(value)) throw new Error("Invalid ISO date.");

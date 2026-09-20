@@ -12,6 +12,10 @@ import {
   type ReportTimeGrouping,
 } from "@/components/reports/financial-report-matrices";
 import {
+  CashFlowForecastChart,
+  CashFlowForecastEventTable,
+} from "@/components/reports/cash-flow-forecast";
+import {
   FINANCIAL_REPORT_LABELS,
   financialReportFilterSchema,
   financialReportTypeSchema,
@@ -30,6 +34,7 @@ import { listCurrentUserCategories } from "@/services/finance/categories-service
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 import {
   getCurrentUserAssetPerformanceReport,
+  getCurrentUserCashFlowForecast,
   getCurrentUserFixedExpenseReport,
   getCurrentUserIncomeExpenseMatrix,
   getCurrentUserNetWorthEvolutionReport,
@@ -55,7 +60,7 @@ const REPORT_GROUPS = [
   },
   {
     label: "Patrimônio",
-    reports: ["net-worth-evolution"],
+    reports: ["net-worth-evolution", "cash-flow-forecast"],
   },
 ] as const satisfies ReadonlyArray<{
   label: string;
@@ -178,6 +183,61 @@ function monthLabel(start: string, end: string) {
   const format = (value: string) =>
     formatter.format(new Date(value + "-01T12:00:00Z")).replace(".", "");
   return start === end ? format(start) : format(start) + " a " + format(end);
+}
+
+function currentDate() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : `${currentYear()}-01-01`;
+}
+
+function shiftDate(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+const CASH_FLOW_PERIODS = [
+  ["next-30", "Próximos 30 dias", 29],
+  ["next-90", "Próximos 90 dias", 89],
+  ["next-180", "Próximos 6 meses", 179],
+  ["next-365", "Próximos 12 meses", 364],
+  ["custom", "Período personalizado", 89],
+] as const;
+
+function resolveCashFlowPeriod(
+  raw: Record<string, string | string[] | undefined>,
+) {
+  const today = currentDate();
+  const requested = typeof raw.cashPeriod === "string" ? raw.cashPeriod : "next-90";
+  const preset = CASH_FLOW_PERIODS.find(([value]) => value === requested) ?? CASH_FLOW_PERIODS[1];
+  const validDate = (value: unknown) => {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return false;
+    }
+    const date = new Date(`${value}T12:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  let startDate =
+    preset[0] === "custom" && validDate(raw.startDate)
+      ? (raw.startDate as string)
+      : today;
+  let endDate =
+    preset[0] === "custom" && validDate(raw.endDate)
+      ? (raw.endDate as string)
+      : shiftDate(today, preset[2]);
+  if (startDate < today) startDate = today;
+  if (endDate < startDate) endDate = startDate;
+  const maximumEnd = shiftDate(startDate, 731);
+  if (endDate > maximumEnd) endDate = maximumEnd;
+  return { period: preset[0], startDate, endDate };
 }
 
 function reportHref(
@@ -652,6 +712,17 @@ export default async function ReportsPage({
           <FixedExpensesReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} />
         ) : report === "period-comparison" ? (
           <ComparisonReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
+        ) : report === "cash-flow-forecast" ? (
+          <CashFlowForecastReport
+            currency={filters.currency}
+            raw={raw}
+            accountOptions={accountsResult.accounts
+              .filter((account) => !account.archived_at)
+              .map((account) => ({
+                value: account.id,
+                label: `${account.name} · ${account.currency}`,
+              }))}
+          />
         ) : report === "net-worth-evolution" ? (
           <NetWorthEvolutionReport
             filters={appliedFilters}
@@ -670,6 +741,134 @@ export default async function ReportsPage({
         )}
       </section>
     </main>
+  );
+}
+
+async function CashFlowForecastReport({
+  currency,
+  raw,
+  accountOptions,
+}: {
+  currency: SupportedCurrency;
+  raw: Record<string, string | string[] | undefined>;
+  accountOptions: Array<{ value: string; label: string }>;
+}) {
+  const period = resolveCashFlowPeriod(raw);
+  const requestedAccounts = arrayParam(raw, "accountIds").filter((id) =>
+    accountOptions.some((account) => account.value === id),
+  );
+  const accountIds =
+    requestedAccounts.length === accountOptions.length ? [] : requestedAccounts;
+  const scenario =
+    (typeof raw.scenario === "string" ? raw.scenario : "base") ===
+    "conservative"
+      ? "conservative"
+      : "base";
+  const rawAverageMonths = Number(
+    typeof raw.averageMonths === "string" ? raw.averageMonths : 6,
+  );
+  const averageMonths = ([3, 6, 12] as const).includes(
+    rawAverageMonths as 3 | 6 | 12,
+  )
+    ? (rawAverageMonths as 3 | 6 | 12)
+    : 6;
+  const result = await getCurrentUserCashFlowForecast({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    currency,
+    accountIds,
+    scenario,
+    averageMonths,
+  });
+  return (
+    <>
+      <ReportHeading
+        title="Projeção de fluxo de caixa"
+        description="Saldos futuros por conta, com recorrências, faturas e um cenário conservador sem duplicar compromissos já cadastrados."
+      />
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros
+          <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span>
+          <span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
+        <form
+          method="get"
+          className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_180px_220px_150px_auto]"
+        >
+          <input type="hidden" name="report" value="cash-flow-forecast" />
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Período
+            <select name="cashPeriod" defaultValue={period.period} className={inputClass}>
+              {CASH_FLOW_PERIODS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Início
+            <input name="startDate" type="date" defaultValue={period.startDate} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Fim
+            <input name="endDate" type="date" defaultValue={period.endDate} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Cenário
+            <select name="scenario" defaultValue={scenario} className={inputClass}>
+              <option value="base">Base</option>
+              <option value="conservative">Conservador</option>
+            </select>
+          </label>
+          <CheckboxFilter
+            label="Contas consideradas"
+            name="accountIds"
+            options={accountOptions}
+            selected={accountIds}
+          />
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Média histórica
+            <select name="averageMonths" defaultValue={averageMonths} className={inputClass}>
+              <option value="3">3 meses</option>
+              <option value="6">6 meses</option>
+              <option value="12">12 meses</option>
+            </select>
+          </label>
+          <ApplyFiltersButton />
+        </form>
+      </details>
+      <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
+        <strong>{scenario === "base" ? "Cenário base" : "Cenário conservador"}:</strong>{" "}
+        {scenario === "base"
+          ? "saldo fechado + lançamentos futuros + recorrências ativas + pagamento das faturas e assinaturas projetadas."
+          : `cenário base + parcela ainda não coberta da média variável dos últimos ${averageMonths} meses completos.`}
+      </p>
+      {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice currency={currency} missingCurrencies={result.missingCurrencies} />
+      <div className="grid border-t border-slate-200 sm:grid-cols-3">
+        <SummaryCell
+          label="Saldo inicial"
+          value={formatMoney(result.openingTotalMinor, currency)}
+          color={result.openingTotalMinor < 0 ? "text-rose-700" : "text-slate-950"}
+        />
+        <SummaryCell
+          label="Menor saldo projetado"
+          value={formatMoney(result.lowestTotalMinor, currency)}
+          color={result.lowestTotalMinor < 0 ? "text-rose-700" : "text-amber-700"}
+        />
+        <SummaryCell
+          label="Saldo final"
+          value={formatMoney(result.closingTotalMinor, currency)}
+          color={result.closingTotalMinor < 0 ? "text-rose-700" : "text-emerald-700"}
+        />
+      </div>
+      <CashFlowForecastChart
+        accounts={result.accounts}
+        points={result.points}
+        currency={currency}
+      />
+      <CashFlowForecastEventTable events={result.events} currency={currency} />
+    </>
   );
 }
 

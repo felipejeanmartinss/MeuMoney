@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { toggleAccountStatus } from "@/app/actions/accounts";
 import { ACCOUNT_TYPE_LABELS, CONTEXT_LABELS } from "@/domain/accounts";
+import { selectNextCreditCardInvoice } from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
@@ -326,16 +327,14 @@ function CardsGroup({
           item !== null,
       ),
   );
-  const nextOpenInvoiceByCard = new Map<string, CreditCardInvoice>();
-
-  for (const invoice of invoices) {
-    if (
-      invoice.status === "open" &&
-      !nextOpenInvoiceByCard.has(invoice.credit_card_id)
-    ) {
-      nextOpenInvoiceByCard.set(invoice.credit_card_id, invoice);
-    }
-  }
+  const nextOpenInvoiceByCard = new Map(
+    cards.flatMap((card) => {
+      const invoice = selectNextCreditCardInvoice(
+        invoices.filter((item) => item.credit_card_id === card.id),
+      );
+      return invoice ? [[card.id, invoice] as const] : [];
+    }),
+  );
 
   return (
     <details open className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

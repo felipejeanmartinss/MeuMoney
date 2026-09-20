@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { toggleCreditCardActivity } from "@/app/actions/credit-cards";
-import { CREDIT_CARD_BRAND_LABELS } from "@/domain/credit-cards";
+import {
+  CREDIT_CARD_BRAND_LABELS,
+  selectNextCreditCardInvoice,
+} from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 
@@ -69,9 +72,8 @@ export default async function CreditCardsPage({
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => {
-          const nextInvoice = invoices.find(
-            (invoice) =>
-              invoice.credit_card_id === card.id && invoice.status === "open",
+          const nextInvoice = selectNextCreditCardInvoice(
+            invoices.filter((invoice) => invoice.credit_card_id === card.id),
           );
           return (
           <article

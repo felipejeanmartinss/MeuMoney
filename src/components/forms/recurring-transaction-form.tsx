@@ -8,6 +8,7 @@ import {
 import type { FinancialFormState } from "@/app/actions/accounts";
 import type { CategoryGroupItem } from "@/domain/categories";
 import {
+  RECURRENCE_AMOUNT_MODE_LABELS,
   RECURRENCE_FREQUENCIES,
   RECURRENCE_FREQUENCY_LABELS,
 } from "@/domain/recurring-transactions";
@@ -47,6 +48,7 @@ type RecurringTransactionFormValues = {
   transactionType?: TransactionType;
   description?: string;
   amountMinor?: string;
+  isAmountFixed?: boolean;
   frequency?: RecurrenceFrequency;
   startDate?: string;
   endDate?: string;
@@ -166,7 +168,7 @@ export function RecurringTransactionForm({
         </Field>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-3">
         <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]}>
           <input
             className={inputClass(Boolean(state.fieldErrors?.amountMinor))}
@@ -176,6 +178,24 @@ export function RecurringTransactionForm({
             placeholder="0,00"
             required
           />
+        </Field>
+
+        <Field
+          label="Comportamento do valor"
+          error={state.fieldErrors?.isAmountFixed?.[0]}
+        >
+          <select
+            className={inputClass(Boolean(state.fieldErrors?.isAmountFixed))}
+            name="isAmountFixed"
+            defaultValue={String(values.isAmountFixed ?? true)}
+          >
+            <option value="true">
+              {RECURRENCE_AMOUNT_MODE_LABELS.fixed}
+            </option>
+            <option value="false">
+              {RECURRENCE_AMOUNT_MODE_LABELS.approximate}
+            </option>
+          </select>
         </Field>
 
         <Field label="Frequência" error={state.fieldErrors?.frequency?.[0]}>
@@ -234,8 +254,8 @@ export function RecurringTransactionForm({
       </div>
 
       <FormMessage tone="info">
-        A geração cria apenas lançamentos previstos. Editar a recorrência não
-        altera previsões que já foram geradas.
+        Valores aproximados podem ter data e valor revisados antes da geração.
+        Editar a recorrência não altera previsões que já foram geradas.
       </FormMessage>
 
       <Field label="Observações" error={state.fieldErrors?.notes?.[0]}>

@@ -34,7 +34,8 @@ export type SavedFinancialReportType =
   | "period-comparison"
   | "asset-performance"
   | "asset-performance-general"
-  | "net-worth-evolution";
+  | "net-worth-evolution"
+  | "cash-flow-forecast";
 export type CreditCardInstallmentStatus =
   | "pending"
   | "invoiced"
@@ -193,6 +194,7 @@ export type RecurringTransaction = {
   transaction_type: TransactionType;
   description: string;
   amount_minor: number;
+  is_amount_fixed: boolean;
   frequency: RecurrenceFrequency;
   start_date: string;
   end_date: string | null;
@@ -955,6 +957,7 @@ export type Database = {
           transaction_type: TransactionType;
           description: string;
           amount_minor: number;
+          is_amount_fixed?: boolean;
           frequency: RecurrenceFrequency;
           start_date: string;
           end_date?: string | null;
@@ -1465,6 +1468,18 @@ export type Database = {
         };
         Returns: string;
       };
+      create_credit_card_invoice_entry: {
+        Args: {
+          target_invoice_id: string;
+          target_category_id: string | null;
+          target_entry_kind: CreditCardEntryKind;
+          target_description: string;
+          target_amount_minor: number;
+          target_entry_date: string;
+          target_notes?: string | null;
+        };
+        Returns: string;
+      };
       update_credit_card_purchase_custom: {
         Args: {
           target_purchase_id: string;
@@ -1557,6 +1572,10 @@ export type Database = {
       };
       generate_recurring_transactions: {
         Args: { target_until: string };
+        Returns: number;
+      };
+      generate_recurring_transactions_reviewed: {
+        Args: { target_until: string; review_overrides?: Json };
         Returns: number;
       };
       copy_previous_month_budgets: {
