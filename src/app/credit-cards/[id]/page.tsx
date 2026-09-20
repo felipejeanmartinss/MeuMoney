@@ -9,6 +9,7 @@ import {
   getInvoiceBillingMonth,
   getInvoiceDueDate,
   getPurchaseReferenceMonth,
+  selectNextCreditCardInvoice,
 } from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserCreditCardDetails } from "@/services/finance/credit-cards-service";
@@ -48,7 +49,7 @@ export default async function CreditCardPage({
     (item) => item.status === "pending",
   );
   const openInvoices = invoices.filter((item) => item.status !== "paid");
-  const nextOpenInvoice = openInvoices.find((item) => item.status === "open");
+  const nextOpenInvoice = selectNextCreditCardInvoice(openInvoices);
   const forecastStart =
     nextOpenInvoice?.reference_month ??
     new Date().toISOString().slice(0, 7) + "-01";

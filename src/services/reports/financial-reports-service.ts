@@ -8,6 +8,18 @@ import {
   type NetWorthEvolutionReportRow,
 } from "@/domain/financial-reports";
 import {
+  averageMonthlyExpenseMinor,
+  buildCashFlowForecastTimeline,
+  residualVariableExpenseMinor,
+  type CashFlowForecastEventInput,
+  type CashFlowForecastEventKind,
+  type CashFlowForecastScenario,
+} from "@/domain/cash-flow-forecast";
+import {
+  getInvoiceDueDate,
+  getPurchaseReferenceMonth,
+} from "@/domain/credit-cards";
+import {
   convertMinorUnits,
   type CurrencyConversionSample,
 } from "@/domain/currency-conversion";
@@ -18,6 +30,7 @@ import {
   type InvestmentPerformancePosition,
 } from "@/domain/investments";
 import { coerceMinorUnits } from "@/domain/money";
+import { collectDueRecurrenceDates } from "@/domain/recurring-transactions";
 import { requireUser } from "@/services/auth/server-auth";
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
 import { currentIsoDate } from "@/utils/dates";
@@ -652,6 +665,690 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
       itemsResult.error || valuationsResult.error || positionsResult.error ||
       snapshotsResult.error || cardsResult.error || invoicesResult.error ||
       conversionResult.hasError,
+    ),
+  };
+}
+
+export type CashFlowForecastReportAccount = {
+  id: string;
+  name: string;
+  currency: SupportedCurrency;
+  openingBalanceMinor: number | null;
+  closingBalanceMinor: number | null;
+};
+
+export type CashFlowForecastReportPoint = {
+  date: string;
+  totalBalanceMinor: number;
+  balancesByAccount: Record<string, number | null>;
+};
+
+export type CashFlowForecastReportEvent = {
+  id: string;
+  date: string;
+  accountId: string;
+  accountName: string;
+  description: string;
+  categoryLabel: string | null;
+  kind: CashFlowForecastEventKind;
+  amountMinor: number | null;
+  accountBalanceMinor: number | null;
+  totalBalanceMinor: number;
+  conservativeOnly: boolean;
+};
+
+function isoDateFromUtc(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function monthStartFromDate(value: string, offset = 0) {
+  const [year, month] = value.slice(0, 7).split("-").map(Number);
+  return isoDateFromUtc(new Date(Date.UTC(year, month - 1 + offset, 1)));
+}
+
+function monthEndFromMonth(value: string) {
+  const [year, month] = value.slice(0, 7).split("-").map(Number);
+  return isoDateFromUtc(new Date(Date.UTC(year, month, 0)));
+}
+
+function datesForReferenceMonths(startDate: string, endDate: string) {
+  const dates: string[] = [];
+  let cursor = monthStartFromDate(startDate, -1);
+  const limit = monthStartFromDate(endDate);
+  while (cursor <= limit && dates.length < 26) {
+    dates.push(cursor);
+    cursor = monthStartFromDate(cursor, 1);
+  }
+  return dates;
+}
+
+function monthsInRange(startDate: string, endDate: string) {
+  const months: string[] = [];
+  let cursor = monthStartFromDate(startDate);
+  const limit = monthStartFromDate(endDate);
+  while (cursor <= limit && months.length < 25) {
+    months.push(cursor.slice(0, 7));
+    cursor = monthStartFromDate(cursor, 1);
+  }
+  return months;
+}
+
+function forecastMonthProportion(
+  month: string,
+  startDate: string,
+  endDate: string,
+) {
+  const monthStart = `${month}-01`;
+  const monthEnd = monthEndFromMonth(month);
+  const includedStart = startDate > monthStart ? startDate : monthStart;
+  const includedEnd = endDate < monthEnd ? endDate : monthEnd;
+  if (includedStart > includedEnd) return 0;
+  const included =
+    Math.round(
+      (new Date(`${includedEnd}T00:00:00Z`).getTime() -
+        new Date(`${includedStart}T00:00:00Z`).getTime()) /
+        86_400_000,
+    ) + 1;
+  const total = Number(monthEnd.slice(8, 10));
+  return included / total;
+}
+
+function sumConvertedBalances(
+  balances: Record<string, number>,
+  accountsById: ReadonlyMap<
+    string,
+    { currency: SupportedCurrency }
+  >,
+  currency: SupportedCurrency,
+  date: string,
+  samples: readonly CurrencyConversionSample[],
+  missingCurrencies: Set<SupportedCurrency>,
+) {
+  return Object.entries(balances).reduce((sum, [accountId, amount]) => {
+    const sourceCurrency = accountsById.get(accountId)?.currency;
+    if (!sourceCurrency) return sum;
+    const converted = convertMinorUnits(
+      amount,
+      sourceCurrency,
+      currency,
+      date,
+      samples,
+    );
+    if (converted === null) {
+      missingCurrencies.add(sourceCurrency);
+      return sum;
+    }
+    return coerceMinorUnits(sum + converted);
+  }, 0);
+}
+
+/**
+ * Consolidated account cash-flow forecast. The base scenario uses the closed
+ * balance, already scheduled movements, active recurrences and card invoices.
+ * The conservative scenario adds only the uncovered portion of historical
+ * variable spending averages.
+ */
+export async function getCurrentUserCashFlowForecast(input: {
+  startDate: string;
+  endDate: string;
+  currency: SupportedCurrency;
+  accountIds?: string[];
+  scenario: CashFlowForecastScenario;
+  averageMonths: 3 | 6 | 12;
+}) {
+  const { supabase, user } = await requireUser();
+  const today = currentIsoDate();
+  const startDate = input.startDate < today ? today : input.startDate;
+  const previousMonth = monthStartFromDate(today, -1);
+  const historyEnd = monthEndFromMonth(previousMonth);
+  const historyStart = monthStartFromDate(previousMonth, -(input.averageMonths - 1));
+
+  const [
+    accountsResult,
+    transactionsResult,
+    transfersResult,
+    recurrencesResult,
+    cardsResult,
+    invoicesResult,
+    purchasesResult,
+    installmentsResult,
+    categoriesResult,
+    conversionResult,
+  ] = await Promise.all([
+    supabase
+      .from("account_balances")
+      .select("id, name, currency, archived_at, current_balance_minor")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .order("name"),
+    supabase
+      .from("transactions")
+      .select("id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, is_active, origin_type, credit_card_invoice_id, recurring_transaction_id")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .gte("transaction_date", historyStart)
+      .lte("transaction_date", input.endDate)
+      .order("transaction_date")
+      .limit(20_000),
+    supabase
+      .from("transfer_entries")
+      .select("id, transfer_id, account_id, direction, amount_minor, transaction_date, status, is_active")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .gte("transaction_date", today)
+      .lte("transaction_date", input.endDate)
+      .order("transaction_date")
+      .limit(10_000),
+    supabase
+      .from("recurring_transactions")
+      .select("id, account_id, category_id, transaction_type, description, amount_minor, frequency, start_date, end_date, next_occurrence, is_active, ended_at")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .is("ended_at", null)
+      .lte("next_occurrence", input.endDate),
+    supabase
+      .from("credit_cards")
+      .select("id, name, currency, linked_account_id, closing_day, due_day, is_active")
+      .eq("user_id", user.id)
+      .eq("is_active", true),
+    supabase
+      .from("credit_card_invoices")
+      .select("id, credit_card_id, reference_month, due_date, status, total_amount, payment_transaction_id")
+      .eq("user_id", user.id)
+      .neq("status", "paid")
+      .lte("due_date", input.endDate),
+    supabase
+      .from("credit_card_purchases")
+      .select("id, credit_card_id, category_id, entry_kind, description, total_amount, purchase_date, is_recurring, status")
+      .eq("user_id", user.id)
+      .eq("status", "active"),
+    supabase
+      .from("credit_card_installments")
+      .select("id, purchase_id, credit_card_id, invoice_id, amount, competence_date, status")
+      .eq("user_id", user.id)
+      .neq("status", "cancelled")
+      .gte("competence_date", historyStart)
+      .lte("competence_date", monthStartFromDate(input.endDate, 1))
+      .limit(20_000),
+    supabase
+      .from("categories")
+      .select("id, name")
+      .eq("user_id", user.id),
+    loadCurrencyConversionSamples(supabase, user.id),
+  ]);
+
+  const requestedAccountIds = new Set(input.accountIds ?? []);
+  const accounts = (accountsResult.data ?? []).filter(
+    (account) =>
+      requestedAccountIds.size === 0 || requestedAccountIds.has(account.id),
+  );
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const accountsById = new Map(accounts.map((account) => [account.id, account]));
+  const categoryNames = new Map(
+    (categoriesResult.data ?? []).map((category) => [category.id, category.name]),
+  );
+  const missingCurrencies = new Set<SupportedCurrency>();
+  const events: CashFlowForecastEventInput[] = [];
+  const allTransactions = transactionsResult.data ?? [];
+  const futureTransactions = allTransactions.filter(
+    (transaction) =>
+      accountIds.has(transaction.account_id) &&
+      transaction.transaction_date >= today,
+  );
+
+  for (const transaction of futureTransactions) {
+    events.push({
+      id: `transaction:${transaction.id}`,
+      accountId: transaction.account_id,
+      date: transaction.transaction_date,
+      description: transaction.description,
+      amountMinor:
+        transaction.transaction_type === "income"
+          ? coerceMinorUnits(transaction.amount_minor)
+          : -coerceMinorUnits(transaction.amount_minor),
+      kind:
+        transaction.origin_type === "credit_card_invoice_payment"
+          ? "card-invoice"
+          : transaction.recurring_transaction_id
+            ? "recurrence"
+            : "scheduled",
+      categoryLabel: transaction.category_id
+        ? categoryNames.get(transaction.category_id) ?? null
+        : null,
+    });
+  }
+
+  for (const transfer of transfersResult.data ?? []) {
+    if (!accountIds.has(transfer.account_id)) continue;
+    events.push({
+      id: `transfer:${transfer.id}`,
+      accountId: transfer.account_id,
+      date: transfer.transaction_date,
+      description: "Transferência entre contas",
+      amountMinor:
+        transfer.direction === "inflow"
+          ? coerceMinorUnits(transfer.amount_minor)
+          : -coerceMinorUnits(transfer.amount_minor),
+      kind: "transfer",
+      categoryLabel: null,
+    });
+  }
+
+  const existingRecurrenceDates = new Map<string, Set<string>>();
+  for (const transaction of allTransactions) {
+    if (!transaction.recurring_transaction_id) continue;
+    const dates =
+      existingRecurrenceDates.get(transaction.recurring_transaction_id) ??
+      new Set<string>();
+    dates.add(transaction.transaction_date);
+    existingRecurrenceDates.set(transaction.recurring_transaction_id, dates);
+  }
+  for (const recurrence of recurrencesResult.data ?? []) {
+    if (!accountIds.has(recurrence.account_id)) continue;
+    const projection = collectDueRecurrenceDates({
+      startDate: recurrence.start_date,
+      nextOccurrence: recurrence.next_occurrence,
+      endDate: recurrence.end_date,
+      frequency: recurrence.frequency,
+      targetDate: input.endDate,
+      existingDates: existingRecurrenceDates.get(recurrence.id),
+    });
+    for (const date of projection.dueDates) {
+      if (date < today) continue;
+      events.push({
+        id: `recurrence:${recurrence.id}:${date}`,
+        accountId: recurrence.account_id,
+        date,
+        description: recurrence.description,
+        amountMinor:
+          recurrence.transaction_type === "income"
+            ? coerceMinorUnits(recurrence.amount_minor)
+            : -coerceMinorUnits(recurrence.amount_minor),
+        kind: "recurrence",
+        categoryLabel: categoryNames.get(recurrence.category_id) ?? null,
+      });
+    }
+  }
+
+  const purchases = purchasesResult.data ?? [];
+  const purchasesById = new Map(purchases.map((purchase) => [purchase.id, purchase]));
+  const installments = installmentsResult.data ?? [];
+  const installmentsByPurchaseAndMonth = new Set(
+    installments.map(
+      (installment) => `${installment.purchase_id}:${installment.competence_date}`,
+    ),
+  );
+  const invoicesByCardAndMonth = new Map(
+    (invoicesResult.data ?? []).map((invoice) => [
+      `${invoice.credit_card_id}:${invoice.reference_month}`,
+      invoice,
+    ]),
+  );
+  const invoiceTransactions = new Set(
+    futureTransactions.flatMap((transaction) =>
+      transaction.credit_card_invoice_id
+        ? [transaction.credit_card_invoice_id]
+        : [],
+    ),
+  );
+  const referenceMonths = datesForReferenceMonths(today, input.endDate);
+
+  for (const card of cardsResult.data ?? []) {
+    if (!card.linked_account_id || !accountIds.has(card.linked_account_id)) continue;
+    const account = accountsById.get(card.linked_account_id)!;
+    const subscriptions = purchases.filter(
+      (purchase) =>
+        purchase.credit_card_id === card.id &&
+        purchase.is_recurring &&
+        purchase.entry_kind === "purchase",
+    );
+    for (const referenceMonth of referenceMonths) {
+      const dueDate = getInvoiceDueDate(
+        referenceMonth,
+        card.closing_day,
+        card.due_day,
+      );
+      if (dueDate < today || dueDate > input.endDate) continue;
+      const invoice = invoicesByCardAndMonth.get(`${card.id}:${referenceMonth}`);
+      if (invoice && invoiceTransactions.has(invoice.id)) continue;
+      let amountInCardCurrency = invoice
+        ? coerceMinorUnits(invoice.total_amount)
+        : 0;
+      for (const subscription of subscriptions) {
+        const firstReference = getPurchaseReferenceMonth(
+          subscription.purchase_date,
+          card.closing_day,
+        );
+        if (
+          referenceMonth >= firstReference &&
+          !installmentsByPurchaseAndMonth.has(
+            `${subscription.id}:${referenceMonth}`,
+          )
+        ) {
+          amountInCardCurrency = coerceMinorUnits(
+            amountInCardCurrency + coerceMinorUnits(subscription.total_amount),
+          );
+        }
+      }
+      if (amountInCardCurrency <= 0) continue;
+      const accountAmount = convertMinorUnits(
+        amountInCardCurrency,
+        card.currency,
+        account.currency,
+        dueDate,
+        conversionResult.samples,
+      );
+      if (accountAmount === null) {
+        missingCurrencies.add(card.currency);
+        continue;
+      }
+      events.push({
+        id: `invoice:${invoice?.id ?? `${card.id}:${referenceMonth}`}`,
+        accountId: card.linked_account_id,
+        date: dueDate,
+        description: `Fatura ${card.name}`,
+        amountMinor: -accountAmount,
+        kind: "card-invoice",
+        categoryLabel: "Cartão de crédito",
+      });
+    }
+  }
+
+  if (input.scenario === "conservative") {
+    const directHistorical = new Map<string, Map<string, number>>();
+    const directLineMeta = new Map<
+      string,
+      { accountId: string; categoryId: string | null; label: string }
+    >();
+    for (const transaction of allTransactions) {
+      if (
+        !accountIds.has(transaction.account_id) ||
+        transaction.transaction_date < historyStart ||
+        transaction.transaction_date > historyEnd ||
+        transaction.status !== "completed" ||
+        transaction.transaction_type !== "expense" ||
+        transaction.recurring_transaction_id ||
+        transaction.origin_type === "credit_card_invoice_payment" ||
+        transaction.origin_type === "investment"
+      ) continue;
+      const lineKey = `${transaction.account_id}:${transaction.category_id ?? "uncategorized"}`;
+      const month = transaction.transaction_date.slice(0, 7);
+      const amounts = directHistorical.get(lineKey) ?? new Map<string, number>();
+      amounts.set(
+        month,
+        coerceMinorUnits(
+          (amounts.get(month) ?? 0) + coerceMinorUnits(transaction.amount_minor),
+        ),
+      );
+      directHistorical.set(lineKey, amounts);
+      directLineMeta.set(lineKey, {
+        accountId: transaction.account_id,
+        categoryId: transaction.category_id,
+        label: transaction.category_id
+          ? categoryNames.get(transaction.category_id) ?? "Sem categoria"
+          : "Sem categoria",
+      });
+    }
+    const directPlanned = new Map<string, number>();
+    for (const transaction of futureTransactions) {
+      if (
+        transaction.transaction_type !== "expense" ||
+        transaction.recurring_transaction_id ||
+        transaction.origin_type === "credit_card_invoice_payment" ||
+        transaction.origin_type === "investment"
+      ) continue;
+      const key = `${transaction.account_id}:${transaction.category_id ?? "uncategorized"}:${transaction.transaction_date.slice(0, 7)}`;
+      directPlanned.set(
+        key,
+        coerceMinorUnits(
+          (directPlanned.get(key) ?? 0) + coerceMinorUnits(transaction.amount_minor),
+        ),
+      );
+    }
+    for (const [lineKey, history] of directHistorical) {
+      const meta = directLineMeta.get(lineKey)!;
+      const average = averageMonthlyExpenseMinor(history, input.averageMonths);
+      for (const month of monthsInRange(startDate, input.endDate)) {
+        const residual = residualVariableExpenseMinor(
+          average,
+          directPlanned.get(`${lineKey}:${month}`) ?? 0,
+          forecastMonthProportion(month, startDate, input.endDate),
+        );
+        if (residual <= 0) continue;
+        const eventDate = [input.endDate, monthEndFromMonth(month)].sort()[0];
+        events.push({
+          id: `average:direct:${lineKey}:${month}`,
+          accountId: meta.accountId,
+          date: eventDate < startDate ? startDate : eventDate,
+          description: `Média variável · ${meta.label}`,
+          amountMinor: -residual,
+          kind: "variable-average",
+          categoryLabel: meta.label,
+          conservativeOnly: true,
+        });
+      }
+    }
+
+    const cardHistory = new Map<string, Map<string, number>>();
+    const cardMeta = new Map<
+      string,
+      { cardId: string; categoryId: string | null; label: string }
+    >();
+    const cardPlanned = new Map<string, number>();
+    for (const installment of installments) {
+      const purchase = purchasesById.get(installment.purchase_id);
+      if (!purchase || purchase.is_recurring) continue;
+      const card = (cardsResult.data ?? []).find(
+        (item) => item.id === installment.credit_card_id,
+      );
+      if (!card?.linked_account_id || !accountIds.has(card.linked_account_id)) continue;
+      const lineKey = `${card.id}:${purchase.category_id ?? "uncategorized"}`;
+      const direction = purchase.entry_kind === "purchase" ? 1 : -1;
+      const amount = coerceMinorUnits(direction * coerceMinorUnits(installment.amount));
+      const month = installment.competence_date.slice(0, 7);
+      const label = purchase.category_id
+        ? categoryNames.get(purchase.category_id) ?? card.name
+        : card.name;
+      cardMeta.set(lineKey, {
+        cardId: card.id,
+        categoryId: purchase.category_id,
+        label,
+      });
+      if (
+        installment.competence_date >= historyStart &&
+        installment.competence_date <= historyEnd
+      ) {
+        const amounts = cardHistory.get(lineKey) ?? new Map<string, number>();
+        amounts.set(month, coerceMinorUnits((amounts.get(month) ?? 0) + amount));
+        cardHistory.set(lineKey, amounts);
+      } else if (installment.competence_date >= monthStartFromDate(today)) {
+        cardPlanned.set(
+          `${lineKey}:${month}`,
+          coerceMinorUnits((cardPlanned.get(`${lineKey}:${month}`) ?? 0) + amount),
+        );
+      }
+    }
+    for (const [lineKey, history] of cardHistory) {
+      const meta = cardMeta.get(lineKey)!;
+      const card = (cardsResult.data ?? []).find((item) => item.id === meta.cardId);
+      if (!card?.linked_account_id) continue;
+      const account = accountsById.get(card.linked_account_id);
+      if (!account) continue;
+      const average = Math.max(
+        0,
+        averageMonthlyExpenseMinor(history, input.averageMonths),
+      );
+      for (const referenceMonth of referenceMonths) {
+        const dueDate = getInvoiceDueDate(
+          referenceMonth,
+          card.closing_day,
+          card.due_day,
+        );
+        if (dueDate < startDate || dueDate > input.endDate) continue;
+        const residualCardCurrency = residualVariableExpenseMinor(
+          average,
+          cardPlanned.get(`${lineKey}:${referenceMonth.slice(0, 7)}`) ?? 0,
+        );
+        if (residualCardCurrency <= 0) continue;
+        const accountAmount = convertMinorUnits(
+          residualCardCurrency,
+          card.currency,
+          account.currency,
+          dueDate,
+          conversionResult.samples,
+        );
+        if (accountAmount === null) {
+          missingCurrencies.add(card.currency);
+          continue;
+        }
+        events.push({
+          id: `average:card:${lineKey}:${referenceMonth}`,
+          accountId: account.id,
+          date: dueDate,
+          description: `Média variável · ${card.name} · ${meta.label}`,
+          amountMinor: -accountAmount,
+          kind: "variable-average",
+          categoryLabel: meta.label,
+          conservativeOnly: true,
+        });
+      }
+    }
+  }
+
+  const timeline = buildCashFlowForecastTimeline({
+    baselineDate: today,
+    startDate,
+    endDate: input.endDate,
+    accounts: accounts.map((account) => ({
+      id: account.id,
+      name: account.name,
+      currentBalanceMinor: coerceMinorUnits(account.current_balance_minor),
+    })),
+    events,
+  });
+  const points: CashFlowForecastReportPoint[] = timeline.points.map((point) => {
+    const balancesByAccount = Object.fromEntries(
+      accounts.map((account) => {
+        const converted = convertMinorUnits(
+          point.balancesByAccount[account.id] ?? 0,
+          account.currency,
+          input.currency,
+          point.date,
+          conversionResult.samples,
+        );
+        if (converted === null) missingCurrencies.add(account.currency);
+        return [account.id, converted];
+      }),
+    );
+    return {
+      date: point.date,
+      balancesByAccount,
+      totalBalanceMinor: Object.values(balancesByAccount).reduce<number>(
+        (sum, amount) => coerceMinorUnits(sum + (amount ?? 0)),
+        0,
+      ),
+    };
+  });
+  const runningNativeBalances = { ...timeline.openingBalancesByAccount };
+  const reportEvents: CashFlowForecastReportEvent[] = timeline.events.map((event) => {
+    runningNativeBalances[event.accountId] = event.accountBalanceMinor;
+    const account = accountsById.get(event.accountId)!;
+    const amountMinor = convertMinorUnits(
+      event.amountMinor,
+      account.currency,
+      input.currency,
+      event.date,
+      conversionResult.samples,
+    );
+    const accountBalanceMinor = convertMinorUnits(
+      event.accountBalanceMinor,
+      account.currency,
+      input.currency,
+      event.date,
+      conversionResult.samples,
+    );
+    if (amountMinor === null || accountBalanceMinor === null) {
+      missingCurrencies.add(account.currency);
+    }
+    return {
+      id: event.id,
+      date: event.date,
+      accountId: event.accountId,
+      accountName: account.name,
+      description: event.description,
+      categoryLabel: event.categoryLabel ?? null,
+      kind: event.kind,
+      amountMinor,
+      accountBalanceMinor,
+      totalBalanceMinor: sumConvertedBalances(
+        runningNativeBalances,
+        accountsById,
+        input.currency,
+        event.date,
+        conversionResult.samples,
+        missingCurrencies,
+      ),
+      conservativeOnly: event.conservativeOnly ?? false,
+    };
+  });
+  const openingDate = startDate;
+  const closingDate = input.endDate;
+  const openingTotalMinor = sumConvertedBalances(
+    timeline.openingBalancesByAccount,
+    accountsById,
+    input.currency,
+    openingDate,
+    conversionResult.samples,
+    missingCurrencies,
+  );
+  const closingTotalMinor = sumConvertedBalances(
+    timeline.closingBalancesByAccount,
+    accountsById,
+    input.currency,
+    closingDate,
+    conversionResult.samples,
+    missingCurrencies,
+  );
+
+  return {
+    accounts: accounts.map((account): CashFlowForecastReportAccount => ({
+      id: account.id,
+      name: account.name,
+      currency: account.currency,
+      openingBalanceMinor: convertMinorUnits(
+        timeline.openingBalancesByAccount[account.id] ?? 0,
+        account.currency,
+        input.currency,
+        openingDate,
+        conversionResult.samples,
+      ),
+      closingBalanceMinor: convertMinorUnits(
+        timeline.closingBalancesByAccount[account.id] ?? 0,
+        account.currency,
+        input.currency,
+        closingDate,
+        conversionResult.samples,
+      ),
+    })),
+    points,
+    events: reportEvents,
+    openingTotalMinor,
+    closingTotalMinor,
+    lowestTotalMinor: points.length
+      ? Math.min(...points.map((point) => point.totalBalanceMinor))
+      : openingTotalMinor,
+    missingCurrencies: [...missingCurrencies],
+    hasError: Boolean(
+      accountsResult.error ||
+        transactionsResult.error ||
+        transfersResult.error ||
+        recurrencesResult.error ||
+        cardsResult.error ||
+        invoicesResult.error ||
+        purchasesResult.error ||
+        installmentsResult.error ||
+        categoriesResult.error ||
+        conversionResult.hasError
     ),
   };
 }

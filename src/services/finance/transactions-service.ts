@@ -231,6 +231,24 @@ export async function deleteCurrentUserTransaction(id: string) {
     : { ok: true as const };
 }
 
+export async function clearCurrentUserInactiveAutomaticTransactions() {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("is_active", false)
+    .eq("origin_type", "system")
+    .select("id");
+
+  return error
+    ? {
+        ok: false as const,
+        message: "Não foi possível limpar os automáticos inativos.",
+      }
+    : { ok: true as const, deletedCount: data?.length ?? 0 };
+}
+
 export async function setCurrentUserTransactionActive(
   id: string,
   active: boolean,

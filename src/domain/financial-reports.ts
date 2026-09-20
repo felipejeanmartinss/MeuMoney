@@ -15,6 +15,7 @@ export const FINANCIAL_REPORT_TYPES = [
   "asset-performance",
   "asset-performance-general",
   "net-worth-evolution",
+  "cash-flow-forecast",
 ] as const;
 
 export type FinancialReportType = (typeof FINANCIAL_REPORT_TYPES)[number];
@@ -26,6 +27,7 @@ export const FINANCIAL_REPORT_LABELS: Record<FinancialReportType, string> = {
   "asset-performance": "Performance (ativos)",
   "asset-performance-general": "Performance (geral)",
   "net-worth-evolution": "Evolução patrimonial",
+  "cash-flow-forecast": "Projeção de fluxo de caixa",
 };
 
 export const financialReportTypeSchema = z.enum(FINANCIAL_REPORT_TYPES);

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
 import {
   recurringGenerationDateSchema,
+  recurringGenerationReviewSchema,
   recurringTransactionFormSchema,
   recurringTransactionIdSchema,
   recurringTransactionStateSchema,
@@ -22,6 +23,7 @@ const recurringInputFrom = (formData: FormData) => ({
   transactionType: formData.get("transactionType"),
   description: formData.get("description"),
   amountMinor: formData.get("amountMinor"),
+  isAmountFixed: formData.get("isAmountFixed") !== "false",
   frequency: formData.get("frequency"),
   startDate: formData.get("startDate"),
   endDate: formData.get("endDate") ?? "",
@@ -112,8 +114,38 @@ export async function generateRecurringTransactions(formData: FormData) {
     redirect("/recurring-transactions?message=generation-error");
   }
 
+  const reviewIds = formData.getAll("reviewRecurringId");
+  const scheduledDates = formData.getAll("reviewScheduledDate");
+  const transactionDates = formData.getAll("reviewTransactionDate");
+  const reviewAmounts = formData.getAll("reviewAmountMinor");
+  if (
+    reviewIds.length !== scheduledDates.length ||
+    reviewIds.length !== transactionDates.length ||
+    reviewIds.length !== reviewAmounts.length
+  ) {
+    redirect("/recurring-transactions?message=generation-error");
+  }
+
+  const reviews = reviewIds.flatMap((recurringId, index) => {
+    if (String(scheduledDates[index]) > parsedDate.data) return [];
+    const parsed = recurringGenerationReviewSchema.safeParse({
+      recurringId,
+      scheduledDate: scheduledDates[index],
+      transactionDate: transactionDates[index],
+      amountMinor: reviewAmounts[index],
+    });
+    return parsed.success ? [parsed.data] : [];
+  });
+  const eligibleReviewCount = scheduledDates.filter(
+    (date) => String(date) <= parsedDate.data,
+  ).length;
+  if (reviews.length !== eligibleReviewCount) {
+    redirect("/recurring-transactions?message=generation-error");
+  }
+
   const result = await generateCurrentUserRecurringTransactions(
     parsedDate.data,
+    reviews,
   );
   revalidateRecurringPaths();
   redirect(

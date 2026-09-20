@@ -11,6 +11,7 @@ import {
   transactionIdSchema,
 } from "@/domain/transactions";
 import {
+  clearCurrentUserInactiveAutomaticTransactions,
   createCurrentUserTransaction,
   deleteCurrentUserTransaction,
   setCurrentUserAccountEntryReconciled,
@@ -141,6 +142,16 @@ export async function deleteTransaction(formData: FormData) {
     );
   }
   redirect(`/transactions?message=${result.ok ? "deleted" : "delete-error"}`);
+}
+
+export async function clearInactiveAutomaticTransactions() {
+  const result = await clearCurrentUserInactiveAutomaticTransactions();
+  revalidateFinancialPaths();
+  redirect(
+    `/transactions?activity=inactive&message=${
+      result.ok ? "inactive-automatic-cleared" : "delete-error"
+    }${result.ok ? `&count=${result.deletedCount}` : ""}`,
+  );
 }
 
 export async function toggleAccountEntryReconciliation(formData: FormData) {

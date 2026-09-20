@@ -22,13 +22,13 @@ import {
 } from "@/utils/dates";
 
 const messages: Record<string, string> = {
-  "invoice-closed": "Fatura fechada. Enquanto não houver pagamento, os lançamentos ainda podem ser corrigidos.",
+  "invoice-closed": "Fatura fechada. A previsão de pagamento foi criada na conta preferencial, quando configurada.",
   "invoice-paid": "Pagamento registrado e saldo da conta atualizado.",
   "payment-reversed": "Pagamento estornado com segurança.",
   "installment-updated": "Valor da parcela atualizado.",
   "installment-error": "A parcela só pode ser alterada em uma fatura aberta.",
   "invoice-error": "Não foi possível concluir a operação.",
-  "entry-created": "Crédito incluído na fatura.",
+  "entry-created": "Lançamento incluído na fatura.",
 };
 
 export default async function CreditCardInvoicePage({
@@ -39,7 +39,15 @@ export default async function CreditCardInvoicePage({
   searchParams: Promise<{ message?: string }>;
 }) {
   const [{ id, invoiceId }, query] = await Promise.all([params, searchParams]);
-  const { card, invoice, installments, purchases, accounts, hasError } =
+  const {
+    card,
+    invoice,
+    installments,
+    purchases,
+    accounts,
+    categories,
+    hasError,
+  } =
     await getCurrentUserCreditCardInvoice(id, invoiceId);
   if (!card || !invoice) notFound();
   const today = toIsoDate(new Date());
@@ -103,10 +111,10 @@ export default async function CreditCardInvoicePage({
         <details className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 marker:hidden">
             <span className="font-extrabold text-slate-950">
-              Crédito na fatura
+              Novo lançamento na fatura
             </span>
             <span className="rounded-lg border px-3 py-2 text-sm font-bold text-emerald-700 group-open:text-slate-700">
-              <span className="group-open:hidden">Adicionar estorno ou cashback</span>
+              <span className="group-open:hidden">Adicionar compra ou crédito</span>
               <span className="hidden group-open:inline">Fechar</span>
             </span>
           </summary>
@@ -116,12 +124,12 @@ export default async function CreditCardInvoicePage({
               closingDay={card.closing_day}
               dueDay={card.due_day}
               currency={card.currency}
-              categories={[]}
+              categories={categories}
               compact
               targetInvoiceId={invoice.id}
-              entryKinds={["refund", "cashback"]}
+              entryKinds={["purchase", "refund", "cashback"]}
               values={{
-                entryKind: "refund",
+                entryKind: "purchase",
                 purchaseDate: today,
                 installmentCount: 1,
               }}
@@ -245,7 +253,7 @@ export default async function CreditCardInvoicePage({
         ) : null}
       </section>
 
-      {invoice.status === "paid" ? (
+      {invoice.status === "paid" && invoice.payment_transaction_id ? (
         <form
           action={reverseCreditCardInvoicePayment}
           className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-white p-4"
@@ -260,6 +268,14 @@ export default async function CreditCardInvoicePage({
             Estornar pagamento
           </button>
         </form>
+      ) : null}
+
+      {invoice.status === "paid" &&
+      invoice.total_amount === 0 &&
+      !invoice.payment_transaction_id ? (
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900">
+          Fatura zerada encerrada como paga, sem lançamento na conta.
+        </p>
       ) : null}
 
       {(invoice.status === "closed" || invoice.status === "overdue") &&

@@ -1,6 +1,7 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
+  Json,
   RecurrenceFrequency,
   RecurringTransactionState,
   TransactionType,
@@ -12,6 +13,7 @@ export type RecurringTransactionMutationInput = {
   transactionType: TransactionType;
   description: string;
   amountMinor: number;
+  isAmountFixed: boolean;
   frequency: RecurrenceFrequency;
   startDate: string;
   endDate: string | null;
@@ -19,8 +21,15 @@ export type RecurringTransactionMutationInput = {
   notes: string | null;
 };
 
+export type RecurringTransactionReviewInput = {
+  recurringId: string;
+  scheduledDate: string;
+  transactionDate: string;
+  amountMinor: number;
+};
+
 const recurringTransactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at";
+  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, is_amount_fixed, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at";
 
 function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -38,6 +47,9 @@ function mutationErrorMessage(error: { message?: string } | null) {
   }
   if (message.includes("recurring_transaction_generation_limit")) {
     return "O período solicitado é muito extenso. Escolha uma data mais próxima.";
+  }
+  if (message.includes("recurrence_review")) {
+    return "Revise a data e o valor das recorrências aproximadas.";
   }
   return "Não foi possível concluir a operação com a recorrência.";
 }
@@ -149,6 +161,7 @@ export async function createCurrentUserRecurringTransaction(
     transaction_type: input.transactionType,
     description: input.description,
     amount_minor: input.amountMinor,
+    is_amount_fixed: input.isAmountFixed,
     frequency: input.frequency,
     start_date: input.startDate,
     end_date: input.endDate,
@@ -174,6 +187,7 @@ export async function updateCurrentUserRecurringTransaction(
       transaction_type: input.transactionType,
       description: input.description,
       amount_minor: input.amountMinor,
+      is_amount_fixed: input.isAmountFixed,
       frequency: input.frequency,
       start_date: input.startDate,
       end_date: input.endDate,
@@ -208,11 +222,15 @@ export async function setCurrentUserRecurringTransactionState(
 
 export async function generateCurrentUserRecurringTransactions(
   targetUntil: string,
+  reviews: RecurringTransactionReviewInput[] = [],
 ) {
   const { supabase } = await requireUser();
   const { data, error } = await supabase.rpc(
-    "generate_recurring_transactions",
-    { target_until: targetUntil },
+    "generate_recurring_transactions_reviewed",
+    {
+      target_until: targetUntil,
+      review_overrides: reviews as unknown as Json,
+    },
   );
 
   return error
