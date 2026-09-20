@@ -24,6 +24,20 @@ button, a { -webkit-tap-highlight-color: transparent; }
 button, summary { touch-action: manipulation; }
 summary::-webkit-details-marker { display: none; }
 
+/* Cabeçalhos de grades simples recebem ordenação crescente/decrescente. */
+table:not([data-sortable="false"]) thead th:not(:has(a, button, input, select)) {
+  cursor: pointer;
+  user-select: none;
+}
+table:not([data-sortable="false"]) thead th[aria-sort="ascending"]::after {
+  content: " ▲";
+  font-size: 0.65em;
+}
+table:not([data-sortable="false"]) thead th[aria-sort="descending"]::after {
+  content: " ▼";
+  font-size: 0.65em;
+}
+
 /* Mantém as telas legadas coerentes enquanto os módulos são modernizados. */
 .text-blue-700 { color: var(--color-brand); }
 .text-blue-800, .text-blue-900, .text-blue-950 { color: var(--color-brand-strong); }

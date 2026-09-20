@@ -29,6 +29,7 @@ export type AccountRegisterSourceEntry = {
   direction: AccountRegisterDirection;
   amountMinor: number;
   editHref: string | null;
+  canDelete?: boolean;
   investmentPositionId?: string | null;
   investmentCashFlowId?: string | null;
 };

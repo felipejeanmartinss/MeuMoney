@@ -224,7 +224,7 @@ export function AccountRegister({
       ) : (
         <>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1080px] table-fixed border-collapse text-[0.82rem]">
+            <table data-sortable="false" className="w-full min-w-[1080px] table-fixed border-collapse text-[0.82rem]">
               <caption className="sr-only">
                 Movimentações da conta, das mais recentes para as mais antigas
               </caption>
@@ -389,6 +389,19 @@ export function AccountRegister({
                               </form>
                             ) : null}
                           </div>
+                        ) : entry.entryType === "transaction" && entry.canDelete ? (
+                          <form action={deleteTransaction} className="flex items-center justify-end gap-2">
+                            <span className="text-xs text-slate-400">Automático</span>
+                            <input type="hidden" name="id" value={entry.id} />
+                            <input type="hidden" name="accountId" value={accountId} />
+                            <input type="hidden" name="page" value={page} />
+                            <ConfirmSubmitButton
+                              confirmation={`Excluir definitivamente “${entry.description}”?`}
+                              className="text-sm font-bold text-red-700 hover:underline disabled:opacity-50"
+                            >
+                              Excluir
+                            </ConfirmSubmitButton>
+                          </form>
                         ) : (
                           <span className="text-xs text-slate-400">
                             Automático
@@ -446,6 +459,19 @@ export function AccountRegister({
                         <span className="text-xs font-bold text-amber-700">
                           {TRANSACTION_STATUS_LABELS[entry.status]}
                         </span>
+                      ) : entry.entryType === "transaction" && entry.canDelete ? (
+                        <form action={deleteTransaction} className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Automático</span>
+                          <input type="hidden" name="id" value={entry.id} />
+                          <input type="hidden" name="accountId" value={accountId} />
+                          <input type="hidden" name="page" value={page} />
+                          <ConfirmSubmitButton
+                            confirmation={`Excluir definitivamente “${entry.description}”?`}
+                            className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-red-700 disabled:opacity-50"
+                          >
+                            Excluir
+                          </ConfirmSubmitButton>
+                        </form>
                       ) : null}
                       <ReconciliationControl
                         accountId={accountId}

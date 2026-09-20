@@ -240,6 +240,9 @@ export async function getCurrentUserAccountHub(id: string) {
           transaction.origin_type === "manual"
             ? `/transactions/${transaction.id}/edit`
             : null,
+        canDelete:
+          transaction.origin_type === "manual" ||
+          transaction.origin_type === "system",
         investmentPositionId:
           investmentLinkByTransaction.get(transaction.id)?.positionId ??
           (transaction.origin_type === "investment"

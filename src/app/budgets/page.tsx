@@ -50,6 +50,33 @@ function toSummaryRows(rows: MonthlyBudgetProgress[]) {
   }));
 }
 
+function BudgetSortHeader({
+  label,
+  field,
+  href,
+  activeField,
+  direction,
+  align = "left",
+}: {
+  label: string;
+  field: string;
+  href: string;
+  activeField: string;
+  direction: "asc" | "desc";
+  align?: "left" | "right";
+}) {
+  return (
+    <th className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
+      <Link href={href} className="inline-flex items-center gap-1 hover:text-slate-950">
+        {label}
+        <span aria-hidden="true" className="text-[0.6rem]">
+          {activeField === field ? (direction === "asc" ? "▲" : "▼") : "↕"}
+        </span>
+      </Link>
+    </th>
+  );
+}
+
 export default async function BudgetsPage({
   searchParams,
 }: {
@@ -61,6 +88,8 @@ export default async function BudgetsPage({
     currency?: string;
     message?: string;
     count?: string;
+    sort?: string;
+    direction?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -124,6 +153,55 @@ export default async function BudgetsPage({
         : undefined;
   const feedbackIsError = params.message === "copy-error";
   const locale = CURRENCY_LOCALES[filters.currency];
+  const sortKey = ["category", "type", "planned", "realized", "difference", "percentage"].includes(
+    params.sort ?? "",
+  )
+    ? params.sort!
+    : "realized";
+  const sortDirection = params.direction === "asc" ? "asc" : "desc";
+  const progressRows = [...progress].sort((left, right) => {
+    const leftCategory = categoryById.get(left.category_id);
+    const rightCategory = categoryById.get(right.category_id);
+    const leftName = leftCategory
+      ? getCategoryDisplayName(leftCategory, categories)
+      : left.category_name;
+    const rightName = rightCategory
+      ? getCategoryDisplayName(rightCategory, categories)
+      : right.category_name;
+    const values: Record<string, [string | number, string | number]> = {
+      category: [leftName, rightName],
+      type: [left.category_kind, right.category_kind],
+      planned: [left.planned_amount_minor, right.planned_amount_minor],
+      realized: [left.realized_amount_minor, right.realized_amount_minor],
+      difference: [left.available_amount_minor, right.available_amount_minor],
+      percentage: [left.percentage_consumed ?? -Infinity, right.percentage_consumed ?? -Infinity],
+    };
+    const [a, b] = values[sortKey];
+    const comparison =
+      typeof a === "number" && typeof b === "number"
+        ? a - b
+        : String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" });
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+  const visibleTotals = progressRows.reduce(
+    (total, row) => ({
+      planned: total.planned + row.planned_amount_minor,
+      realized: total.realized + row.realized_amount_minor,
+      difference: total.difference + row.available_amount_minor,
+    }),
+    { planned: 0, realized: 0, difference: 0 },
+  );
+  const sortHref = (key: string) => {
+    const query = new URLSearchParams({
+      view,
+      context: filters.context,
+      month: filters.month,
+      year: String(year),
+      sort: key,
+      direction: sortKey === key && sortDirection === "desc" ? "asc" : "desc",
+    });
+    return `/budgets?${query.toString()}`;
+  };
   const commonQuery = {
     context: filters.context,
   };
@@ -372,16 +450,28 @@ export default async function BudgetsPage({
                     </caption>
                     <thead className="bg-slate-100 text-slate-600">
                       <tr>
-                        <th className="px-3 py-2 text-left">Categoria</th>
-                        <th className="px-3 py-2 text-left">Tipo</th>
-                        <th className="px-3 py-2 text-right">Planejado</th>
-                        <th className="px-3 py-2 text-right">Realizado</th>
-                        <th className="px-3 py-2 text-right">Diferença</th>
-                        <th className="px-3 py-2 text-right">%</th>
+                        {[
+                          ["Categoria", "category", "left"],
+                          ["Tipo", "type", "left"],
+                          ["Planejado", "planned", "right"],
+                          ["Realizado", "realized", "right"],
+                          ["Diferença", "difference", "right"],
+                          ["%", "percentage", "right"],
+                        ].map(([label, field, align]) => (
+                          <BudgetSortHeader
+                            key={field}
+                            label={label}
+                            field={field}
+                            href={sortHref(field)}
+                            activeField={sortKey}
+                            direction={sortDirection}
+                            align={align as "left" | "right"}
+                          />
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {progress.map((row) => {
+                      {progressRows.map((row) => {
                         const category = categoryById.get(row.category_id);
                         return (
                           <tr
@@ -441,6 +531,23 @@ export default async function BudgetsPage({
                         );
                       })}
                     </tbody>
+                    <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-black text-slate-950">
+                      <tr>
+                        <th scope="row" colSpan={2} className="px-3 py-3 text-left">
+                          Total das linhas exibidas
+                        </th>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                          {formatBudgetMoney(visibleTotals.planned, filters.currency, locale)}
+                        </td>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                          {formatBudgetMoney(visibleTotals.realized, filters.currency, locale)}
+                        </td>
+                        <td className={`px-3 py-3 text-right tabular-nums ${visibleTotals.difference < 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                          {formatBudgetMoney(visibleTotals.difference, filters.currency, locale)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-slate-400">—</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               ) : (

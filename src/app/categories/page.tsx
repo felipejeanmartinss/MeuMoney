@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { toggleCategoryStatus } from "@/app/actions/categories";
+import {
+  toggleCategoryFixedExpense,
+  toggleCategoryStatus,
+} from "@/app/actions/categories";
 import { CONTEXT_LABELS, FINANCIAL_CONTEXTS } from "@/domain/accounts";
 import { CATEGORY_KIND_LABELS, CATEGORY_KINDS } from "@/domain/categories";
 import { listCurrentUserCategories } from "@/services/finance/categories-service";
@@ -13,6 +16,8 @@ const messages: Record<string, string> = {
   deleted: "Categoria excluída e vínculos realocados com sucesso.",
   "status-updated": "Status da categoria atualizado com sucesso.",
   "status-error": "Não foi possível alterar o status da categoria.",
+  "fixed-expense-updated": "Classificação de despesa fixa atualizada.",
+  "fixed-expense-error": "Não foi possível alterar a classificação de despesa fixa.",
   "group-created": "Grupo criado com sucesso.",
   "group-updated": "Grupo atualizado com sucesso.",
   "group-deleted": "Grupo excluído e categorias realocadas com sucesso.",
@@ -43,6 +48,33 @@ function CategoryRow({
           {isSubcategory ? "↳ " : ""}
           {category.name}
         </span>
+      </td>
+      <td className="border-b border-slate-200 px-3 py-2 text-center">
+        {category.kind === "expense" && isSubcategory ? (
+          <form action={toggleCategoryFixedExpense}>
+            <input type="hidden" name="id" value={category.id} />
+            <input
+              type="hidden"
+              name="fixed"
+              value={category.is_fixed_expense ? "false" : "true"}
+            />
+            <button
+              type="submit"
+              role="checkbox"
+              aria-checked={category.is_fixed_expense}
+              aria-label={`${category.is_fixed_expense ? "Remover" : "Marcar"} ${category.name} como despesa fixa`}
+              className={`inline-grid size-6 place-items-center rounded border text-xs font-black ${
+                category.is_fixed_expense
+                  ? "border-emerald-700 bg-emerald-700 text-white"
+                  : "border-slate-300 bg-white text-transparent hover:border-emerald-600"
+              }`}
+            >
+              ✓
+            </button>
+          </form>
+        ) : (
+          <span className="text-slate-300">—</span>
+        )}
       </td>
       <td className="border-b border-slate-200 px-3 py-2 text-slate-600">
         <Link
@@ -194,7 +226,7 @@ export default async function CategoriesPage({
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[52rem] border-collapse text-left text-sm">
+                  <table data-sortable="false" className="w-full min-w-[52rem] border-collapse text-left text-sm">
                     <caption className="sr-only">
                       Categorias de {CATEGORY_KIND_LABELS[kind].toLowerCase()} no
                       contexto {CONTEXT_LABELS[context].toLowerCase()}
@@ -202,7 +234,8 @@ export default async function CategoriesPage({
                     <thead className="bg-blue-50 text-xs uppercase tracking-wide text-blue-950">
                       <tr>
                         <th className="w-[34%] px-3 py-2 font-bold">Categoria</th>
-                        <th className="w-[24%] px-3 py-2 font-bold">Grupo</th>
+                        <th className="w-[12%] px-3 py-2 text-center font-bold">Despesa fixa</th>
+                        <th className="w-[22%] px-3 py-2 font-bold">Grupo</th>
                         <th className="w-[18%] px-3 py-2 font-bold">Nível</th>
                         <th className="w-[10%] px-3 py-2 font-bold">Situação</th>
                         <th className="px-3 py-2 text-right font-bold">Ações</th>
@@ -218,7 +251,7 @@ export default async function CategoriesPage({
                         return [
                           <tr key={`group-${group.id}`} className="bg-slate-50">
                             <td
-                              colSpan={4}
+                              colSpan={5}
                               className="border-b border-slate-200 px-3 py-2"
                             >
                               <span className="font-extrabold text-slate-900">

@@ -115,7 +115,7 @@ export function AnnualBudgetForm({ year, context, currency, categories }: {
         Receitas aparecem primeiro. Os totais consolidados usam {currency} sem repetir o símbolo em cada célula.
       </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full min-w-[1410px] table-fixed border-collapse text-xs tabular-nums">
+        <table data-sortable="false" className="w-full min-w-[1410px] table-fixed border-collapse text-xs tabular-nums">
           <caption className="sr-only">Orçamento anual por categoria e subcategoria</caption>
           <thead className="sticky top-0 bg-slate-100 text-slate-600">
             <tr>

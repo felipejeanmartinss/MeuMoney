@@ -312,6 +312,20 @@ function CardsGroup({
         value: card.used_limit,
       })),
   );
+  const openInvoiceTotals = totalsByCurrency(
+    invoices
+      .filter((invoice) => invoice.status !== "paid")
+      .map((invoice) => {
+        const card = cards.find((item) => item.id === invoice.credit_card_id);
+        return card
+          ? { currency: card.currency, value: invoice.total_amount }
+          : null;
+      })
+      .filter(
+        (item): item is { currency: SupportedCurrency; value: number } =>
+          item !== null,
+      ),
+  );
   const nextOpenInvoiceByCard = new Map<string, CreditCardInvoice>();
 
   for (const invoice of invoices) {
@@ -334,9 +348,17 @@ function CardsGroup({
             Próxima fatura e total comprometido de cada cartão.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Comprometido</span>
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          <div>
+            <p className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
+              Faturas em aberto
+            </p>
+            <CurrencyTotals totals={openInvoiceTotals} emptyLabel="Sem faturas" />
+          </div>
+          <div>
+            <p className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
+              Comprometido
+            </p>
             <CurrencyTotals totals={totals} emptyLabel="Nenhum cartão" />
           </div>
           <span aria-hidden="true" className="text-sm text-slate-400 transition group-open:rotate-90">▸</span>

@@ -25,7 +25,7 @@ import type {
   Category,
   FinancialContext,
   FinancialReportBasis,
-  FinancialReportCategoryMonthly,
+  FinancialReportEntryBySource,
   InvestmentPositionPerformanceSummary,
   SupportedCurrency,
 } from "@/types/database";
@@ -91,16 +91,19 @@ async function loadCategoryMonthlyEntries(input: {
   basis: FinancialReportBasis;
   context: ReportContext;
   sourceCurrencies: SupportedCurrency[];
+  sourceKeys?: string[];
+  categoryIds?: string[];
+  subcategoryIds?: string[];
 }) {
   const { supabase, user } = await requireUser();
   const loadAllReportRows = async () => {
-    const rows: FinancialReportCategoryMonthly[] = [];
+    const rows: FinancialReportEntryBySource[] = [];
     const pageSize = 1_000;
     for (let start = 0; ; start += pageSize) {
       let query = supabase
-        .from("financial_report_category_monthly")
+        .from("financial_report_entries_by_source")
         .select(
-          "basis, user_id, reference_month, currency, section, row_id, category_id, group_name, row_name, context, amount_minor",
+          "basis, user_id, reference_month, currency, section, row_id, category_id, group_name, row_name, context, source_key, amount_minor",
         )
         .eq("user_id", user.id)
         .eq("basis", input.basis)
@@ -109,11 +112,14 @@ async function loadCategoryMonthlyEntries(input: {
       if (input.context !== "all") {
         query = query.eq("context", input.context);
       }
+      if (input.sourceKeys?.length) {
+        query = query.in("source_key", input.sourceKeys);
+      }
       const page = await query
         .order("reference_month")
         .range(start, start + pageSize - 1);
       if (page.error) return { data: rows, error: page.error };
-      rows.push(...((page.data ?? []) as FinancialReportCategoryMonthly[]));
+      rows.push(...((page.data ?? []) as FinancialReportEntryBySource[]));
       if ((page.data?.length ?? 0) < pageSize) {
         return { data: rows, error: null };
       }
@@ -124,10 +130,6 @@ async function loadCategoryMonthlyEntries(input: {
     result,
     categoriesResult,
     conversionResult,
-    cardCreditsResult,
-    cardCreditInstallmentsResult,
-    cardsResult,
-    accountsResult,
   ] = await Promise.all([
     loadAllReportRows(),
     supabase
@@ -137,27 +139,6 @@ async function loadCategoryMonthlyEntries(input: {
       )
       .eq("user_id", user.id),
     loadCurrencyConversionSamples(supabase, user.id),
-    supabase
-      .from("credit_card_purchases")
-      .select("id, credit_card_id, entry_kind")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .in("entry_kind", ["refund", "cashback"]),
-    supabase
-      .from("credit_card_installments")
-      .select("purchase_id, competence_date, amount, status")
-      .eq("user_id", user.id)
-      .gte("competence_date", monthStart(input.startMonth))
-      .lte("competence_date", monthStart(input.endMonth))
-      .neq("status", "cancelled"),
-    supabase
-      .from("credit_cards")
-      .select("id, currency, linked_account_id")
-      .eq("user_id", user.id),
-    supabase
-      .from("accounts")
-      .select("id, context")
-      .eq("user_id", user.id),
   ]);
   const categories = new Map(
     ((categoriesResult.data ?? []) as CategoryDimension[]).map((category) => [
@@ -185,77 +166,38 @@ async function loadCategoryMonthlyEntries(input: {
     const parent = category?.parent_id
       ? categories.get(category.parent_id)
       : undefined;
+    const categoryKey = parent?.id ?? category?.id ?? row.row_id;
+    const subcategoryKey = parent ? category?.id ?? null : null;
+    if (input.categoryIds?.length && !input.categoryIds.includes(categoryKey)) {
+      return [];
+    }
+    if (
+      input.subcategoryIds?.length &&
+      (!subcategoryKey || !input.subcategoryIds.includes(subcategoryKey))
+    ) {
+      return [];
+    }
     return [{
       rowId: row.row_id,
       section: row.section,
       groupLabel: row.group_name,
       label: row.row_name,
-      categoryKey: parent?.id ?? category?.id ?? row.row_id,
+      categoryKey,
       categoryLabel: parent?.name ?? category?.name ?? row.row_name,
-      subcategoryKey: parent ? category?.id ?? null : null,
+      subcategoryKey,
       subcategoryLabel: parent ? category?.name ?? null : null,
       isFixedExpense: category?.is_fixed_expense ?? false,
       referenceMonth: row.reference_month,
       amountMinor: convertedAmount,
     }];
   });
-  const creditPurchaseById = new Map(
-    (cardCreditsResult.data ?? []).map((purchase) => [purchase.id, purchase]),
-  );
-  const cardById = new Map((cardsResult.data ?? []).map((card) => [card.id, card]));
-  const accountContextById = new Map(
-    (accountsResult.data ?? []).map((account) => [account.id, account.context]),
-  );
-  if (input.basis === "competence") {
-    for (const installment of cardCreditInstallmentsResult.data ?? []) {
-      const purchase = creditPurchaseById.get(installment.purchase_id);
-      if (!purchase) continue;
-      const card = cardById.get(purchase.credit_card_id);
-      if (!card || !input.sourceCurrencies.includes(card.currency)) continue;
-      const context = card.linked_account_id
-        ? accountContextById.get(card.linked_account_id) ?? "personal"
-        : "personal";
-      if (input.context !== "all" && input.context !== context) continue;
-      const convertedAmount = convertMinorUnits(
-        coerceMinorUnits(installment.amount),
-        card.currency,
-        input.currency,
-        `${installment.competence_date.slice(0, 7)}-31`,
-        conversionResult.samples,
-      );
-      if (convertedAmount === null) {
-        missingCurrencies.add(card.currency);
-        continue;
-      }
-      const isRefund = purchase.entry_kind === "refund";
-      const key = `card-credit:${purchase.entry_kind}`;
-      entries.push({
-        rowId: key,
-        section: "income",
-        groupLabel: "Créditos de cartão",
-        label: isRefund ? "Estornos" : "Cashback",
-        categoryKey: key,
-        categoryLabel: isRefund ? "Estornos" : "Cashback",
-        subcategoryKey: null,
-        subcategoryLabel: null,
-        isFixedExpense: false,
-        referenceMonth: installment.competence_date,
-        amountMinor: convertedAmount,
-      });
-    }
-  }
-
   return {
     entries,
     missingCurrencies: [...missingCurrencies],
     hasError: Boolean(
       result.error ||
         categoriesResult.error ||
-        conversionResult.hasError ||
-        cardCreditsResult.error ||
-        cardCreditInstallmentsResult.error ||
-        cardsResult.error ||
-        accountsResult.error,
+        conversionResult.hasError,
     ),
   };
 }
@@ -308,6 +250,9 @@ export async function getCurrentUserIncomeExpenseMatrix(input: {
   context: ReportContext;
   sourceCurrencies: SupportedCurrency[];
   allDates?: boolean;
+  sourceKeys?: string[];
+  categoryIds?: string[];
+  subcategoryIds?: string[];
 }) {
   const source = await loadCategoryMonthlyEntries({
     ...input,
@@ -334,6 +279,9 @@ export async function getCurrentUserPeriodComparisonReport(input: {
   basis: FinancialReportBasis;
   context: ReportContext;
   sourceCurrencies: SupportedCurrency[];
+  sourceKeys?: string[];
+  categoryIds?: string[];
+  subcategoryIds?: string[];
 }) {
   const startMonth = [input.firstStart, input.secondStart].sort()[0];
   const endMonth = [input.firstEnd, input.secondEnd].sort().at(-1)!;
@@ -344,6 +292,9 @@ export async function getCurrentUserPeriodComparisonReport(input: {
     basis: input.basis,
     context: input.context,
     sourceCurrencies: input.sourceCurrencies,
+    sourceKeys: input.sourceKeys,
+    categoryIds: input.categoryIds,
+    subcategoryIds: input.subcategoryIds,
   });
   return {
     rows: buildPeriodComparison(source.entries, input),
@@ -358,6 +309,9 @@ export async function getCurrentUserFixedExpenseReport(input: {
   basis: FinancialReportBasis;
   context: ReportContext;
   sourceCurrencies: SupportedCurrency[];
+  sourceKeys?: string[];
+  categoryIds?: string[];
+  subcategoryIds?: string[];
 }) {
   const source = await loadCategoryMonthlyEntries({
     ...input,
@@ -380,6 +334,7 @@ export async function getCurrentUserAssetPerformanceReport(input: {
   context: ReportContext;
   state: "active" | "all";
   sourceCurrencies: SupportedCurrency[];
+  sourceKeys?: string[];
 }) {
   const [{ supabase, user }, result] = await Promise.all([
     requireUser(),
@@ -542,6 +497,7 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
   context: ReportContext;
   sourceCurrencies: SupportedCurrency[];
   allDates?: boolean;
+  sourceKeys?: string[];
 }) {
   const { supabase, user } = await requireUser();
   const [
@@ -568,7 +524,9 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
     loadCurrencyConversionSamples(supabase, user.id),
   ]);
   const accounts = (accountsResult.data ?? []).filter(
-    (row) => input.sourceCurrencies.includes(row.currency) && (input.context === "all" || row.context === input.context),
+    (row) => input.sourceCurrencies.includes(row.currency) &&
+      (input.context === "all" || row.context === input.context) &&
+      (!input.sourceKeys?.length || input.sourceKeys.includes(`account:${row.id}`)),
   );
   const items = (itemsResult.data ?? []).filter(
     (row) => input.sourceCurrencies.includes(row.currency) && (input.context === "all" || row.context === input.context),
@@ -582,6 +540,7 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
   const cards = (cardsResult.data ?? []).filter(
     (row) =>
       input.sourceCurrencies.includes(row.currency) &&
+      (!input.sourceKeys?.length || input.sourceKeys.includes(`card:${row.id}`)) &&
       (input.context === "all" ||
         (row.linked_account_id
           ? accountContext.get(row.linked_account_id) === input.context

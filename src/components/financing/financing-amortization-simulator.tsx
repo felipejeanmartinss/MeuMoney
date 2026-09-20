@@ -183,7 +183,7 @@ export function FinancingAmortizationSimulator({
               Primeiras parcelas
             </div>
             <div className="max-h-64 overflow-auto">
-              <table className="min-w-full text-xs">
+              <table data-sortable="false" className="min-w-full text-xs">
                 <thead className="sticky top-0 bg-white text-left text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Nº</th>

@@ -17,6 +17,7 @@ import {
   deleteCurrentUserCategory,
   deleteCurrentUserCategoryGroup,
   setCurrentUserCategoryArchived,
+  setCurrentUserCategoryFixedExpense,
   updateCurrentUserCategory,
   updateCurrentUserCategoryGroup,
 } from "@/services/finance/categories-service";
@@ -139,6 +140,20 @@ export async function toggleCategoryStatus(formData: FormData) {
   const result = await setCurrentUserCategoryArchived(parsedId.data, shouldArchive);
   revalidatePath("/categories");
   redirect(`/categories?message=${result.ok ? "status-updated" : "status-error"}`);
+}
+
+export async function toggleCategoryFixedExpense(formData: FormData) {
+  const parsedId = categoryIdSchema.safeParse(formData.get("id"));
+  if (!parsedId.success) redirect("/categories?message=fixed-expense-error");
+  const result = await setCurrentUserCategoryFixedExpense(
+    parsedId.data,
+    formData.get("fixed") === "true",
+  );
+  revalidatePath("/categories");
+  revalidatePath("/reports");
+  redirect(
+    `/categories?message=${result.ok ? "fixed-expense-updated" : "fixed-expense-error"}`,
+  );
 }
 
 export async function createCategoryGroup(
