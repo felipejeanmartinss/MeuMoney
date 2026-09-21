@@ -49,9 +49,9 @@ export async function getCurrentUserMonthlyCheckin(referenceMonth: string): Prom
   const today = currentIsoDate();
   const [checkinResult, unclassifiedResult, unreconciledTransactions, unreconciledTransfers, recurrencesResult, invoicesResult, budgetResult, positionsResult] = await Promise.all([
     supabase.from("monthly_financial_checkins").select("id, user_id, reference_month, status, observation, closed_at, created_at, updated_at").eq("user_id", user.id).eq("reference_month", referenceMonth).maybeSingle(),
-    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).is("category_id", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd),
-    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).lte("transaction_date", today),
-    supabase.from("transfer_entries").select("id").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).lte("transaction_date", today),
+    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).eq("origin_type", "manual").is("category_id", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd),
+    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd).lte("transaction_date", today),
+    supabase.from("transfer_entries").select("id").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd).lte("transaction_date", today),
     supabase.from("financial_dashboard_upcoming_recurrences").select("id").eq("user_id", user.id).gte("next_occurrence", today).lte("next_occurrence", addDays(today, 30)),
     supabase.from("financial_dashboard_invoices").select("id, credit_card_name, due_date, outstanding_amount_minor, currency").eq("user_id", user.id).gte("due_date", today).lte("due_date", addDays(today, 45)).in("effective_status", ["open", "closed", "overdue"]).order("due_date").limit(12),
     supabase.from("monthly_budget_progress").select("category_id, category_name, planned_amount_minor, realized_amount_minor, percentage_consumed").eq("user_id", user.id).eq("reference_month", referenceMonth).eq("category_kind", "expense"),

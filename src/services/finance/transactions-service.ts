@@ -21,6 +21,7 @@ export type TransactionFilters = {
   status?: TransactionStatus;
   accountId?: string;
   categoryId?: string;
+  uncategorized?: boolean;
   dateFrom?: string;
   dateTo?: string;
   activity: "active" | "inactive" | "all";
@@ -48,6 +49,9 @@ export async function listCurrentUserTransactions(
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
   if (filters.categoryId) {
     query = query.eq("category_id", filters.categoryId);
+  }
+  if (filters.uncategorized) {
+    query = query.eq("origin_type", "manual").is("category_id", null);
   }
   if (filters.dateFrom) {
     query = query.gte("transaction_date", filters.dateFrom);

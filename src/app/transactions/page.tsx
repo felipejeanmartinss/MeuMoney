@@ -48,7 +48,7 @@ export default async function TransactionsPage({
   const parsedFilters = transactionFiltersSchema.safeParse(singleParams);
   const filters = parsedFilters.success
     ? parsedFilters.data
-    : { activity: "active" as const };
+    : { activity: "active" as const, uncategorized: false };
   const { transactions, accounts, categories, groups, hasError } =
     await listCurrentUserTransactions(filters);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
@@ -59,6 +59,12 @@ export default async function TransactionsPage({
     typeof rawParams.message === "string" ? rawParams.message : undefined;
   const feedback = messageCode ? messages[messageCode] : undefined;
   const feedbackIsError = messageCode === "delete-error";
+  const unclassifiedCount = transactions.filter(
+    (transaction) =>
+      transaction.is_active &&
+      transaction.origin_type === "manual" &&
+      !transaction.category_id,
+  ).length;
 
   return (
     <main className="app-page">
@@ -113,7 +119,22 @@ export default async function TransactionsPage({
         </form>
       ) : null}
 
+      {unclassifiedCount > 0 && !filters.uncategorized ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-950">
+            {unclassifiedCount} lançamento{unclassifiedCount === 1 ? "" : "s"} sem categoria precisa{unclassifiedCount === 1 ? "" : "m"} de revisão.
+          </p>
+          <Link
+            href="/transactions?uncategorized=true"
+            className="inline-flex min-h-10 items-center rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold text-amber-900 hover:bg-amber-100"
+          >
+            Revisar sem categoria
+          </Link>
+        </div>
+      ) : null}
+
       <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        {filters.uncategorized ? <input type="hidden" name="uncategorized" value="true" /> : null}
         <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
           Tipo
           <select

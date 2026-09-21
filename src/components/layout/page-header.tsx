@@ -1,8 +1,9 @@
 import Link from "next/link";
 
-export function PageHeader({ title, description, actions, back }: {
+export function PageHeader({ title, description, mobileDescription, actions, back }: {
   title: string;
   description?: string;
+  mobileDescription?: string;
   actions?: React.ReactNode;
   back?: { href: string; label: string };
 }) {
@@ -12,7 +13,10 @@ export function PageHeader({ title, description, actions, back }: {
       <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h1>
-          {description ? <p className="mt-1 max-w-2xl text-sm text-slate-600">{description}</p> : null}
+          {description ? <>
+            <p className="mt-1 hidden max-w-2xl text-sm text-slate-600 sm:block">{description}</p>
+            <p className="mt-1 max-w-full truncate text-xs text-slate-600 sm:hidden" title={description}>{mobileDescription ?? description}</p>
+          </> : null}
         </div>
         {actions ? <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

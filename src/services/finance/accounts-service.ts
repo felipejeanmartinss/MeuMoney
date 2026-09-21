@@ -68,6 +68,7 @@ export async function getCurrentUserAccountHub(id: string) {
         )
         .eq("user_id", user.id)
         .eq("account_id", id)
+        .eq("is_active", true)
         .order("transaction_date", { ascending: true })
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);
@@ -88,6 +89,7 @@ export async function getCurrentUserAccountHub(id: string) {
         )
         .eq("user_id", user.id)
         .eq("account_id", id)
+        .eq("is_active", true)
         .order("transaction_date", { ascending: true })
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);

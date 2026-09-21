@@ -89,6 +89,10 @@ export const transactionFiltersSchema = z.object({
   status: optionalEnum(TRANSACTION_STATUSES),
   accountId: optionalUuid,
   categoryId: optionalUuid,
+  uncategorized: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .default(false),
   dateFrom: optionalDate,
   dateTo: optionalDate,
   activity: z

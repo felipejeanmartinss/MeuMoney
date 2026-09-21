@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
+import { CheckboxFilter } from "@/components/reports/checkbox-filter";
 import Link from "next/link";
 import {
   deleteSavedFinancialReport,
@@ -438,46 +439,6 @@ function CommonReportFields({
         </label>
       ) : null}
     </>
-  );
-}
-
-function CheckboxFilter({
-  label,
-  name,
-  options,
-  selected,
-}: {
-  label: string;
-  name: string;
-  options: Array<{ value: string; label: string }>;
-  selected: string[];
-}) {
-  return (
-    <fieldset className="grid min-w-0 gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-      <legend>{label}</legend>
-      <details className="relative">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-900 marker:hidden">
-          <span className="truncate font-semibold">
-            {selected.length === 0 ? "Todos" : `${selected.length} selecionados`}
-          </span>
-          <span aria-hidden="true" className="text-slate-400">▾</span>
-        </summary>
-        <div className="absolute left-0 top-full z-30 mt-1 grid max-h-72 min-w-72 gap-1 overflow-auto rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
-          {options.length ? options.map((option) => (
-            <label key={option.value} className="flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              <input
-                type="checkbox"
-                name={name}
-                value={option.value}
-                defaultChecked={selected.length === 0 || selected.includes(option.value)}
-                className="size-4 accent-emerald-700"
-              />
-              <span className="truncate">{option.label}</span>
-            </label>
-          )) : <span className="px-2 py-1 text-sm font-normal text-slate-500">Nenhuma opção</span>}
-        </div>
-      </details>
-    </fieldset>
   );
 }
 
