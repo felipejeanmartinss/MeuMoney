@@ -572,6 +572,7 @@ export default async function BudgetsPage({
                 <div>
                   <h2 className="font-black text-slate-950">Histórico e sugestão</h2>
                   <p className="text-xs text-slate-500">Mínimo, média, mediana e máximo dos últimos 12 meses para apoiar o próximo planejamento.</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">Sazonalidade é identificada quando há um pico de pelo menos 50% acima da média ou quando o mesmo mês supera a média histórica em 25%.</p>
                 </div>
                 <span className="text-xs font-semibold text-slate-500">Alertas em 80%, 100% e acima do orçamento</span>
               </div>
