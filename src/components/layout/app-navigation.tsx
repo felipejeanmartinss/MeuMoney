@@ -140,6 +140,12 @@ function NavigationGlyph({
         <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
       </>
     ),
+    checkin: (
+      <>
+        <rect x="5" y="3" width="14" height="18" rx="2" />
+        <path d="M9 3v3h6V3M8 11l2 2 4-4M8 17h8" />
+      </>
+    ),
   };
 
   return (

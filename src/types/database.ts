@@ -49,6 +49,7 @@ export type FinancialGoalStatus =
   | "completed"
   | "archived";
 export type FinancialGoalLinkType = "account" | "investment" | "financing";
+export type MonthlyCheckinStatus = "open" | "closed";
 export type FinancialGoalContributionSource =
   | "manual"
   | "transaction"
@@ -764,6 +765,17 @@ export type FinancialGoalLink = {
   created_at: string;
 };
 
+export type MonthlyFinancialCheckin = {
+  id: string;
+  user_id: string;
+  reference_month: string;
+  status: MonthlyCheckinStatus;
+  observation: string | null;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ImportJob = {
   id: string;
   user_id: string;
@@ -1293,6 +1305,23 @@ export type Database = {
         };
         Update: Partial<
           Omit<FinancialGoalLink, "id" | "user_id" | "goal_id" | "created_at">
+        >;
+        Relationships: [];
+      };
+      monthly_financial_checkins: {
+        Row: MonthlyFinancialCheckin;
+        Insert: {
+          id?: string;
+          user_id: string;
+          reference_month: string;
+          status?: MonthlyCheckinStatus;
+          observation?: string | null;
+          closed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<MonthlyFinancialCheckin, "id" | "user_id" | "created_at">
         >;
         Relationships: [];
       };

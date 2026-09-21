@@ -25,6 +25,7 @@ describe("navigation model", () => {
     expect(MAIN_NAVIGATION.map((item) => item.label)).toEqual([
       "Início",
       "Metas",
+      "Check-in",
       "Contas",
       "Investimentos",
       "Patrimônio",

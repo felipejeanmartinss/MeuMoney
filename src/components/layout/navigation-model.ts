@@ -14,7 +14,8 @@ export type NavigationIcon =
   | "security"
   | "financing"
   | "reports"
-  | "target";
+  | "target"
+  | "checkin";
 
 export type NavigationItem = {
   href: string;
@@ -47,6 +48,13 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     label: "Metas",
     icon: "target",
     match: ["/goals"],
+  },
+  {
+    section: "home",
+    href: "/check-in",
+    label: "Check-in",
+    icon: "checkin",
+    match: ["/check-in"],
   },
   {
     section: "accounts",
