@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   changeRecurringTransactionState,
@@ -272,27 +273,15 @@ export default async function RecurringTransactionsPage({
     messageCode === "status-error" || messageCode === "generation-error";
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Agenda financeira
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Recorrências
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Acompanhe compromissos futuros e gere previsões sem alterar o saldo
-            realizado.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Recorrências" actions={
         <Link
           href="/recurring-transactions/new"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
           Nova recorrência
         </Link>
-      </header>
+      } />
 
       {feedback ? (
         <p

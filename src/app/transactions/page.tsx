@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   clearInactiveAutomaticTransactions,
@@ -60,19 +61,8 @@ export default async function TransactionsPage({
   const feedbackIsError = messageCode === "delete-error";
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
-            Fluxo financeiro
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-            Lançamentos
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Registre receitas e despesas previstas ou realizadas.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Lançamentos" actions={
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
             href="/transfers"
@@ -87,7 +77,7 @@ export default async function TransactionsPage({
             Novo lançamento
           </Link>
         </div>
-      </div>
+      } />
 
       {feedback ? (
         <p

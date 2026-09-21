@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { toggleAccountStatus } from "@/app/actions/accounts";
 import { ACCOUNT_TYPE_LABELS, CONTEXT_LABELS } from "@/domain/accounts";
@@ -443,20 +444,8 @@ export default async function AccountsPage({
   const hasError = accountResult.hasError || cardResult.hasError;
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Central financeira
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Contas
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Saldos, extratos e faturas organizados por tipo e sempre separados
-            por moeda.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Contas" description="Saldos e faturas por moeda." actions={
         <div className="flex flex-wrap gap-2">
           <Link
             href="/credit-cards/new"
@@ -471,7 +460,7 @@ export default async function AccountsPage({
             Nova conta
           </Link>
         </div>
-      </header>
+      } />
 
       {feedback ? (
         <p

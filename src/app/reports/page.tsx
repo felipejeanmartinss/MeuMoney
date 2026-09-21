@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   deleteSavedFinancialReport,
@@ -613,18 +614,8 @@ export default async function ReportsPage({
           : null;
 
   return (
-    <main className="mx-auto grid max-w-[1700px] gap-5 px-3 py-6 sm:px-5 lg:px-7">
-      <header>
-        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-          Análise financeira
-        </p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-          Central de relatórios
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600 sm:text-base">
-          Matrizes consolidadas na moeda de referência do perfil.
-        </p>
-      </header>
+    <main className="app-page max-w-[1700px]">
+      <PageHeader title="Relatórios" description="Valores consolidados na moeda do perfil." />
 
       <nav
         aria-label="Tipos de relatório"

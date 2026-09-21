@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   deleteInvestmentPosition,
@@ -858,19 +859,8 @@ export default async function InvestmentsPage({
     financingResult.hasError;
 
   return (
-    <main className="mx-auto grid max-w-[1760px] gap-4 px-3 py-5 sm:px-5 lg:px-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Carteira e compromissos
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Investimentos
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Posições por moeda e classe de ativo.
-          </p>
-        </div>
+    <main className="app-page max-w-[1760px]">
+      <PageHeader title="Investimentos" actions={
         <div className="flex flex-wrap gap-2">
           {activeTab === "positions" ? (
             <Link
@@ -899,11 +889,11 @@ export default async function InvestmentsPage({
               : "Importar financiamento"}
           </Link>
         </div>
-      </header>
+      } />
 
       <nav
         aria-label="Seções de investimentos"
-        className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+        className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
       >
         <Link
           href="/investments"

@@ -22,6 +22,7 @@ export type NavigationItem = {
   label: string;
   icon: NavigationIcon;
   match: readonly string[];
+  exclude?: readonly string[];
 };
 
 export type NavigationSection =
@@ -44,17 +45,17 @@ export const MAIN_NAVIGATION: ReadonlyArray<
   },
   {
     section: "home",
-    href: "/goals",
-    label: "Metas",
-    icon: "target",
-    match: ["/goals"],
-  },
-  {
-    section: "home",
     href: "/check-in",
     label: "Check-in",
     icon: "checkin",
     match: ["/check-in"],
+  },
+  {
+    section: "home",
+    href: "/goals",
+    label: "Metas",
+    icon: "target",
+    match: ["/goals"],
   },
   {
     section: "accounts",
@@ -97,7 +98,7 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     href: "/settings",
     label: "Perfil",
     icon: "profile",
-    match: ["/settings", "/imports"],
+    match: ["/settings", "/imports", "/data-quality"],
   },
 ];
 
@@ -143,6 +144,13 @@ export const SECONDARY_NAVIGATION: Record<
       label: "Posições",
       icon: "investments",
       match: ["/investments"],
+      exclude: ["/investments/prices", "/investments/benchmarks", "/investments/financing-imports", "/investments/financings"],
+    },
+    {
+      href: "/investments/prices",
+      label: "Cotações",
+      icon: "investments",
+      match: ["/investments/prices"],
     },
     {
       href: "/investments/benchmarks",
@@ -154,7 +162,7 @@ export const SECONDARY_NAVIGATION: Record<
       href: "/investments?tab=financing",
       label: "Financiamentos",
       icon: "financing",
-      match: [],
+      match: ["/investments/financing-imports", "/investments/financings"],
     },
   ],
   profile: [
@@ -202,19 +210,29 @@ export function isNavigationItemActive(
   item: NavigationItem,
   searchParams = "",
 ) {
+  if (item.exclude?.some((prefix) => matchesPath(pathname, prefix))) return false;
   if (item.href.includes("?")) {
     const [path, query] = item.href.split("?");
-    return pathname === path && searchParams === query;
+    const actual = new URLSearchParams(searchParams);
+    return (pathname === path && [...new URLSearchParams(query)].every(
+      ([key, value]) => actual.get(key) === value,
+    )) || item.match.some((prefix) => matchesPath(pathname, prefix));
   }
   if (
     item.href === "/investments" &&
     pathname === "/investments" &&
-    searchParams === "tab=financing"
+    item.label === "Posições" &&
+    new URLSearchParams(searchParams).get("tab") === "financing"
   ) {
     return false;
   }
   return item.match.some((prefix) => matchesPath(pathname, prefix));
 }
+
+// Keep one row of reachable destinations on narrow screens; the menu holds all routes.
+export const MOBILE_NAVIGATION = MAIN_NAVIGATION.filter((item) =>
+  ["/dashboard", "/check-in", "/goals", "/accounts", "/investments"].includes(item.href),
+);
 
 export function secondaryNavigationFor(pathname: string) {
   const section = resolveNavigationSection(pathname);

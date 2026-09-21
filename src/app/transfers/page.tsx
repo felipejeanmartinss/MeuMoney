@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   deleteTransfer,
@@ -56,20 +57,8 @@ export default async function TransfersPage({
   const feedbackIsError = messageCode?.endsWith("error") ?? false;
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
-            Movimentação interna
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-            Transferências
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Mova valores entre contas ou pague cartões da mesma moeda sem
-            transformar a operação em receita ou despesa.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Transferências" actions={
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
             href="/transactions"
@@ -84,7 +73,7 @@ export default async function TransfersPage({
             Nova transferência
           </Link>
         </div>
-      </div>
+      } />
 
       {feedback ? (
         <p

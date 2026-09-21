@@ -7,6 +7,12 @@ describe("safe redirects", () => {
     expect(getSafeRedirectPath("//evil.example")).toBe("/dashboard");
     expect(getSafeRedirectPath("https://evil.example")).toBe("/dashboard");
   });
+  it.each(["/goals", "/goals/123", "/check-in", "/data-quality", "/reports", "/reports/saved/123", "/budgets", "/investments/benchmarks", "/imports", "/net-worth"])(
+    "protects the integrated module %s", (pathname) => expect(isPrivatePath(pathname)).toBe(true),
+  );
+  it.each(["/goals-public", "/reports-public", "/check-in-preview", "/privacy", "/"])(
+    "does not match a public route with a similar prefix: %s", (pathname) => expect(isPrivatePath(pathname)).toBe(false),
+  );
   it("classifies private and guest-only routes", () => {
     expect(isPrivatePath("/dashboard")).toBe(true);
     expect(isPrivatePath("/accounts/new")).toBe(true);

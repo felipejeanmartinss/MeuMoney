@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { ExpenseDistribution } from "@/components/dashboard/expense-distribution";
 import { MetricCard } from "@/components/dashboard/metric-card";
@@ -50,7 +51,6 @@ export default async function DashboardPage({
   const basis: FinancialReportBasis =
     params.basis === "cash" ? "cash" : "competence";
   const data = await getFinancialDashboard(referenceMonth, basis);
-  const firstName = data.profile?.full_name?.trim().split(/\s+/)[0];
   const preferredSection = data.currencies[0];
   const attentionItems = preferredSection
     ? [
@@ -97,19 +97,8 @@ export default async function DashboardPage({
     : [];
 
   return (
-    <main className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
-      <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Visão financeira
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            {formatReferenceMonth(referenceMonth)}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {firstName ? `${firstName}, acompanhe` : "Acompanhe"} saldos, resultado e compromissos.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Início" description={formatReferenceMonth(referenceMonth)} actions={
         <form
           method="get"
           className="grid gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
@@ -138,11 +127,11 @@ export default async function DashboardPage({
             Aplicar
           </button>
         </form>
-      </header>
+      } />
 
       {data.hasError ? (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-          Parte dos indicadores não pôde ser carregada. Confirme a migration desta feature e tente novamente.
+          Parte dos indicadores não pôde ser carregada. Tente novamente antes de tomar decisões.
         </p>
       ) : null}
       {data.missingCurrencies.length ? (
@@ -152,13 +141,6 @@ export default async function DashboardPage({
         </p>
       ) : null}
 
-      <section aria-labelledby="attention-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">Próximas decisões</p><h2 id="attention-title" className="mt-1 text-lg font-black text-slate-950">Sua atenção hoje</h2></div>
-          <Link href="/data-quality" className="text-xs font-bold text-emerald-700 hover:underline">Central de qualidade</Link>
-        </div>
-        {attentionItems.length ? <div className="mt-3 grid gap-2 md:grid-cols-2">{attentionItems.map((item) => <Link key={`${item.href}:${item.label}`} href={item.href} className={`rounded-xl border px-3 py-2.5 transition hover:-translate-y-px hover:shadow-sm ${item.tone === "negative" ? "border-rose-200 bg-rose-50" : item.tone === "warning" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><p className="text-sm font-bold text-slate-950">{item.label}</p><p className="mt-0.5 text-xs text-slate-600">{item.detail}</p></Link>)}</div> : <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Nenhuma ação urgente encontrada. Sua rotina está em dia.</p>}
-      </section>
 
       {data.currencies.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -180,12 +162,22 @@ export default async function DashboardPage({
               </p>
             </header>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <MetricCard label="Saldo disponível" value={formatMoney(section.accountBalanceMinor, section.currency, locale)} helper={`${section.accounts.length} conta(s) ativa(s)`} tone={section.accountBalanceMinor < 0 ? "negative" : "neutral"} />
               <MetricCard label="Receitas" value={formatMoney(month.income_amount_minor, section.currency, locale)} helper="Valores realizados no mês" tone="positive" />
               <MetricCard label={basis === "cash" ? "Saídas de caixa" : "Despesas de consumo"} value={formatMoney(month.expense_amount_minor, section.currency, locale)} helper={basis === "cash" ? "Inclui pagamentos de fatura" : "Inclui parcelas por competência"} tone="negative" />
               <MetricCard label="Resultado" value={formatMoney(month.result_amount_minor, section.currency, locale)} helper={`${basisLabels[basis]} do mês`} tone={month.result_amount_minor < 0 ? "negative" : "positive"} />
             </div>
+
+            {section === preferredSection ? (
+      <section aria-labelledby="attention-title" className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="attention-title" className="text-base font-semibold text-slate-950">Sua atenção hoje</h2>
+          <Link href="/data-quality" className="text-xs font-bold text-emerald-700 hover:underline">Central de qualidade</Link>
+        </div>
+        {attentionItems.length ? <div className="mt-3 grid gap-2 md:grid-cols-2">{attentionItems.map((item) => <Link key={`${item.href}:${item.label}`} href={item.href} className={`rounded-xl border px-3 py-2.5 transition hover:border-slate-400 ${item.tone === "negative" ? "border-rose-200 bg-rose-50" : item.tone === "warning" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><p className="text-sm font-bold text-slate-950">{item.label}</p><p className="mt-0.5 text-xs text-slate-600">{item.detail}</p></Link>)}</div> : <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Nenhuma ação identificada nos dados disponíveis.</p>}
+      </section>
+            ) : null}
 
             <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
               <MonthlyEvolution rows={section.evolution} currency={section.currency} locale={locale} basis={basis} />
@@ -195,7 +187,7 @@ export default async function DashboardPage({
             <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
               <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-                  <div><h3 className="font-black text-slate-950">Contas</h3><p className="mt-1 text-sm text-slate-600">Saldos atuais e acesso ao extrato.</p></div>
+                  <div><h3 className="font-black text-slate-950">Contas</h3></div>
                   <Link href="/accounts" className="text-sm font-bold text-emerald-700 hover:underline">Ver todas</Link>
                 </div>
                 {section.accounts.length ? (

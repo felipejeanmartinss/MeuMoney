@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { copyPreviousMonthBudgets } from "@/app/actions/budgets";
 import { AnnualBudgetForm } from "@/components/forms/annual-budget-form";
@@ -255,19 +256,8 @@ export default async function BudgetsPage({
   }));
 
   return (
-    <main className="mx-auto grid max-w-[1500px] gap-5 px-3 py-6 sm:px-5 sm:py-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-            Planejamento
-          </p>
-          <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
-            Orçamentos
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Receitas e despesas planejadas na moeda preferencial do perfil.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Orçamentos" description="Planejamento na moeda preferencial do perfil." actions={
         <nav
           aria-label="Período do orçamento"
           className="flex rounded-xl bg-slate-100 p-1"
@@ -295,7 +285,7 @@ export default async function BudgetsPage({
             Anual
           </Link>
         </nav>
-      </header>
+      } />
 
       <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <form method="get" className="grid gap-3 sm:grid-cols-3 sm:items-end">

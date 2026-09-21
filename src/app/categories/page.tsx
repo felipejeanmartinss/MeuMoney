@@ -1,3 +1,4 @@
+import { PageHeader, PageHelp } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   toggleCategoryFixedExpense,
@@ -132,20 +133,8 @@ export default async function CategoriesPage({
   const feedbackIsError = params.message === "status-error";
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 sm:py-10">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
-            Organização
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-            Categorias
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Uma grade compacta para administrar grupos, categorias e
-            subcategorias sem perder a visão do conjunto.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Categorias" actions={
         <div className="flex flex-wrap gap-2">
           <Link
             href="/categories/groups/new"
@@ -160,12 +149,11 @@ export default async function CategoriesPage({
             Nova categoria
           </Link>
         </div>
-      </header>
+      } />
 
-      <aside className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-        As sugestões iniciais são opcionais. Você pode editar, inativar ou
-        excluir todas e trabalhar apenas com a estrutura que fizer sentido.
-      </aside>
+      <PageHelp title="Sobre as categorias iniciais">
+        As sugestões são opcionais. Edite, inative ou exclua as categorias conforme sua organização.
+      </PageHelp>
 
       {feedback ? (
         <p

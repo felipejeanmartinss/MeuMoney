@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { clearFinancialImportHistory } from "@/app/actions/file-imports";
 import { listCurrentUserImportJobs } from "@/services/finance/file-imports-service";
@@ -46,20 +47,8 @@ export default async function ImportsPage({
   const hasJobs = jobs.length > 0;
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Entrada assistida
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Importações
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Revise CSV, OFX, QIF e PDF em uma área temporária antes de alterar seu
-            histórico financeiro.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Importações" actions={
         <div className="flex flex-col gap-2 sm:flex-row">
           {hasJobs ? (
             <form action={clearFinancialImportHistory}>
@@ -75,7 +64,7 @@ export default async function ImportsPage({
             Nova importação
           </Link>
         </div>
-      </div>
+      } />
 
       {feedback ? (
         <p

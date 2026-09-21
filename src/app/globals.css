@@ -19,10 +19,36 @@ body {
 @media (min-width: 64rem) {
   html { font-size: 15px; }
 }
-button, input, select { font: inherit; }
+button, input, select, textarea { font-family: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button, summary { touch-action: manipulation; }
 summary::-webkit-details-marker { display: none; }
+
+@layer components {
+  .app-page {
+    display: grid;
+    min-width: 0;
+    width: 100%;
+    max-width: 1500px;
+    margin-inline: auto;
+    gap: 1.25rem;
+    padding: 1rem;
+  }
+  .app-page > * { min-width: 0; }
+  .app-page h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+  @media (min-width: 40rem) {
+    .app-page { padding: 1.5rem; }
+    .app-page h1 { font-size: 1.875rem; }
+  }
+}
+
+@media (max-width: 40rem) {
+  /* Prevent focus zoom on phones without overriding checkbox/radio dimensions. */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: 1rem;
+    max-width: 100%;
+  }
+}
 
 /* Cabeçalhos de grades simples recebem ordenação crescente/decrescente. */
 table:not([data-sortable="false"]) thead th:not(:has(a, button, input, select)) {
