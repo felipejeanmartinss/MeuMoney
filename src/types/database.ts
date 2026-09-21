@@ -36,6 +36,23 @@ export type SavedFinancialReportType =
   | "asset-performance-general"
   | "net-worth-evolution"
   | "cash-flow-forecast";
+export type FinancialGoalType =
+  | "emergency_fund"
+  | "travel"
+  | "home_purchase"
+  | "renovation"
+  | "financial_independence"
+  | "financing_payoff";
+export type FinancialGoalStatus =
+  | "active"
+  | "paused"
+  | "completed"
+  | "archived";
+export type FinancialGoalLinkType = "account" | "investment" | "financing";
+export type FinancialGoalContributionSource =
+  | "manual"
+  | "transaction"
+  | "investment";
 export type CreditCardInstallmentStatus =
   | "pending"
   | "invoiced"
@@ -710,6 +727,43 @@ export type FinancingContractSummary = FinancingContract & {
   scheduled_installments: number;
 };
 
+export type FinancialGoal = {
+  id: string;
+  user_id: string;
+  name: string;
+  goal_type: FinancialGoalType;
+  currency: SupportedCurrency;
+  target_amount_minor: number;
+  target_date: string;
+  status: FinancialGoalStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialGoalContribution = {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  contribution_date: string;
+  amount_minor: number;
+  currency: SupportedCurrency;
+  source: FinancialGoalContributionSource;
+  description: string | null;
+  created_at: string;
+};
+
+export type FinancialGoalLink = {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  source_type: FinancialGoalLinkType;
+  account_id: string | null;
+  investment_position_id: string | null;
+  financing_contract_id: string | null;
+  created_at: string;
+};
+
 export type ImportJob = {
   id: string;
   user_id: string;
@@ -1185,6 +1239,61 @@ export type Database = {
         Row: FinancingExtraAmortization;
         Insert: never;
         Update: never;
+        Relationships: [];
+      };
+      financial_goals: {
+        Row: FinancialGoal;
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          goal_type: FinancialGoalType;
+          currency: SupportedCurrency;
+          target_amount_minor: number;
+          target_date: string;
+          status?: FinancialGoalStatus;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<FinancialGoal, "id" | "user_id" | "created_at" | "updated_at">
+        >;
+        Relationships: [];
+      };
+      financial_goal_contributions: {
+        Row: FinancialGoalContribution;
+        Insert: {
+          id?: string;
+          user_id: string;
+          goal_id: string;
+          contribution_date: string;
+          amount_minor: number;
+          currency: SupportedCurrency;
+          source?: FinancialGoalContributionSource;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Omit<FinancialGoalContribution, "id" | "user_id" | "goal_id" | "created_at">
+        >;
+        Relationships: [];
+      };
+      financial_goal_links: {
+        Row: FinancialGoalLink;
+        Insert: {
+          id?: string;
+          user_id: string;
+          goal_id: string;
+          source_type: FinancialGoalLinkType;
+          account_id?: string | null;
+          investment_position_id?: string | null;
+          financing_contract_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Omit<FinancialGoalLink, "id" | "user_id" | "goal_id" | "created_at">
+        >;
         Relationships: [];
       };
       import_jobs: {

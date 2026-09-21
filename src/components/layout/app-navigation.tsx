@@ -133,6 +133,13 @@ function NavigationGlyph({
         <path d="M17 7h3v3" />
       </>
     ),
+    target: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
+      </>
+    ),
   };
 
   return (

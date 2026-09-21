@@ -13,7 +13,8 @@ export type NavigationIcon =
   | "imports"
   | "security"
   | "financing"
-  | "reports";
+  | "reports"
+  | "target";
 
 export type NavigationItem = {
   href: string;
@@ -39,6 +40,13 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     label: "Início",
     icon: "home",
     match: ["/dashboard"],
+  },
+  {
+    section: "home",
+    href: "/goals",
+    label: "Metas",
+    icon: "target",
+    match: ["/goals"],
   },
   {
     section: "accounts",
