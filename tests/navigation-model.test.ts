@@ -24,6 +24,8 @@ describe("navigation model", () => {
   it("keeps reports as an independent primary destination", () => {
     expect(MAIN_NAVIGATION.map((item) => item.label)).toEqual([
       "Início",
+      "Metas",
+      "Check-in",
       "Contas",
       "Investimentos",
       "Patrimônio",

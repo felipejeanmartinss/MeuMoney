@@ -13,7 +13,9 @@ export type NavigationIcon =
   | "imports"
   | "security"
   | "financing"
-  | "reports";
+  | "reports"
+  | "target"
+  | "checkin";
 
 export type NavigationItem = {
   href: string;
@@ -39,6 +41,20 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     label: "Início",
     icon: "home",
     match: ["/dashboard"],
+  },
+  {
+    section: "home",
+    href: "/goals",
+    label: "Metas",
+    icon: "target",
+    match: ["/goals"],
+  },
+  {
+    section: "home",
+    href: "/check-in",
+    label: "Check-in",
+    icon: "checkin",
+    match: ["/check-in"],
   },
   {
     section: "accounts",
@@ -129,6 +145,12 @@ export const SECONDARY_NAVIGATION: Record<
       match: ["/investments"],
     },
     {
+      href: "/investments/benchmarks",
+      label: "Benchmarks",
+      icon: "reports",
+      match: ["/investments/benchmarks"],
+    },
+    {
       href: "/investments?tab=financing",
       label: "Financiamentos",
       icon: "financing",
@@ -147,6 +169,12 @@ export const SECONDARY_NAVIGATION: Record<
       label: "Importações",
       icon: "imports",
       match: ["/imports"],
+    },
+    {
+      href: "/data-quality",
+      label: "Qualidade dos dados",
+      icon: "security",
+      match: ["/data-quality"],
     },
     {
       href: "/settings/security",

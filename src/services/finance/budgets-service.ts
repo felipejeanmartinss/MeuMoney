@@ -1,5 +1,6 @@
 import "server-only";
 import { coerceMinorUnits } from "@/domain/money";
+import { calculateBudgetHistoryStats, type BudgetHistoryStats } from "@/domain/budgets";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
   FinancialContext,
@@ -254,4 +255,69 @@ export async function copyCurrentUserPreviousMonthBudgets(input: {
   return result.ok
     ? { ok: true as const, copiedCount: rows.length }
     : result;
+}
+
+function monthRange(referenceMonth: string) {
+  const end = new Date(`${referenceMonth.slice(0, 7)}-01T12:00:00Z`);
+  const months: string[] = [];
+  for (let index = 11; index >= 0; index -= 1) {
+    const current = new Date(end);
+    current.setUTCMonth(current.getUTCMonth() - index);
+    months.push(`${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, "0")}-01`);
+  }
+  return months;
+}
+
+export async function getCurrentUserBudgetInsights(input: {
+  referenceMonth: string;
+  context: FinancialContext;
+  currency: SupportedCurrency;
+}) {
+  const { supabase, user } = await requireUser();
+  const months = monthRange(input.referenceMonth);
+  const [historyResult, progressResult] = await Promise.all([
+    supabase
+      .from("financial_report_category_monthly")
+      .select("reference_month, category_id, row_name, amount_minor")
+      .eq("user_id", user.id)
+      .eq("basis", "competence")
+      .eq("section", "expense")
+      .eq("context", input.context)
+      .eq("currency", input.currency)
+      .gte("reference_month", months[0])
+      .lte("reference_month", months.at(-1) ?? months[0]),
+    supabase
+      .from("monthly_budget_progress")
+      .select(progressColumns)
+      .eq("user_id", user.id)
+      .eq("reference_month", input.referenceMonth)
+      .eq("context", input.context)
+      .eq("currency", input.currency)
+      .eq("category_kind", "expense"),
+  ]);
+  const historyByCategory = new Map<string, { name: string; values: Map<string, number> }>();
+  for (const row of historyResult.data ?? []) {
+    if (!row.category_id) continue;
+    const current = historyByCategory.get(row.category_id) ?? { name: row.row_name, values: new Map<string, number>() };
+    current.name = row.row_name;
+    current.values.set(row.reference_month, coerceMinorUnits(row.amount_minor));
+    historyByCategory.set(row.category_id, current);
+  }
+  for (const row of progressResult.data ?? []) {
+    if (!historyByCategory.has(row.category_id)) {
+      historyByCategory.set(row.category_id, { name: row.category_name, values: new Map() });
+    }
+  }
+  const insights: BudgetHistoryStats[] = [...historyByCategory.entries()].map(([categoryId, current]) => {
+    const progress = (progressResult.data ?? []).find((row) => row.category_id === categoryId);
+    return calculateBudgetHistoryStats({
+      categoryId,
+      categoryName: current.name,
+      history: months.map((referenceMonth) => ({ referenceMonth, amountMinor: current.values.get(referenceMonth) ?? 0 })),
+      plannedAmountMinor: progress ? coerceMinorUnits(progress.planned_amount_minor) : 0,
+      realizedAmountMinor: progress ? coerceMinorUnits(progress.realized_amount_minor) : 0,
+      referenceMonth: input.referenceMonth,
+    });
+  }).sort((left, right) => right.realizedAmountMinor - left.realizedAmountMinor || right.averageAmountMinor - left.averageAmountMinor);
+  return { insights, months, hasError: Boolean(historyResult.error || progressResult.error) };
 }

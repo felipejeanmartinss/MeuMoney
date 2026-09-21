@@ -14,6 +14,7 @@ import { CURRENCY_LOCALES } from "@/domain/currencies";
 import { getCurrentProfile } from "@/services/auth/server-auth";
 import {
   getCurrentUserAnnualBudget,
+  getCurrentUserBudgetInsights,
   getCurrentUserMonthlyBudget,
 } from "@/services/finance/budgets-service";
 import type { MonthlyBudgetProgress } from "@/types/database";
@@ -125,7 +126,15 @@ export default async function BudgetsPage({
           referenceMonth: toReferenceMonth(filters.month),
           context: filters.context,
           currency: filters.currency,
-        });
+      });
+  const budgetInsights =
+    view === "monthly"
+      ? await getCurrentUserBudgetInsights({
+          referenceMonth: toReferenceMonth(filters.month),
+          context: filters.context,
+          currency: filters.currency,
+        })
+      : null;
   const { categories, progress, hasError } = budgetData;
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
@@ -557,6 +566,28 @@ export default async function BudgetsPage({
               )}
             </section>
           </div>
+          {budgetInsights ? (
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="font-black text-slate-950">Histórico e sugestão</h2>
+                  <p className="text-xs text-slate-500">Mínimo, média, mediana e máximo dos últimos 12 meses para apoiar o próximo planejamento.</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">Sazonalidade é identificada quando há um pico de pelo menos 50% acima da média ou quando o mesmo mês supera a média histórica em 25%.</p>
+                </div>
+                <span className="text-xs font-semibold text-slate-500">Alertas em 80%, 100% e acima do orçamento</span>
+              </div>
+              {budgetInsights.hasError ? <p role="alert" className="m-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">O histórico está parcialmente indisponível.</p> : null}
+              {budgetInsights.insights.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[980px] border-collapse text-xs">
+                    <caption className="sr-only">Estatísticas históricas e sugestão de orçamento por categoria</caption>
+                    <thead className="bg-slate-100 text-slate-600"><tr><th className="px-3 py-2 text-left">Categoria</th><th className="px-3 py-2 text-right">Mínimo</th><th className="px-3 py-2 text-right">Média</th><th className="px-3 py-2 text-right">Mediana</th><th className="px-3 py-2 text-right">Máximo</th><th className="px-3 py-2 text-right">Planejado atual</th><th className="px-3 py-2 text-right">Sugestão</th><th className="px-3 py-2 text-right">Consumo</th><th className="px-3 py-2 text-left">Sazonalidade</th></tr></thead>
+                    <tbody>{budgetInsights.insights.map((row) => { const alertClass = row.percentageConsumed !== null && row.percentageConsumed >= 100 ? "bg-rose-50" : row.percentageConsumed !== null && row.percentageConsumed >= 80 ? "bg-amber-50" : ""; return <tr key={row.categoryId} className={`border-t border-slate-100 ${alertClass}`}><th scope="row" className="max-w-56 truncate px-3 py-2 text-left font-semibold text-slate-900">{row.categoryName}</th><td className="px-3 py-2 text-right tabular-nums">{formatBudgetMoney(row.minimumAmountMinor, filters.currency, locale)}</td><td className="px-3 py-2 text-right tabular-nums">{formatBudgetMoney(row.averageAmountMinor, filters.currency, locale)}</td><td className="px-3 py-2 text-right tabular-nums">{formatBudgetMoney(row.medianAmountMinor, filters.currency, locale)}</td><td className="px-3 py-2 text-right tabular-nums">{formatBudgetMoney(row.maximumAmountMinor, filters.currency, locale)}</td><td className="px-3 py-2 text-right font-semibold tabular-nums">{formatBudgetMoney(row.plannedAmountMinor, filters.currency, locale)}</td><td className="px-3 py-2 text-right font-black text-emerald-700 tabular-nums">{formatBudgetMoney(row.suggestedAmountMinor, filters.currency, locale)}</td><td className={`px-3 py-2 text-right font-bold tabular-nums ${row.percentageConsumed !== null && row.percentageConsumed >= 100 ? "text-rose-700" : row.percentageConsumed !== null && row.percentageConsumed >= 80 ? "text-amber-700" : "text-slate-700"}`}>{formatPercentage(row.percentageConsumed)}</td><td className="px-3 py-2 text-left">{row.seasonal ? <span className="rounded-full bg-violet-100 px-2 py-1 font-bold text-violet-800">Identificada</span> : <span className="text-slate-400">—</span>}</td></tr>; })}</tbody>
+                  </table>
+                </div>
+              ) : <p className="p-4 text-sm text-slate-600">Ainda não há histórico suficiente para sugerir valores.</p>}
+            </section>
+          ) : null}
         </>
       ) : (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
