@@ -1,0 +1,87 @@
+// Isolated PostgreSQL verification. Set PGLITE_MODULE_PATH to an installed PGlite module.
+// No remote database, credentials or application data are used.
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+const { PGlite } = await import(process.env.PGLITE_MODULE_PATH ? pathToFileURL(process.env.PGLITE_MODULE_PATH).href : "@electric-sql/pglite");
+const db = new PGlite();
+const owner = "11111111-1111-4111-8111-111111111111";
+const other = "22222222-2222-4222-8222-222222222222";
+const tx = "33333333-3333-4333-8333-333333333333";
+const foreignTx = "44444444-4444-4444-8444-444444444444";
+const read = async (name) => (await readFile(new URL("../supabase/migrations/" + name, import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+try {
+  await db.exec(`
+    create role anon; create role authenticated; create role service_role;
+    create schema auth; create schema private;
+    grant usage on schema auth, private to authenticated;
+    create table auth.users(id uuid primary key);
+    insert into auth.users values ('${owner}'), ('${other}');
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.user_id', true),'')::uuid $$;
+    create type public.financial_context as enum ('personal','professional');
+    create type public.net_worth_item_type as enum ('financing','loan');
+    create table public.net_worth_items(id uuid primary key default gen_random_uuid(), user_id uuid not null, kind text, item_type public.net_worth_item_type,
+      name text not null, currency text not null, current_value_minor bigint, valuation_date date, context public.financial_context, notes text, unique(id,user_id));
+    create table public.accounts(id uuid primary key default gen_random_uuid(), user_id uuid, currency text);
+    insert into public.accounts(user_id,currency) values ('${owner}','BRL'), ('${other}','BRL');
+    create table public.transactions(id uuid primary key,user_id uuid,account_id uuid references public.accounts(id),is_active boolean default true,status text default 'completed',transaction_type text default 'expense',amount_minor bigint);
+    insert into public.transactions(id,user_id,account_id,amount_minor) select '${tx}', user_id,id,11000 from public.accounts where user_id='${owner}';
+    insert into public.transactions(id,user_id,account_id,amount_minor) select '${foreignTx}', user_id,id,11000 from public.accounts where user_id='${other}';
+    create function public.set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at=clock_timestamp(); return new; end $$;
+  `);
+  const original = await read("20260815135005_card_cash_financing_imports.sql");
+  await db.exec(original.slice(original.indexOf("create table public.financing_contracts ("), original.indexOf("alter table public.financing_import_jobs\nadd constraint")));
+  await db.exec(original.slice(original.indexOf("create table public.financing_schedule_entries ("), original.indexOf("create index financing_import_jobs_owner_status_idx")));
+  await db.exec(`create trigger financing_contracts_set_updated_at before update on public.financing_contracts for each row execute procedure public.set_updated_at();
+    grant select on public.net_worth_items,public.financing_contracts,public.financing_schedule_entries,public.financing_extra_amortizations to authenticated;
+    alter table public.financing_contracts enable row level security;
+    alter table public.financing_schedule_entries enable row level security;
+    alter table public.financing_extra_amortizations enable row level security;
+    alter table public.net_worth_items enable row level security;
+    create policy owner_contract on public.financing_contracts for select to authenticated using(auth.uid()=user_id);
+    create policy owner_schedule on public.financing_schedule_entries for select to authenticated using(auth.uid()=user_id);
+    create policy owner_extra on public.financing_extra_amortizations for select to authenticated using(auth.uid()=user_id);
+    create policy owner_item on public.net_worth_items for select to authenticated using(auth.uid()=user_id);
+  `);
+  const manual = await read("20260912214419_card_commitment_and_manual_financing.sql");
+  await db.exec(manual.slice(manual.indexOf("create or replace function private.create_manual_financing_contract(")));
+  await db.exec(await read("20260921235122_flexible_financing_and_benchmarks.sql"));
+  const contract = { name: "Teste", institution: "Banco", contract_reference: "TEST", product_type: "financing", context: "personal", currency: "BRL", amortization_system: "SAC", original_principal_minor: 120000, original_term_months: 12, contract_date: "2025-12-01", current_balance_minor: 110000, balance_date: "2026-01-01", nominal_annual_rate: "12" };
+  const row = { source_sequence: 1, installment_number: 1, due_date: "2026-01-01", total_amount_minor: 11200, principal_minor: 10000, interest_minor: 1200, insurance_mip_minor: 0, insurance_dfi_minor: 0, service_fee_minor: 0, penalty_minor: 0, late_interest_minor: 0, fgts_minor: 0, outstanding_balance_minor: 110000, payment_status: "paid", payment_date: "2026-01-01", paid_amount_minor: 11200, extra_amortization_minor: 0, installments_reduced: 0, linked_transaction_id: tx };
+  const save = async (id, version, rows) => (await db.query("select public.save_financing_contract($1,$2,$3::jsonb,$4::jsonb) as id", [id,version,JSON.stringify(contract),JSON.stringify(rows)])).rows[0].id;
+  const version = async (id) => (await db.query("select updated_at::text as stamp from public.financing_contracts where id=$1", [id])).rows[0].stamp;
+  await db.exec(`set role authenticated; select set_config('test.user_id','${owner}',false);`);
+  const id = await save(null,null,[row]);
+  const entry = (await db.query("select * from public.financing_schedule_entries where contract_id=$1", [id])).rows[0];
+  assert.equal(entry.linked_transaction_id,tx);
+  assert.equal(Number((await db.query("select total_paid_minor from public.financing_contract_summaries where id=$1",[id])).rows[0].total_paid_minor),11200);
+  const stamp = await version(id);
+  await save(id,stamp,[{...row,id:entry.id,due_date:"2026-01-02"}]);
+  await assert.rejects(save(id,stamp,[row]), /financing_conflict/);
+  await assert.rejects(save(id,await version(id),[{...row,id:entry.id,linked_transaction_id:foreignTx}]), /invalid_financing_link/);
+  await assert.rejects(save(id,await version(id),[{...row,id:entry.id},{...row,source_sequence:2,installment_number:2}]), /unique/);
+  assert.equal(Number((await db.query("select count(*) as n from public.financing_schedule_entries where contract_id=$1",[id])).rows[0].n),1);
+  await db.exec(`select set_config('test.user_id','${other}',false);`);
+  assert.equal((await db.query("select * from public.financing_contract_summaries")).rows.length,0);
+  await assert.rejects(save(id,stamp,[row]), /financing_not_found/);
+  await assert.rejects(db.exec("insert into public.investment_benchmark_months values ('cdi','2026-01-01',1,'test',now())"), /permission denied/);
+  await db.exec(`reset role; update public.financing_schedule_entries set insurance_mip_minor=20,service_fee_minor=30,fgts_minor=50,source_pages='{2}' where id='${entry.id}'; set role authenticated; select set_config('test.user_id','${owner}',false);`);
+  await save(id,await version(id),[{...row,id:entry.id,service_fee_minor:50,linked_transaction_id:null}]);
+  const preserved = (await db.query("select * from public.financing_schedule_entries where id=$1",[entry.id])).rows[0];
+  assert.equal(Number(preserved.insurance_mip_minor),20);
+  assert.equal(Number(preserved.service_fee_minor),30);
+  assert.equal(Number(preserved.fgts_minor),50);
+  assert.deepEqual(preserved.source_pages,[2]);
+  assert.equal(preserved.linked_transaction_id,null);
+  await db.exec("reset role");
+  await assert.rejects(db.query("update public.financing_schedule_entries set linked_transaction_id=$1 where id=$2",[foreignTx,entry.id]), /foreign key/);
+  assert.equal(Number((await db.query("select amount_minor from public.transactions where id=$1",[tx])).rows[0].amount_minor),11000);
+  await db.exec(`set role authenticated;`);
+  await save(id,await version(id),[{...row,id:entry.id}]);
+  await db.exec(`reset role; update public.transactions set is_active=false where id='${tx}'; set role authenticated;`);
+  await save(id,await version(id),[{...row,id:entry.id,due_date:"2026-01-03"}]);
+  await db.exec(`reset role; delete from public.transactions where id='${tx}';`);
+  assert.equal((await db.query("select linked_transaction_id from public.financing_schedule_entries where id=$1",[entry.id])).rows[0].linked_transaction_id,null);
+  console.log("PostgreSQL: create/edit, optimistic lock, owner isolation, link validation, atomic rollback, unlink, preserved legacy metadata and benchmark permissions passed.");
+} catch (error) { console.error(error.message); process.exitCode = 1; }
+finally { await db.close(); }

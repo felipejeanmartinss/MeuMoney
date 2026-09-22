@@ -1,5 +1,19 @@
 # Regras de negócio
 
+## Financiamentos flexíveis e benchmarks
+
+- A importação bancária de novos financiamentos foi descontinuada. Contratos e históricos existentes são preservados; as antigas rotas de importação encaminham ao cadastro manual.
+- Valores monetários são exibidos como `2.028,65` e calculados/persistidos em centavos inteiros. As projeções SAC/PRICE usam a taxa nominal anual dividida por 12 e arredondamento por parcela; não adivinham TR, seguros ou reajustes futuros.
+- Todo o fluxo pode ser editado, inclusive datas, principal, juros, encargos, pagamentos e saldo. O saldo atual do contrato tem data-base própria; o usuário pode atualizá-lo explicitamente pela última parcela paga.
+- A amortização ocorre depois da parcela selecionada: somente valor reduz as prestações restantes; somente quantidade antecipa o principal das últimas N parcelas; ambos aplicam o valor informado no prazo reduzido. É uma projeção para revisão, não uma reprodução das regras de antecipação de cada banco. Exige prévia e confirmação antes de salvar.
+- O recálculo automático preserva o passado e bloqueia a substituição de parcelas futuras pagas, vinculadas ou já amortizadas. A edição manual continua disponível. Taxas futuras são mantidas; fatores e valores devem ser conferidos após reajustes.
+- Vínculos de pagamentos são apenas históricos. Um lançamento pode aparecer em uma única parcela, deve pertencer ao usuário e usar a moeda do contrato; novos vínculos aceitam despesas ativas realizadas. Vínculos existentes podem ser preservados mesmo se a movimentação depois for inativada. Editar/excluir parcela ou desvincular nunca altera o extrato; excluir o lançamento desfaz a referência automaticamente.
+- O salvamento do contrato/fluxo é atômico, protegido por proprietário e versão. Campos históricos de origem e FGTS são mantidos; componentes de encargos são preservados quando seu total não foi alterado. Quando o total de encargos é editado, passa a ser uma rubrica consolidada.
+- Os cards exibem total pago, saldo devedor e parcelas quitadas/amortizadas sobre o prazo original. Total pago considera valores efetivamente marcados como pagos, incluindo amortizações pagas, sem duplicação de vínculos bancários.
+- Benchmarks usam meses encerrados e a mesma janela para ativo/classe e referências. A primeira versão compara posições em BRL; toda posição selecionada, inclusive arquivada, exige histórico completo e avaliações nos fechamentos mensais de abertura e término. Lacunas não viram zero nem repetição de cotações antigas.
+- O retorno mensal usa Dietz modificado: resultado = saldo final − saldo inicial − aportes + resgates + rendimentos distribuídos; capital pondera os fluxos externos pelos dias restantes após sua data. Retornos mensais são compostos. Retorno real = (1 + retorno)/(1 + IPCA) − 1. Não se trata de TIR ou TWR diário exato.
+- Séries mensais compartilhadas guardam índice, competência, retorno percentual, fonte e data da sincronização. Usuários autenticados têm somente leitura; escrita é administrativa. BCB/SGS: CDI 4391, Selic 4390, IPCA 433 e PTAX venda no fim do mês 3696 (dólar convertido em variação mensal). Ibovespa/IFIX aguardam histórico de fonte autorizada, sem dados fictícios.
+
 ## Segurança e ciclo de vida dos dados — Sprint 12
 
 - Todo backup é versionado, pertence à sessão autenticada e inclui todas as
