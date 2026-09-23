@@ -45,7 +45,10 @@ describe("navigation model", () => {
     expect(
       secondaryNavigationFor("/credit-cards").map((item) => item.label),
     ).toContain("Cartões");
-    expect(secondaryNavigationFor("/reports")).toEqual([]);
+    expect(secondaryNavigationFor("/reports").map((item) => item.label)).toEqual([
+      "Favoritos", "Receitas x despesas", "Despesas fixas", "Comparativo entre períodos",
+      "Performance (ativos)", "Performance (geral)", "Evolução patrimonial", "Projeção de fluxo de caixa",
+    ]);
     expect(
       secondaryNavigationFor("/recurring-transactions").map(
         (item) => item.label,
@@ -89,5 +92,11 @@ describe("navigation model", () => {
     expect(isNavigationItemActive("/investments", financing!, "")).toBe(
       false,
     );
+  });
+
+  it("highlights one report in the sidebar, including favorites", () => {
+    const items = secondaryNavigationFor("/reports");
+    expect(items.filter((item) => isNavigationItemActive("/reports", item, "report=income-expense")).map((item) => item.label)).toEqual(["Receitas x despesas"]);
+    expect(items.filter((item) => isNavigationItemActive("/reports", item, "area=favorites")).map((item) => item.label)).toEqual(["Favoritos"]);
   });
 });

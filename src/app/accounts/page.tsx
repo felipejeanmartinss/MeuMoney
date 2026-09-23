@@ -141,7 +141,7 @@ function AccountGroup({
       </summary>
 
       {accounts.length === 0 ? (
-        <p className="px-5 py-8 text-sm text-slate-500">
+        <p className="px-3 py-5 text-sm text-slate-500">
           Nenhuma conta neste grupo.
         </p>
       ) : (
@@ -151,11 +151,11 @@ function AccountGroup({
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-3 py-2 font-bold">Conta</th>
-                  <th className="px-4 py-3 font-bold">Tipo</th>
-                  <th className="px-4 py-3 font-bold">Atualização</th>
-                  <th className="px-4 py-3 text-right font-bold">Saldo atual</th>
-                  <th className="px-4 py-3 text-right font-bold">Projetado</th>
-                  <th className="px-5 py-3 text-right font-bold">Situação</th>
+                  <th className="px-3 py-2 font-bold">Tipo</th>
+                  <th className="px-3 py-2 font-bold">Atualização</th>
+                  <th className="px-3 py-2 text-right font-bold">Saldo atual</th>
+                  <th className="px-3 py-2 text-right font-bold">Projetado</th>
+                  <th className="px-3 py-2 text-right font-bold">Situação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -232,7 +232,7 @@ function AccountGroup({
 
           <div className="grid divide-y divide-slate-100 md:hidden">
             {accounts.map((account) => (
-              <article key={account.id} className="grid gap-2 p-3">
+              <article key={account.id} className="grid gap-1.5 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <Link
@@ -241,7 +241,7 @@ function AccountGroup({
                     >
                       {account.name}
                     </Link>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="text-xs text-slate-500">
                       {ACCOUNT_TYPE_LABELS[account.type]} ·{" "}
                       {CONTEXT_LABELS[account.context]}
                     </p>
@@ -250,11 +250,11 @@ function AccountGroup({
                     {account.archived_at ? "Inativa" : "Ativa"}
                   </span>
                 </div>
-                <dl className="grid grid-cols-2 gap-3">
+                <dl className="grid grid-cols-2 gap-2">
                   <div>
                     <dt className="text-xs font-bold text-slate-500">Atual</dt>
                     <dd
-                      className={`mt-0.5 text-lg font-extrabold ${
+                      className={`text-base font-semibold ${
                         account.current_balance_minor < 0
                           ? "text-rose-700"
                           : "text-slate-950"
@@ -266,7 +266,7 @@ function AccountGroup({
                   <div>
                     <dt className="text-xs font-bold text-slate-500">Projetado</dt>
                     <dd
-                      className={`mt-0.5 text-lg font-extrabold ${
+                      className={`text-base font-semibold ${
                         account.projected_balance_minor < 0
                           ? "text-rose-700"
                           : "text-slate-950"
@@ -338,17 +338,15 @@ function CardsGroup({
   );
 
   return (
-    <details open className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <summary className="flex cursor-pointer list-none flex-col gap-3 border-b border-slate-200 px-5 py-4 marker:hidden sm:flex-row sm:items-center sm:justify-between">
+    <details open className="group min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <summary className="flex cursor-pointer list-none flex-col gap-2 border-b border-slate-200 px-3 py-2.5 marker:hidden sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-950">
+          <h2 className="text-base font-semibold text-slate-950">
             Cartões de crédito
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Próxima fatura e total comprometido de cada cartão.
-          </p>
+          <p className="text-xs text-slate-600">Próxima fatura e total comprometido.</p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div>
             <p className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
               Faturas em aberto
@@ -369,46 +367,15 @@ function CardsGroup({
           Nenhum cartão cadastrado.
         </p>
       ) : (
-        <div className="grid divide-y divide-slate-100">
-          {cards.map((card) => {
-            const nextInvoice = nextOpenInvoiceByCard.get(card.id);
-            return (
-            <Link
-              key={card.id}
-              href={`/credit-cards/${card.id}`}
-              className="grid gap-2 px-5 py-4 hover:bg-emerald-50/40 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:gap-6"
-            >
-              <div>
-                <span className="font-extrabold text-slate-950">
-                  {card.name}
-                </span>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  {card.issuer} · final {card.last_four_digits}
-                </p>
-              </div>
-              <div className="sm:text-right">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Próxima fatura
-                </p>
-                <p className="mt-1 font-extrabold text-rose-700">
-                  {formatMoney(nextInvoice?.total_amount ?? 0, card.currency)}
-                </p>
-              </div>
-              <div className="sm:text-right">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Comprometido
-                </p>
-                <p className="mt-1 font-extrabold text-slate-950">
-                  {formatMoney(card.used_limit, card.currency)}
-                </p>
-              </div>
-              <span className="text-xs font-bold text-slate-500">
-                {card.is_active ? "Ativo" : "Inativo"}
-              </span>
-            </Link>
-            );
-          })}
-        </div>
+        <>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-[50rem] w-full border-collapse text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Cartão</th><th className="px-3 py-2">Emissor</th><th className="px-3 py-2 text-right">Próxima fatura</th><th className="px-3 py-2 text-right">Comprometido</th><th className="px-3 py-2 text-right">Situação</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">{cards.map((card) => <tr key={card.id} className="hover:bg-emerald-50/40"><td className="px-3 py-2"><Link href={`/credit-cards/${card.id}`} className="font-bold text-slate-950 hover:text-emerald-700">{card.name}</Link><p className="text-xs text-slate-500">final {card.last_four_digits}</p></td><td className="px-3 py-2 text-slate-600">{card.issuer}</td><td className="px-3 py-2 text-right font-semibold text-rose-700">{formatMoney(nextOpenInvoiceByCard.get(card.id)?.total_amount ?? 0, card.currency)}</td><td className="px-3 py-2 text-right font-semibold">{formatMoney(card.used_limit, card.currency)}</td><td className="px-3 py-2 text-right"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${card.is_active ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{card.is_active ? "Ativo" : "Inativo"}</span></td></tr>)}</tbody>
+            </table>
+          </div>
+          <div className="divide-y divide-slate-100 md:hidden">{cards.map((card) => <Link key={card.id} href={`/credit-cards/${card.id}`} className="block p-3 hover:bg-emerald-50/40"><div className="flex items-start justify-between gap-2"><div><p className="font-bold text-slate-950">{card.name}</p><p className="text-xs text-slate-500">{card.issuer} · final {card.last_four_digits}</p></div><span className="text-xs font-semibold text-slate-500">{card.is_active ? "Ativo" : "Inativo"}</span></div><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs"><span>Próxima <strong className="text-rose-700">{formatMoney(nextOpenInvoiceByCard.get(card.id)?.total_amount ?? 0, card.currency)}</strong></span><span>Comprometido <strong>{formatMoney(card.used_limit, card.currency)}</strong></span></div></Link>)}</div>
+        </>
       )}
     </details>
   );
@@ -515,19 +482,15 @@ export default async function AccountsPage({
       <div className="grid gap-3">
         <AccountGroup
           title="Contas correntes e poupança"
-          description="Contas bancárias usadas no dia a dia e reservas."
+          description="Uso diário e reservas."
           accounts={banking}
         />
         <AccountGroup
           title="Contas de investimento"
-          description="Contas transacionais usadas para aportes, resgates e liquidação. As posições ficam na central de Investimentos."
+          description="Aportes, resgates e liquidação."
           accounts={investmentAccounts}
         />
-        <AccountGroup
-          title="Dinheiro e outras contas"
-          description="Caixa físico e demais saldos transacionais."
-          accounts={cashAndOther}
-        />
+        {cashAndOther.length ? <AccountGroup title="Dinheiro e outras contas" description="Caixa físico e demais saldos transacionais." accounts={cashAndOther} /> : null}
         <CardsGroup cards={visibleCards} invoices={cardResult.invoices} />
       </div>
     </main>

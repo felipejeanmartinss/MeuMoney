@@ -235,17 +235,12 @@ export function DesktopNavigation() {
       </nav>
       {secondary.length ? (
         <nav aria-label={`Opções de ${sectionLabel}`} className="grid gap-1">
-          <p className="mb-1 px-2.5 text-[0.64rem] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-            {sectionLabel}
-          </p>
+          {section !== "reports" ? <p className="mb-1 px-2.5 text-[0.64rem] font-extrabold uppercase tracking-[0.16em] text-slate-400">{sectionLabel}</p> : null}
           {secondary.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              search={search}
-              compact
-            />
+            <div key={item.href}>
+              {item.group ? <p className="mb-0.5 mt-2 px-2.5 text-[0.62rem] font-extrabold uppercase tracking-[0.13em] text-slate-400">{item.group}</p> : null}
+              <NavLink item={item} pathname={pathname} search={search} compact />
+            </div>
           ))}
         </nav>
       ) : null}
@@ -288,13 +283,10 @@ export function MobileSecondaryMenu() {
               {MAIN_NAVIGATION.find((item) => item.section === section)?.label}
             </p>
             {items.map((item) => (
-              <NavLink
-                key={item.href}
-                item={item}
-                pathname={pathname}
-                search={search}
-                compact
-              />
+              <div key={item.href}>
+                {item.group ? <p className="mt-2 px-3 text-[0.62rem] font-bold uppercase tracking-wide text-slate-400">{item.group}</p> : null}
+                <NavLink item={item} pathname={pathname} search={search} compact />
+              </div>
             ))}
           </div>
         ))}

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { InvestmentUnitPriceForm } from "@/components/forms/investment-unit-price-form";
 import { listCurrentUserMarketPricedInvestmentPositions } from "@/services/finance/investments-service";
 
@@ -10,9 +9,6 @@ export default async function InvestmentPricesPage() {
 
   return (
     <main className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:px-8">
-      <Link href="/investments" className="w-fit text-sm font-bold text-emerald-700">
-        ← Voltar para investimentos
-      </Link>
       <header>
         <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
           Ações e fundos imobiliários

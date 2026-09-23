@@ -1,11 +1,12 @@
 import type { IncomeExpenseReportRow } from "@/domain/financial-reports";
 import type { SupportedCurrency } from "@/types/database";
 import { formatMoney } from "@/domain/money";
+import { roundedAxisMaximumMinor } from "@/domain/report-chart-axis";
 
 export function IncomeExpenseColumnChart({ rows, currency }: { rows: IncomeExpenseReportRow[]; currency: SupportedCurrency }) {
   const displayed = rows.slice(-24);
   if (!displayed.length) return <p className="p-6 text-center text-sm text-slate-500">Nenhum valor no período.</p>;
-  const max = Math.max(1, ...displayed.flatMap((row) => [row.incomeAmountMinor, row.expenseAmountMinor]));
+  const max = roundedAxisMaximumMinor(Math.max(0, ...displayed.flatMap((row) => [row.incomeAmountMinor, row.expenseAmountMinor])));
   const width = Math.max(640, displayed.length * 48 + 70);
   const height = 300, baseline = 255, plotHeight = 214, left = 55;
   const barWidth = Math.max(7, Math.min(17, (width - left - 20) / displayed.length / 3));

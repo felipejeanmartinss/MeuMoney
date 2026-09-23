@@ -23,6 +23,7 @@ export type NavigationItem = {
   icon: NavigationIcon;
   match: readonly string[];
   exclude?: readonly string[];
+  group?: string;
 };
 
 export type NavigationSection =
@@ -88,7 +89,7 @@ export const MAIN_NAVIGATION: ReadonlyArray<
   },
   {
     section: "reports",
-    href: "/reports",
+    href: "/reports?report=income-expense",
     label: "Relatórios",
     icon: "reports",
     match: ["/reports"],
@@ -103,7 +104,7 @@ export const MAIN_NAVIGATION: ReadonlyArray<
 ];
 
 export const SECONDARY_NAVIGATION: Record<
-  Exclude<NavigationSection, "home" | "net-worth" | "reports">,
+  Exclude<NavigationSection, "home" | "net-worth">,
   readonly NavigationItem[]
 > = {
   accounts: [
@@ -164,6 +165,16 @@ export const SECONDARY_NAVIGATION: Record<
       icon: "financing",
       match: ["/investments/financing-imports", "/investments/financings"],
     },
+  ],
+  reports: [
+    { href: "/reports?area=favorites", label: "Favoritos", icon: "reports", match: [], group: "Favoritos" },
+    { href: "/reports?report=income-expense", label: "Receitas x despesas", icon: "reports", match: [], group: "Receitas e despesas" },
+    { href: "/reports?report=fixed-expenses", label: "Despesas fixas", icon: "reports", match: [] },
+    { href: "/reports?report=period-comparison", label: "Comparativo entre períodos", icon: "reports", match: [] },
+    { href: "/reports?report=asset-performance", label: "Performance (ativos)", icon: "reports", match: [], group: "Ativos e passivos" },
+    { href: "/reports?report=asset-performance-general", label: "Performance (geral)", icon: "reports", match: [] },
+    { href: "/reports?report=net-worth-evolution", label: "Evolução patrimonial", icon: "reports", match: [], group: "Patrimônio" },
+    { href: "/reports?report=cash-flow-forecast", label: "Projeção de fluxo de caixa", icon: "reports", match: [] },
   ],
   profile: [
     {
@@ -238,8 +249,7 @@ export function secondaryNavigationFor(pathname: string) {
   const section = resolveNavigationSection(pathname);
   if (
     section === "home" ||
-    section === "net-worth" ||
-    section === "reports"
+    section === "net-worth"
   ) {
     return [];
   }

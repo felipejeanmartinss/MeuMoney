@@ -42,5 +42,5 @@ export async function deleteSavedFinancialReport(formData: FormData) {
     ? await deleteCurrentUserSavedFinancialReport(id.data)
     : { ok: false as const };
   revalidatePath("/reports");
-  redirect(`/reports?message=${result.ok ? "saved-deleted" : "delete-error"}`);
+  redirect(`/reports?area=favorites&message=${result.ok ? "saved-deleted" : "delete-error"}`);
 }

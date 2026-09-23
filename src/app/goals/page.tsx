@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader, PageHelp } from "@/components/layout/page-header";
+import { PageHeader } from "@/components/layout/page-header";
 import { FINANCIAL_GOAL_STATUS_LABELS, FINANCIAL_GOAL_TYPE_LABELS } from "@/domain/financial-goals";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserFinancialGoals } from "@/services/finance/financial-goals-service";
@@ -46,10 +46,6 @@ export default async function GoalsPage() {
             </Link>
           ))}
         </div>
-        <PageHelp title="Como acompanhar uma meta?">
-          Defina valor e prazo, vincule contas ou investimentos e registre contribuições.
-          Os saldos vinculados atualizam o progresso; revise a contribuição mensal quando necessário.
-        </PageHelp>
       </section>
     </main>
   );

@@ -19,7 +19,6 @@ import {
   CashFlowForecastEventTable,
 } from "@/components/reports/cash-flow-forecast";
 import {
-  FINANCIAL_REPORT_LABELS,
   financialReportFilterSchema,
   financialReportTypeSchema,
   periodComparisonFilterSchema,
@@ -51,24 +50,6 @@ import type {
 } from "@/types/database";
 
 export const metadata = { title: "Relatórios" };
-
-const REPORT_GROUPS = [
-  {
-    label: "Receitas e despesas",
-    reports: ["income-expense", "fixed-expenses", "period-comparison"],
-  },
-  {
-    label: "Ativos e passivos",
-    reports: ["asset-performance", "asset-performance-general"],
-  },
-  {
-    label: "Patrimônio",
-    reports: ["net-worth-evolution", "cash-flow-forecast"],
-  },
-] as const satisfies ReadonlyArray<{
-  label: string;
-  reports: readonly FinancialReportType[];
-}>;
 
 const inputClass =
   "min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
@@ -241,39 +222,6 @@ function resolveCashFlowPeriod(
   const maximumEnd = shiftDate(startDate, 731);
   if (endDate > maximumEnd) endDate = maximumEnd;
   return { period: preset[0], startDate, endDate };
-}
-
-function reportHref(
-  report: FinancialReportType,
-  filters: {
-    year: number;
-    currency: SupportedCurrency;
-    basis: FinancialReportBasis;
-    context: FinancialContext | "all";
-    sourceCurrencies: SupportedCurrency[];
-    sourceKeys?: string[];
-    categoryIds?: string[];
-    subcategoryIds?: string[];
-    timeGrouping?: ReportTimeGrouping;
-    categoryGrouping?: ReportCategoryGrouping;
-  },
-) {
-  const query = new URLSearchParams({
-    report,
-    year: String(filters.year),
-    currency: filters.currency,
-    basis: filters.basis,
-    context: filters.context,
-  });
-  for (const sourceCurrency of filters.sourceCurrencies) {
-    query.append("sourceCurrencies", sourceCurrency);
-  }
-  for (const sourceKey of filters.sourceKeys ?? []) query.append("sourceKeys", sourceKey);
-  for (const categoryId of filters.categoryIds ?? []) query.append("categoryIds", categoryId);
-  for (const subcategoryId of filters.subcategoryIds ?? []) query.append("subcategoryIds", subcategoryId);
-  if (filters.timeGrouping) query.set("timeGrouping", filters.timeGrouping);
-  if (filters.categoryGrouping) query.set("categoryGrouping", filters.categoryGrouping);
-  return "/reports?" + query.toString();
 }
 
 function savedReportHref(
@@ -488,6 +436,7 @@ export default async function ReportsPage({
   const report =
     financialReportTypeSchema.safeParse(value("report")).data ??
     "income-expense";
+  const showFavorites = value("area") === "favorites";
   const common = financialReportFilterSchema.safeParse({
     year: value("year") ?? currentYear(),
     currency: profileResult.profile?.preferred_currency ?? "BRL",
@@ -562,7 +511,6 @@ export default async function ReportsPage({
     categoryGrouping,
     filterOptions,
   };
-  const commonFilters = { ...appliedFilters, context, sourceCurrencies };
   const savedFilters = Object.fromEntries(
     Object.entries(raw).filter(([key, item]) => key !== "message" && item !== undefined),
   );
@@ -579,71 +527,32 @@ export default async function ReportsPage({
     <main className="app-page max-w-[1700px]">
       <PageHeader title="Relatórios" description="Valores consolidados na moeda do perfil." />
 
-      <nav
-        aria-label="Tipos de relatório"
-        className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2"
-      >
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="px-1 text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Favoritos</span>
-          <div className="flex flex-wrap gap-1.5">
-            {savedReportsResult.reports.length ? savedReportsResult.reports.map((saved) => (
-              <span key={saved.id} className="inline-flex min-h-8 items-center overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50">
-                <Link href={savedReportHref(saved.report_type, saved.filters)} className="px-2.5 py-1 text-xs font-semibold text-emerald-900">{saved.name}</Link>
-                <form action={deleteSavedFinancialReport}><input type="hidden" name="id" value={saved.id} /><button type="submit" aria-label={`Excluir relatório salvo ${saved.name}`} className="min-h-8 border-l border-emerald-200 px-2 text-sm text-rose-700">×</button></form>
-              </span>
-            )) : <span className="px-1 text-xs text-slate-500">Nenhum relatório salvo.</span>}
-          </div>
-        </div>
-        {REPORT_GROUPS.map((group) => (
-          <div key={group.label} className="flex min-w-0 flex-col gap-1.5">
-            <span className="px-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-slate-500">
-              {group.label}
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {group.reports.map((item) => {
-                const active = report === item;
-                return (
-                  <Link
-                    key={item}
-                    href={reportHref(item, commonFilters)}
-                    aria-current={active ? "page" : undefined}
-                    className={
-                      "inline-flex min-h-9 items-center rounded-lg px-3 py-1.5 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1 " +
-                      (active
-                        ? "bg-emerald-700 text-white shadow-sm"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200")
-                    }
-                  >
-                    {FINANCIAL_REPORT_LABELS[item]}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        <details className="self-end rounded-xl border border-slate-200 bg-slate-50 md:col-span-2">
-          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-black text-slate-700 marker:hidden">
-            + Salvar visualização atual
-          </summary>
-          <form action={saveFinancialReport} className="flex flex-col gap-2 border-t border-slate-200 p-3">
-            <input type="hidden" name="reportType" value={report} />
-            <input type="hidden" name="filters" value={JSON.stringify(savedFilters)} />
-            <label className="grid gap-1 text-xs font-bold text-slate-600">
-              Nome do relatório
-              <input name="name" maxLength={80} required className={inputClass} placeholder="Ex.: Gastos da casa" />
-            </label>
-            <button className="min-h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">
-              Salvar e fixar
-            </button>
-          </form>
-        </details>
-      </nav>
-
       {reportMessage ? (
         <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
           {reportMessage}
         </p>
       ) : null}
+
+      {showFavorites ? (
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <h2 className="border-b border-slate-200 px-4 py-3 text-base font-semibold">Favoritos</h2>
+          {savedReportsResult.reports.length ? <div className="divide-y divide-slate-100">{savedReportsResult.reports.map((saved) => (
+            <div key={saved.id} className="flex items-center justify-between gap-3 px-4 py-2">
+              <Link href={savedReportHref(saved.report_type, saved.filters)} className="min-w-0 truncate py-2 text-sm font-semibold text-emerald-800 hover:underline">{saved.name}</Link>
+              <form action={deleteSavedFinancialReport}><input type="hidden" name="id" value={saved.id} /><button type="submit" aria-label={`Excluir relatório salvo ${saved.name}`} className="min-h-9 rounded-lg px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50">Excluir</button></form>
+            </div>
+          ))}</div> : <p className="px-4 py-5 text-sm text-slate-500">Nenhum relatório salvo. Salve uma visualização para encontrá-la aqui.</p>}
+        </section>
+      ) : <>
+        <details className="rounded-xl border border-slate-200 bg-white">
+          <summary className="cursor-pointer list-none px-4 py-2.5 text-sm font-semibold text-emerald-800 marker:hidden">+ Salvar visualização atual</summary>
+          <form action={saveFinancialReport} className="flex flex-wrap items-end gap-2 border-t border-slate-200 p-3">
+            <input type="hidden" name="reportType" value={report} />
+            <input type="hidden" name="filters" value={JSON.stringify(savedFilters)} />
+            <label className="grid min-w-48 flex-1 gap-1 text-xs font-bold text-slate-600">Nome do relatório<input name="name" maxLength={80} required className={inputClass} placeholder="Ex.: Gastos da casa" /></label>
+            <button className="min-h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Salvar e fixar</button>
+          </form>
+        </details>
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {report === "income-expense" ? (
@@ -680,6 +589,7 @@ export default async function ReportsPage({
           />
         )}
       </section>
+      </>}
     </main>
   );
 }

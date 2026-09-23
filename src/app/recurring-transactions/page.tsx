@@ -10,6 +10,7 @@ import {
   type RecurrenceCalendarEvent,
 } from "@/components/recurrences/recurrence-calendar";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
+import { sumAmountsByCurrency } from "@/domain/currency-totals";
 import { formatMoney, minorUnitsToInput } from "@/domain/money";
 import {
   collectDueRecurrenceDates,
@@ -188,6 +189,7 @@ export default async function RecurringTransactionsPage({
     }),
     ...(groupFilter === "subscription" ? subscriptionOverview.rows.map((item) => ({ ...item, detail: item.kind === "card" ? "Cartão" : "Lançamento na conta" })) : []),
   ];
+  const groupTotals = sumAmountsByCurrency(groupRows);
 
   const filtered = recurrences.filter((recurrence) => {
     const state = recurrenceState(recurrence);
@@ -669,6 +671,7 @@ export default async function RecurringTransactionsPage({
           </div>
         </div>
         {subscriptionOverview.hasError ? <p role="alert" className="mt-2 text-xs text-amber-800">Algumas assinaturas não puderam ser carregadas.</p> : null}
+        {groupRows.length ? <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-slate-100 py-2 text-sm"><span className="font-semibold text-slate-600">Total dos valores exibidos</span>{groupTotals.map(([currency, total]) => <strong key={currency} className="tabular-nums text-slate-950">{formatMoney(total, currency, CURRENCY_LOCALES[currency])}</strong>)}<span className="text-xs text-slate-500">Soma por moeda, sem ajustar a frequência.</span></div> : null}
         {groupRows.length ? <div className="mt-2 divide-y divide-slate-100">{groupRows.map((item) => <Link key={item.id} href={item.href} className="flex items-center justify-between gap-3 py-2 hover:bg-slate-50"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.source} · {item.detail}</p></div><span className="shrink-0 text-sm font-semibold tabular-nums">{formatMoney(item.amountMinor, item.currency, CURRENCY_LOCALES[item.currency])}</span></Link>)}</div> : <p className="mt-3 text-sm text-slate-500">Nenhum item neste grupo.</p>}
       </section>
     </main>
