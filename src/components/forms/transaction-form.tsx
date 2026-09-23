@@ -139,9 +139,34 @@ export function TransactionForm({
     setCategoryId(selection);
   }
 
+  const additionalFields = (
+    <div className={`grid ${compact ? "gap-2" : "gap-4"}`}>
+      <Field label="Observações" error={state.fieldErrors?.notes?.[0]} compact={compact}>
+        <textarea
+          className={`${inputClass(Boolean(state.fieldErrors?.notes), compact)} ${compact ? "min-h-14 py-2" : "min-h-28 py-3"}`}
+          name="notes"
+          defaultValue={values.notes}
+          maxLength={1000}
+          placeholder="Opcional"
+          aria-invalid={Boolean(state.fieldErrors?.notes)}
+        />
+      </Field>
+      <div className={`flex flex-wrap ${compact ? "gap-x-5 gap-y-2" : "gap-4"}`}>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" name="isSubscription" value="true" defaultChecked={values.isSubscription} className="size-4 accent-emerald-700" />
+          Assinatura
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" name="createRecurring" value="true" className="size-4 accent-emerald-700" />
+          {values.id ? "Criar recorrência" : "Tornar recorrente"}
+        </label>
+      </div>
+    </div>
+  );
+
   return (
-    <div className={`grid ${compact ? "gap-3" : "gap-5"}`}>
-      <form action={formAction} className={`grid ${compact ? "gap-3" : "gap-5"}`}>
+    <div className={`grid ${compact ? "gap-2" : "gap-5"}`}>
+      <form action={formAction} className={`grid ${compact ? "gap-2" : "gap-5"}`}>
         {values.id ? (
           <input type="hidden" name="id" value={values.id} />
         ) : null}
@@ -153,16 +178,15 @@ export function TransactionForm({
         ) : null}
         {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
-        <Field
+        {!fixedType ? <Field
           label="Tipo de lançamento"
           error={state.fieldErrors?.transactionType?.[0]}
           compact={compact}
         >
           <select
             className={inputClass(Boolean(state.fieldErrors?.transactionType), compact)}
-            name={fixedType ? undefined : "transactionType"}
+            name="transactionType"
             value={transactionType}
-            disabled={Boolean(fixedType)}
             onChange={(event) =>
               changeTransactionType(event.target.value as TransactionType)
             }
@@ -174,7 +198,7 @@ export function TransactionForm({
               </option>
             ))}
           </select>
-        </Field>
+        </Field> : null}
 
       <Field label="Descrição" error={state.fieldErrors?.description?.[0]} compact={compact}>
         <input
@@ -192,7 +216,7 @@ export function TransactionForm({
         />
       </Field>
 
-      <div className={`grid sm:grid-cols-2 ${compact ? "gap-3" : "gap-5"}`}>
+      <div className={`grid sm:grid-cols-2 ${compact ? "gap-2" : "gap-5"}`}>
         <Field label="Conta" error={state.fieldErrors?.accountId?.[0]} compact={compact}>
           <select
             className={inputClass(Boolean(state.fieldErrors?.accountId), compact)}
@@ -232,7 +256,7 @@ export function TransactionForm({
               invalid={Boolean(state.fieldErrors?.categoryId)}
               compact={compact}
             />
-            {!values.id && accountId && onTransferSelected ? (
+            {!compact && !values.id && accountId && onTransferSelected ? (
               <p className="text-xs text-slate-500">
                 Contas e cartões compatíveis aparecem junto às categorias. Ao
                 escolher um destino, o formulário muda para Transferência.
@@ -243,13 +267,13 @@ export function TransactionForm({
               onClick={() => setQuickCreateOpen(true)}
               className={`${compact ? "min-h-8 text-xs" : "min-h-10 text-sm"} justify-self-start rounded-lg px-2 font-bold text-blue-700 hover:bg-blue-50`}
             >
-              + Criar categoria ou subcategoria
+              {compact ? "+ Categoria" : "+ Criar categoria ou subcategoria"}
             </button>
           </div>
         </Field>
       </div>
 
-      <div className={`grid sm:grid-cols-3 ${compact ? "gap-3" : "gap-5"}`}>
+      <div className={`grid sm:grid-cols-3 ${compact ? "gap-2" : "gap-5"}`}>
         <Field label="Valor" error={state.fieldErrors?.amountMinor?.[0]} compact={compact}>
           <input
             className={inputClass(Boolean(state.fieldErrors?.amountMinor), compact)}
@@ -292,35 +316,12 @@ export function TransactionForm({
         </Field>
       </div>
 
-      <Field label="Observações" error={state.fieldErrors?.notes?.[0]} compact={compact}>
-        <textarea
-          className={`${inputClass(Boolean(state.fieldErrors?.notes), compact)} ${compact ? "min-h-14 py-2" : "min-h-28 py-3"}`}
-          name="notes"
-          defaultValue={values.notes}
-          maxLength={1000}
-          placeholder="Opcional"
-          aria-invalid={Boolean(state.fieldErrors?.notes)}
-        />
-      </Field>
-
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-          <input type="checkbox" name="isSubscription" value="true" defaultChecked={values.isSubscription} className="size-4 accent-emerald-700" />
-          Assinatura
-        </label>
-
-        <label
-          className={`flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 ${compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm"} font-semibold text-slate-700`}
-        >
-          <input
-            type="checkbox"
-            name="createRecurring"
-            value="true"
-            className="size-4 accent-emerald-700"
-          />
-          {values.id
-            ? "Criar recorrência"
-            : "Tornar recorrente"}
-        </label>
+        {compact ? (
+          <details className="rounded-md border border-slate-200 bg-white px-2.5 py-2" open={Boolean(values.notes || values.isSubscription || state.message) || undefined}>
+            <summary className="cursor-pointer text-xs font-semibold text-slate-700">Mais opções</summary>
+            <div className="mt-2">{additionalFields}</div>
+          </details>
+        ) : additionalFields}
 
         <SubmitButton pending={pending} compact={compact}>
           {values.id ? "Salvar alterações" : "Criar lançamento"}

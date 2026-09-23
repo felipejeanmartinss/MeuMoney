@@ -1,5 +1,11 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
+import {
+  isMissingSubscriptionColumn,
+  subscriptionMigrationMessage,
+  withSubscriptionDefaults,
+  withoutSubscriptionFlag,
+} from "@/services/finance/subscription-schema";
 import type {
   TransactionStatus,
   TransactionType,
@@ -28,16 +34,13 @@ export type TransactionFilters = {
   activity: "active" | "inactive" | "all";
 };
 
-const transactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_subscription, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
-
 export async function listCurrentUserTransactions(
   filters: TransactionFilters,
 ) {
   const { supabase, user } = await requireUser();
   let query = supabase
     .from("transactions")
-    .select(transactionColumns)
+    .select("*")
     .eq("user_id", user.id)
     .order("transaction_date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -85,7 +88,7 @@ export async function listCurrentUserTransactions(
     ]);
 
   return {
-    transactions: transactionsResult.data ?? [],
+    transactions: withSubscriptionDefaults(transactionsResult.data ?? []),
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
     groups: groupsResult.data ?? [],
@@ -148,13 +151,16 @@ export async function getCurrentUserTransaction(id: string) {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("transactions")
-    .select(transactionColumns)
+    .select("*")
     .eq("user_id", user.id)
     .eq("id", id)
     .eq("origin_type", "manual")
     .maybeSingle();
 
-  return { transaction: data, hasError: Boolean(error) };
+  return {
+    transaction: data ? withSubscriptionDefaults([data])[0] : null,
+    hasError: Boolean(error),
+  };
 }
 
 function mutationErrorMessage(error: { message?: string } | null) {
@@ -172,7 +178,7 @@ export async function createCurrentUserTransaction(
   input: TransactionMutationInput,
 ) {
   const { supabase, user } = await requireUser();
-  const { error } = await supabase.from("transactions").insert({
+  const values = {
     user_id: user.id,
     account_id: input.accountId,
     category_id: input.categoryId,
@@ -183,7 +189,16 @@ export async function createCurrentUserTransaction(
     status: input.status,
     notes: input.notes,
     is_subscription: input.isSubscription,
-  });
+  };
+  const { error } = await supabase.from("transactions").insert(values);
+  if (isMissingSubscriptionColumn(error)) {
+    if (input.isSubscription) return { ok: false as const, message: subscriptionMigrationMessage };
+    const compatibleValues = withoutSubscriptionFlag(values);
+    const retry = await supabase.from("transactions").insert(compatibleValues);
+    return retry.error
+      ? { ok: false as const, message: mutationErrorMessage(retry.error) }
+      : { ok: true as const };
+  }
 
   return error
     ? { ok: false as const, message: mutationErrorMessage(error) }
@@ -195,24 +210,40 @@ export async function updateCurrentUserTransaction(
   input: TransactionMutationInput,
 ) {
   const { supabase, user } = await requireUser();
+  const values = {
+    account_id: input.accountId,
+    category_id: input.categoryId,
+    transaction_type: input.transactionType,
+    description: input.description,
+    amount_minor: input.amountMinor,
+    transaction_date: input.transactionDate,
+    status: input.status,
+    notes: input.notes,
+    is_subscription: input.isSubscription,
+  };
   const { data, error } = await supabase
     .from("transactions")
-    .update({
-      account_id: input.accountId,
-      category_id: input.categoryId,
-      transaction_type: input.transactionType,
-      description: input.description,
-      amount_minor: input.amountMinor,
-      transaction_date: input.transactionDate,
-      status: input.status,
-      notes: input.notes,
-      is_subscription: input.isSubscription,
-    })
+    .update(values)
     .eq("user_id", user.id)
     .eq("id", id)
     .eq("origin_type", "manual")
     .select("id")
     .maybeSingle();
+  if (isMissingSubscriptionColumn(error)) {
+    if (input.isSubscription) return { ok: false as const, message: subscriptionMigrationMessage };
+    const compatibleValues = withoutSubscriptionFlag(values);
+    const retry = await supabase
+      .from("transactions")
+      .update(compatibleValues)
+      .eq("user_id", user.id)
+      .eq("id", id)
+      .eq("origin_type", "manual")
+      .select("id")
+      .maybeSingle();
+    return retry.error || !retry.data
+      ? { ok: false as const, message: mutationErrorMessage(retry.error) }
+      : { ok: true as const };
+  }
 
   return error || !data
     ? { ok: false as const, message: mutationErrorMessage(error) }

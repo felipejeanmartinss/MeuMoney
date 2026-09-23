@@ -11,7 +11,7 @@ export function FormMessage({ tone = "error", children }: { tone?: "error" | "su
 }
 
 export function Field({ label, error, children, compact = false }: { label: string; error?: string; children: ReactNode; compact?: boolean }) {
-  return <label className={`grid font-medium text-slate-800 ${compact ? "gap-1 text-xs" : "gap-2 text-sm"}`}><span>{label}</span>{children}{error ? <span className="text-xs font-normal text-red-700">{error}</span> : null}</label>;
+  return <label className={`grid content-start font-medium text-slate-800 ${compact ? "gap-1 text-xs" : "gap-2 text-sm"}`}><span>{label}</span>{children}{error ? <span className="text-xs font-normal text-red-700">{error}</span> : null}</label>;
 }
 
 export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {

@@ -1,5 +1,11 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
+import {
+  isMissingSubscriptionColumn,
+  subscriptionMigrationMessage,
+  withSubscriptionDefaults,
+  withoutSubscriptionFlag,
+} from "@/services/finance/subscription-schema";
 import type {
   Json,
   RecurrenceFrequency,
@@ -34,7 +40,12 @@ export async function getSubscriptionOverview() {
       return [{ id: transaction.id, name: transaction.description, source: account.name, currency: account.currency as SupportedCurrency, amountMinor: transaction.amount_minor, kind: "account" as const, href: `/accounts/${account.id}` }];
     }),
   ];
-  return { rows, hasError: Boolean(cards.error || purchases.error || transactions.error || accounts.error) };
+  return {
+    rows,
+    hasError: Boolean(cards.error || purchases.error || accounts.error ||
+      (transactions.error && !isMissingSubscriptionColumn(transactions.error))),
+    subscriptionUnavailable: isMissingSubscriptionColumn(transactions.error),
+  };
 }
 
 export type RecurringTransactionMutationInput = {
@@ -58,9 +69,6 @@ export type RecurringTransactionReviewInput = {
   transactionDate: string;
   amountMinor: number;
 };
-
-const recurringTransactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, is_amount_fixed, is_subscription, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at";
 
 function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -91,7 +99,7 @@ export async function listCurrentUserRecurringTransactions() {
     await Promise.all([
       supabase
         .from("recurring_transactions")
-        .select(recurringTransactionColumns)
+        .select("*")
         .eq("user_id", user.id)
         .is("ended_at", null)
         .order("is_active", { ascending: false })
@@ -114,7 +122,7 @@ export async function listCurrentUserRecurringTransactions() {
     ]);
 
   return {
-    recurrences: recurrencesResult.data ?? [],
+    recurrences: withSubscriptionDefaults(recurrencesResult.data ?? []),
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
     groups: groupsResult.data ?? [],
@@ -173,19 +181,22 @@ export async function getCurrentUserRecurringTransaction(id: string) {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("recurring_transactions")
-    .select(recurringTransactionColumns)
+    .select("*")
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle();
 
-  return { recurrence: data, hasError: Boolean(error) };
+  return {
+    recurrence: data ? withSubscriptionDefaults([data])[0] : null,
+    hasError: Boolean(error),
+  };
 }
 
 export async function createCurrentUserRecurringTransaction(
   input: RecurringTransactionMutationInput,
 ) {
   const { supabase, user } = await requireUser();
-  const { error } = await supabase.from("recurring_transactions").insert({
+  const values = {
     user_id: user.id,
     account_id: input.accountId,
     category_id: input.categoryId,
@@ -199,7 +210,16 @@ export async function createCurrentUserRecurringTransaction(
     end_date: input.endDate,
     next_occurrence: input.nextOccurrence,
     notes: input.notes,
-  });
+  };
+  const { error } = await supabase.from("recurring_transactions").insert(values);
+  if (isMissingSubscriptionColumn(error)) {
+    if (input.isSubscription) return { ok: false as const, message: subscriptionMigrationMessage };
+    const compatibleValues = withoutSubscriptionFlag(values);
+    const retry = await supabase.from("recurring_transactions").insert(compatibleValues);
+    return retry.error
+      ? { ok: false as const, message: mutationErrorMessage(retry.error) }
+      : { ok: true as const };
+  }
 
   return error
     ? { ok: false as const, message: mutationErrorMessage(error) }
@@ -211,27 +231,43 @@ export async function updateCurrentUserRecurringTransaction(
   input: RecurringTransactionMutationInput,
 ) {
   const { supabase, user } = await requireUser();
+  const values = {
+    account_id: input.accountId,
+    category_id: input.categoryId,
+    transaction_type: input.transactionType,
+    description: input.description,
+    amount_minor: input.amountMinor,
+    is_amount_fixed: input.isAmountFixed,
+    is_subscription: input.isSubscription,
+    frequency: input.frequency,
+    start_date: input.startDate,
+    end_date: input.endDate,
+    next_occurrence: input.nextOccurrence,
+    notes: input.notes,
+  };
   const { data, error } = await supabase
     .from("recurring_transactions")
-    .update({
-      account_id: input.accountId,
-      category_id: input.categoryId,
-      transaction_type: input.transactionType,
-      description: input.description,
-      amount_minor: input.amountMinor,
-      is_amount_fixed: input.isAmountFixed,
-      is_subscription: input.isSubscription,
-      frequency: input.frequency,
-      start_date: input.startDate,
-      end_date: input.endDate,
-      next_occurrence: input.nextOccurrence,
-      notes: input.notes,
-    })
+    .update(values)
     .eq("user_id", user.id)
     .eq("id", id)
     .is("ended_at", null)
     .select("id")
     .maybeSingle();
+  if (isMissingSubscriptionColumn(error)) {
+    if (input.isSubscription) return { ok: false as const, message: subscriptionMigrationMessage };
+    const compatibleValues = withoutSubscriptionFlag(values);
+    const retry = await supabase
+      .from("recurring_transactions")
+      .update(compatibleValues)
+      .eq("user_id", user.id)
+      .eq("id", id)
+      .is("ended_at", null)
+      .select("id")
+      .maybeSingle();
+    return retry.error || !retry.data
+      ? { ok: false as const, message: mutationErrorMessage(retry.error) }
+      : { ok: true as const };
+  }
 
   return error || !data
     ? { ok: false as const, message: mutationErrorMessage(error) }
