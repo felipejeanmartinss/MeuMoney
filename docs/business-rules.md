@@ -112,6 +112,7 @@
 - Editar uma recorrência altera somente gerações futuras. Lançamentos previstos já gerados permanecem como registro histórico.
 - Conta e categoria devem estar ativas e pertencer ao usuário autenticado; a natureza da categoria deve coincidir com a natureza da recorrência.
 - Recorrências e ocorrências não são excluídas fisicamente pela interface.
+- Enquanto a migração do indicador de assinatura não estiver aplicada ao banco, a agenda e as movimentações comuns continuam legíveis e editáveis; o indicador ausente é tratado como falso. A gravação sem assinatura é repetida sem esse campo. Marcar uma assinatura é bloqueado com orientação explícita, evitando salvar uma marcação que seria perdida. As assinaturas em conta só aparecem no agrupamento após a migração.
 
 ## Orçamento mensal — Sprint 6
 

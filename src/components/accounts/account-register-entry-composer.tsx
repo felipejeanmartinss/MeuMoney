@@ -75,11 +75,11 @@ export function AccountRegisterEntryComposer({
         <section
           id={panelId}
           aria-label="Novo registro na conta"
-          className="col-span-2 -mx-3 -mb-2 mt-2 border-t border-amber-300 bg-amber-50/70 px-2.5 py-2.5 sm:px-3"
+          className="col-span-2 -mx-3 -mb-2 mt-1 border-t border-slate-200 bg-slate-50/70 px-2.5 py-2 sm:px-3"
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="mb-1.5 flex items-center justify-between gap-3">
             <h3 className="text-sm font-extrabold text-slate-950">
-              Registrar direto no extrato
+              Novo lançamento
             </h3>
             <button
               type="button"
