@@ -19,7 +19,7 @@ import {
 } from "@/domain/recurring-transactions";
 import { getCategoryQualifiedName } from "@/domain/categories";
 import { TRANSACTION_TYPE_LABELS } from "@/domain/transactions";
-import { listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
+import { getSubscriptionOverview, listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
 import type {
   RecurringTransactionState,
   SupportedCurrency,
@@ -163,6 +163,7 @@ export default async function RecurringTransactionsPage({
     hasError,
   } =
     await listCurrentUserRecurringTransactions();
+  const subscriptionOverview = await getSubscriptionOverview();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
@@ -179,6 +180,14 @@ export default async function RecurringTransactionsPage({
   const today = toIsoDate(new Date());
   const timelineMonth =
     period && /^\d{4}-\d{2}$/.test(period) ? period : currentReferenceMonth();
+  const groupFilter = asString(rawParams.group) === "recurrence" ? "recurrence" : "subscription";
+  const groupRows = [
+    ...recurrences.filter((item) => recurrenceState(item) === "active" && item.transaction_type === "expense" && item.is_subscription === (groupFilter === "subscription")).map((item) => {
+      const account = accountById.get(item.account_id);
+      return { id: item.id, name: item.description, source: account?.name ?? "Conta", currency: (account?.currency ?? "BRL") as SupportedCurrency, amountMinor: item.amount_minor, detail: RECURRENCE_FREQUENCY_LABELS[item.frequency], href: `/recurring-transactions/${item.id}/edit` };
+    }),
+    ...(groupFilter === "subscription" ? subscriptionOverview.rows.map((item) => ({ ...item, detail: item.kind === "card" ? "Cartão" : "Lançamento na conta" })) : []),
+  ];
 
   const filtered = recurrences.filter((recurrence) => {
     const state = recurrenceState(recurrence);
@@ -650,6 +659,17 @@ export default async function RecurringTransactionsPage({
           </p>
         </div>
         <RecurrenceCalendar month={timelineMonth} events={timelineEvents} />
+      </section>
+      <section className="rounded-xl border border-slate-200 bg-white p-3" aria-labelledby="subscriptions-title">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><h2 id="subscriptions-title" className="text-base font-semibold">Assinaturas e recorrências</h2><p className="text-xs text-slate-500">Revise cobranças nas contas e nos cartões para identificar o que pode reduzir.</p></div>
+          <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+            <Link href="/recurring-transactions?group=subscription#subscriptions-title" aria-current={groupFilter === "subscription" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${groupFilter === "subscription" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600"}`}>Assinaturas</Link>
+            <Link href="/recurring-transactions?group=recurrence#subscriptions-title" aria-current={groupFilter === "recurrence" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${groupFilter === "recurrence" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600"}`}>Recorrências</Link>
+          </div>
+        </div>
+        {subscriptionOverview.hasError ? <p role="alert" className="mt-2 text-xs text-amber-800">Algumas assinaturas não puderam ser carregadas.</p> : null}
+        {groupRows.length ? <div className="mt-2 divide-y divide-slate-100">{groupRows.map((item) => <Link key={item.id} href={item.href} className="flex items-center justify-between gap-3 py-2 hover:bg-slate-50"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.source} · {item.detail}</p></div><span className="shrink-0 text-sm font-semibold tabular-nums">{formatMoney(item.amountMinor, item.currency, CURRENCY_LOCALES[item.currency])}</span></Link>)}</div> : <p className="mt-3 text-sm text-slate-500">Nenhum item neste grupo.</p>}
       </section>
     </main>
   );

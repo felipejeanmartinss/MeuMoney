@@ -14,6 +14,7 @@
     "test": "vitest run tests",
     "test:watch": "vitest tests",
     "fixtures:pdf": "node scripts/generate-pdf-import-fixtures.mjs",
+    "benchmarks:sync": "node --env-file=.env.local scripts/sync-investment-benchmarks.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

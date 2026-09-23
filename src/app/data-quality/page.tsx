@@ -8,7 +8,7 @@ export default async function DataQualityPage() {
   const data = await getCurrentUserDataQuality();
   return (
     <main className="app-page max-w-5xl">
-      <PageHeader title="Qualidade dos dados" back={{ href: "/dashboard", label: "Início" }} />
+      <PageHeader title="Qualidade dos dados" />
       {data.hasError ? <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Algumas verificações não puderam ser carregadas.</p> : null}
       <section className="grid grid-cols-2 gap-3">
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Itens para revisar</p><p className="mt-1 text-3xl font-black text-slate-950">{data.hasError ? `${data.attentionCount} (parcial)` : data.attentionCount}</p><p className="mt-1 text-xs text-slate-600">verificações com pendências</p></article>

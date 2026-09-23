@@ -23,7 +23,6 @@ export default async function GoalsPage() {
         title="Metas"
         description="Defina o que você quer conquistar e acompanhe o caminho até lá."
         mobileDescription="Acompanhe o caminho das suas metas."
-        back={{ href: "/dashboard", label: "Início" }}
         actions={<Link href="/goals/new" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800">Nova meta</Link>}
       />
 

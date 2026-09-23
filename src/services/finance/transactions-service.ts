@@ -14,6 +14,7 @@ export type TransactionMutationInput = {
   transactionDate: string;
   status: TransactionStatus;
   notes: string | null;
+  isSubscription: boolean;
 };
 
 export type TransactionFilters = {
@@ -28,7 +29,7 @@ export type TransactionFilters = {
 };
 
 const transactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
+  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_subscription, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
 
 export async function listCurrentUserTransactions(
   filters: TransactionFilters,
@@ -181,6 +182,7 @@ export async function createCurrentUserTransaction(
     transaction_date: input.transactionDate,
     status: input.status,
     notes: input.notes,
+    is_subscription: input.isSubscription,
   });
 
   return error
@@ -204,6 +206,7 @@ export async function updateCurrentUserTransaction(
       transaction_date: input.transactionDate,
       status: input.status,
       notes: input.notes,
+      is_subscription: input.isSubscription,
     })
     .eq("user_id", user.id)
     .eq("id", id)

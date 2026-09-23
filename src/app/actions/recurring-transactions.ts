@@ -24,6 +24,7 @@ const recurringInputFrom = (formData: FormData) => ({
   description: formData.get("description"),
   amountMinor: formData.get("amountMinor"),
   isAmountFixed: formData.get("isAmountFixed") !== "false",
+  isSubscription: formData.get("isSubscription") === "true",
   frequency: formData.get("frequency"),
   startDate: formData.get("startDate"),
   endDate: formData.get("endDate") ?? "",

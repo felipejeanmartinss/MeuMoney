@@ -84,6 +84,7 @@ export const recurringTransactionFormSchema = z
       .max(180, "Use até 180 caracteres."),
     amountMinor: positiveMoneyInput,
     isAmountFixed: z.boolean().default(true),
+    isSubscription: z.boolean().default(false),
     frequency: z.enum(RECURRENCE_FREQUENCIES, {
       error: "Selecione a frequência.",
     }),

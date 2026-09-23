@@ -213,7 +213,7 @@ export function CategoryForm({
       <input
         type="hidden"
         name="isFixedExpense"
-        value={parentId && values.isFixedExpense ? "on" : ""}
+        value={values.isFixedExpense ? "on" : ""}
       />
 
       <SubmitButton pending={pending}>

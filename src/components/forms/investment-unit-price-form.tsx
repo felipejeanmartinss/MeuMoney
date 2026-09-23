@@ -16,7 +16,7 @@ import {
   parseMoneyInputToMinor,
 } from "@/domain/money";
 import type { SupportedCurrency } from "@/types/database";
-import { FormMessage, inputClass, SubmitButton } from "./form-controls";
+import { FormMessage, SubmitButton } from "./form-controls";
 
 type Position = {
   id: string;
@@ -72,7 +72,7 @@ export function InvestmentUnitPriceForm({ positions }: { positions: Position[] }
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table data-sortable="false" className="w-full min-w-[760px] border-collapse text-sm">
+          <table data-sortable="false" className="w-full min-w-[580px] border-collapse text-sm tabular-nums">
             <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-4 py-3">Ativo</th>
@@ -86,18 +86,17 @@ export function InvestmentUnitPriceForm({ positions }: { positions: Position[] }
                 const projectedValue = projectedValues[position.id];
                 return (
                 <tr key={position.id}>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-1.5">
                     <input type="hidden" name="positionId" value={position.id} />
-                    <p className="font-extrabold text-slate-950">{position.asset_name}</p>
-                    <p className="text-xs text-slate-500">{position.institution} · {position.currency}</p>
+                    <div className="flex flex-wrap items-baseline gap-x-2"><span className="font-semibold text-slate-950">{position.asset_name}</span><span className="text-xs text-slate-500">{position.institution} · {position.currency}</span></div>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-slate-700">
+                  <td className="px-3 py-1.5 text-slate-700">
                     {formatInvestmentQuantity(position.quantity)}
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-3 py-1 text-right">
                     <input
                       aria-label={`Valor unitário de ${position.asset_name}`}
-                      className={`${inputClass()} ml-auto h-10 max-w-40 text-right`}
+                      className="ml-auto min-h-11 w-32 rounded-lg border border-slate-300 bg-white px-3 text-right text-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                       name="unitPriceMinor"
                       value={prices[position.id] ?? ""}
                       onChange={(event) =>
@@ -110,7 +109,7 @@ export function InvestmentUnitPriceForm({ positions }: { positions: Position[] }
                       required
                     />
                   </td>
-                  <td className="px-4 py-3 text-right font-extrabold text-slate-950">
+                  <td className="px-3 py-1.5 text-right font-semibold text-slate-950">
                     {projectedValue === null
                       ? "—"
                       : formatMoney(projectedValue, position.currency)}

@@ -3,9 +3,9 @@
 import { useState, type FormEvent } from "react";
 import {
   formatMoney,
-  minorUnitsToInput,
   parseMoneyInputToMinor,
 } from "@/domain/money";
+import { financingMoneyInput, normalizeFinancingMoney } from "@/domain/financing-schedule";
 import {
   simulateFinancing,
   type FinancingAmortizationMethod,
@@ -25,7 +25,7 @@ function parseRateInput(value: string) {
 }
 
 function defaultRate(value: string | null) {
-  return value?.replace(".", ",") ?? "0,00";
+  return value == null ? "0,00" : String(value).replace(".", ",");
 }
 
 export function FinancingAmortizationSimulator({
@@ -90,7 +90,8 @@ export function FinancingAmortizationSimulator({
           <input
             name="principal"
             inputMode="decimal"
-            defaultValue={minorUnitsToInput(principalMinor)}
+            defaultValue={financingMoneyInput(principalMinor)}
+            onBlur={(event) => { event.target.value = normalizeFinancingMoney(event.target.value); }}
             className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm"
             required
           />

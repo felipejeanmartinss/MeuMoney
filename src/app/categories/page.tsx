@@ -51,7 +51,7 @@ function CategoryRow({
         </span>
       </td>
       <td className="border-b border-slate-200 px-3 py-2 text-center">
-        {category.kind === "expense" && isSubcategory ? (
+        {category.kind === "expense" ? (
           <form action={toggleCategoryFixedExpense}>
             <input type="hidden" name="id" value={category.id} />
             <input

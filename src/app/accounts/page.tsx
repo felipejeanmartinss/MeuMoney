@@ -130,12 +130,12 @@ function AccountGroup({
   return (
     <details
       open
-      className="group min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="group min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white"
     >
-      <summary className="flex cursor-pointer list-none flex-col gap-3 border-b border-slate-200 px-5 py-4 marker:hidden sm:flex-row sm:items-center sm:justify-between">
+      <summary className="flex cursor-pointer list-none flex-col gap-2 border-b border-slate-200 px-3 py-2.5 marker:hidden sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm text-slate-600">{description}</p>
+          <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+          <p className="text-xs text-slate-600">{description}</p>
         </div>
         <AccountBalanceTotals accounts={accounts} />
       </summary>
@@ -150,7 +150,7 @@ function AccountGroup({
             <table className="min-w-[50rem] w-full border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-5 py-3 font-bold">Conta</th>
+                  <th className="px-3 py-2 font-bold">Conta</th>
                   <th className="px-4 py-3 font-bold">Tipo</th>
                   <th className="px-4 py-3 font-bold">Atualização</th>
                   <th className="px-4 py-3 text-right font-bold">Saldo atual</th>
@@ -161,7 +161,7 @@ function AccountGroup({
               <tbody className="divide-y divide-slate-100">
                 {accounts.map((account) => (
                   <tr key={account.id} className="hover:bg-emerald-50/40">
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2">
                       <Link
                         href={`/accounts/${account.id}`}
                         className="font-bold text-slate-950 hover:text-emerald-700"
@@ -172,14 +172,14 @@ function AccountGroup({
                         {CONTEXT_LABELS[account.context]}
                       </p>
                     </td>
-                    <td className="px-4 py-4 text-slate-600">
+                    <td className="px-4 py-2 text-slate-600">
                       {ACCOUNT_TYPE_LABELS[account.type]}
                     </td>
-                    <td className="px-4 py-4 text-slate-600">
+                    <td className="px-4 py-2 text-slate-600">
                       {formatDate(account.updated_at)}
                     </td>
                     <td
-                      className={`px-4 py-4 text-right font-extrabold ${
+                      className={`px-4 py-2 text-right font-semibold ${
                         account.current_balance_minor < 0
                           ? "text-rose-700"
                           : "text-slate-950"
@@ -191,7 +191,7 @@ function AccountGroup({
                       )}
                     </td>
                     <td
-                      className={`px-4 py-4 text-right font-extrabold ${
+                      className={`px-4 py-2 text-right font-semibold ${
                         account.projected_balance_minor < 0
                           ? "text-rose-700"
                           : "text-slate-950"
@@ -202,7 +202,7 @@ function AccountGroup({
                         account.currency,
                       )}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-bold ${
@@ -232,7 +232,7 @@ function AccountGroup({
 
           <div className="grid divide-y divide-slate-100 md:hidden">
             {accounts.map((account) => (
-              <article key={account.id} className="grid gap-3 p-5">
+              <article key={account.id} className="grid gap-2 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <Link
@@ -512,7 +512,7 @@ export default async function AccountsPage({
         </Link>
       </nav>
 
-      <div className="grid gap-5">
+      <div className="grid gap-3">
         <AccountGroup
           title="Contas correntes e poupança"
           description="Contas bancárias usadas no dia a dia e reservas."

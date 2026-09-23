@@ -62,7 +62,7 @@ export default async function CreditCardsPage({
         </section>
       ) : null}
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => {
           const nextInvoice = selectNextCreditCardInvoice(
             invoices.filter((invoice) => invoice.credit_card_id === card.id),
@@ -70,7 +70,7 @@ export default async function CreditCardsPage({
           return (
           <article
             key={card.id}
-            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+            className={`rounded-xl border border-slate-200 bg-white p-3 ${
               card.is_active ? "" : "opacity-65"
             }`}
           >
@@ -86,7 +86,7 @@ export default async function CreditCardsPage({
                 {card.is_active ? "Ativo" : "Inativo"}
               </span>
             </div>
-            <dl className="mt-3 grid grid-cols-3 gap-3 border-y border-slate-100 py-3">
+            <dl className="mt-2 grid grid-cols-3 gap-2 border-y border-slate-100 py-2">
               <div>
                 <dt className="text-xs text-slate-500">Próxima fatura</dt>
                 <dd className="mt-0.5 text-sm font-extrabold text-rose-700">
@@ -108,7 +108,7 @@ export default async function CreditCardsPage({
                 </dd>
               </div>
             </dl>
-            <div className="mt-3 flex flex-wrap gap-1">
+            <div className="mt-2 flex flex-wrap gap-1">
               <Link
                 href={`/credit-cards/${card.id}`}
                 className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold"

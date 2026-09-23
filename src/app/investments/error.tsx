@@ -11,7 +11,7 @@ export default function InvestmentsError({
   return (
     <FinancialRouteError
       title="Seus investimentos estão temporariamente indisponíveis"
-      description="Tente carregar novamente. Se o problema continuar, confirme se a migration da Sprint 9 foi aplicada ao Supabase deste ambiente."
+      description="Não conseguimos carregar os dados. Tente novamente em instantes."
       reset={reset}
     />
   );

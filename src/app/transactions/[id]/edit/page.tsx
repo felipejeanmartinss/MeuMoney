@@ -69,6 +69,7 @@ export default async function EditTransactionPage({
             transactionDate: transaction.transaction_date,
             status: transaction.status,
             notes: transaction.notes ?? "",
+            isSubscription: transaction.is_subscription,
           }}
         />
       </section>

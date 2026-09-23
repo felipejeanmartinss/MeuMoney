@@ -193,7 +193,8 @@ export type Transaction = {
   amount_minor: number;
   transaction_date: string;
   status: TransactionStatus;
-  notes: string | null;
+    notes: string | null;
+    is_subscription: boolean;
   is_active: boolean;
   reconciled_at: string | null;
   origin_type: TransactionOriginType;
@@ -212,7 +213,8 @@ export type RecurringTransaction = {
   transaction_type: TransactionType;
   description: string;
   amount_minor: number;
-  is_amount_fixed: boolean;
+    is_amount_fixed: boolean;
+    is_subscription: boolean;
   frequency: RecurrenceFrequency;
   start_date: string;
   end_date: string | null;
@@ -637,6 +639,9 @@ export type FinancingImportJob = {
 };
 
 export type FinancingScheduleEntry = {
+  extra_amortization_minor?: number;
+  installments_reduced?: number;
+  linked_transaction_id?: string | null;
   id: string;
   contract_id: string;
   user_id: string;
@@ -990,6 +995,7 @@ export type Database = {
           transaction_date: string;
           status?: TransactionStatus;
           notes?: string | null;
+          is_subscription?: boolean;
           is_active?: boolean;
           reconciled_at?: string | null;
           origin_type?: TransactionOriginType;
@@ -1024,6 +1030,7 @@ export type Database = {
           description: string;
           amount_minor: number;
           is_amount_fixed?: boolean;
+          is_subscription?: boolean;
           frequency: RecurrenceFrequency;
           start_date: string;
           end_date?: string | null;
@@ -1239,6 +1246,12 @@ export type Database = {
         Row: FinancingContract;
         Insert: never;
         Update: never;
+        Relationships: [];
+      };
+      investment_benchmark_months: {
+        Row: { code: string; reference_month: string; return_percent: number; source: string; synced_at: string };
+        Insert: { code: string; reference_month: string; return_percent: number; source: string; synced_at?: string };
+        Update: { return_percent?: number; source?: string; synced_at?: string };
         Relationships: [];
       };
       financing_schedule_entries: {
@@ -1687,6 +1700,10 @@ export type Database = {
           target_contract: Json;
           target_schedule: Json;
         };
+        Returns: string;
+      };
+      save_financing_contract: {
+        Args: { target_contract_id: string | null; expected_updated_at: string | null; target_contract: Json; target_schedule: Json };
         Returns: string;
       };
       cancel_financing_import: {

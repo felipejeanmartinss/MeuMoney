@@ -706,16 +706,10 @@ function FinancingsView({
       </section>
       <section className="flex flex-wrap gap-2">
         <Link
-          href="/investments/financing-imports/new"
-          className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
-        >
-          Importar PDF do banco
-        </Link>
-        <Link
           href="/investments/financings/new"
           className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
         >
-          Cadastrar manualmente
+          Novo financiamento
         </Link>
       </section>
 
@@ -723,10 +717,10 @@ function FinancingsView({
         <section className="grid gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">
-              Contratos estruturados
+              Contratos
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Indicadores derivados dos extratos financeiros revisados.
+              Pagamentos e saldo do fluxo cadastrado.
             </p>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -749,9 +743,10 @@ function FinancingsView({
                     {contract.status === "active" ? "Ativo" : contract.status === "settled" ? "Quitado" : "Arquivado"}
                   </span>
                 </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                  <div><dt className="text-slate-500">Total pago</dt><dd className="mt-1 font-semibold text-slate-950">{formatMoney(contract.total_paid_minor, contract.currency)}</dd></div>
                   <div><dt className="text-slate-500">Saldo devedor</dt><dd className="mt-1 font-extrabold text-slate-950">{formatMoney(contract.current_balance_minor, contract.currency)}</dd></div>
-                  <div><dt className="text-slate-500">Juros pagos</dt><dd className="mt-1 font-extrabold text-slate-950">{formatMoney(contract.interest_paid_minor, contract.currency)}</dd></div>
+                  <div><dt className="text-slate-500">Parcelas</dt><dd className="mt-1 font-semibold text-slate-950">{contract.paid_installments}/{contract.original_term_months ?? contract.paid_installments + contract.scheduled_installments}</dd></div>
                 </dl>
               </Link>
             ))}
@@ -881,12 +876,12 @@ export default async function InvestmentsPage({
             </Link>
           ) : null}
           <Link
-            href={activeTab === "positions" ? "/investments/new" : "/investments/financing-imports/new"}
+            href={activeTab === "positions" ? "/investments/new" : "/investments/financings/new"}
             className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
           >
             {activeTab === "positions"
               ? "Nova posição"
-              : "Importar financiamento"}
+              : "Novo financiamento"}
           </Link>
         </div>
       } />

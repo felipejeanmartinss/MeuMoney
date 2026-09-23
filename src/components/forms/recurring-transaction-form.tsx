@@ -49,6 +49,7 @@ type RecurringTransactionFormValues = {
   description?: string;
   amountMinor?: string;
   isAmountFixed?: boolean;
+  isSubscription?: boolean;
   frequency?: RecurrenceFrequency;
   startDate?: string;
   endDate?: string;
@@ -252,6 +253,11 @@ export function RecurringTransactionForm({
           />
         </Field>
       </div>
+
+      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+        <input type="checkbox" name="isSubscription" value="true" defaultChecked={values.isSubscription} className="size-4 accent-emerald-700" />
+        Assinatura
+      </label>
 
       <FormMessage tone="info">
         Valores aproximados podem ter data e valor revisados antes da geração.

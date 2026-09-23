@@ -14,6 +14,7 @@ import type {
   FinancialReportBasis,
 } from "@/types/database";
 import { formatFinancialDate } from "@/utils/financial-formatters";
+import { currentIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Visão financeira" };
 
@@ -52,10 +53,17 @@ export default async function DashboardPage({
     params.basis === "cash" ? "cash" : "competence";
   const data = await getFinancialDashboard(referenceMonth, basis);
   const preferredSection = data.currencies[0];
+  const today = currentIsoDate();
+  const monthEnd = new Date(`${today.slice(0, 7)}-01T12:00:00Z`);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+  monthEnd.setUTCDate(0);
+  const includeNextMonth = referenceMonth === today.slice(0, 7) && Number(today.slice(8, 10)) >= monthEnd.getUTCDate() - 6;
+  const nextMonth = new Date(`${referenceMonth}-01T12:00:00Z`); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  const attentionMonths = new Set([referenceMonth, ...(includeNextMonth ? [nextMonth.toISOString().slice(0, 7)] : [])]);
   const attentionItems = preferredSection
     ? [
         ...preferredSection.invoices
-          .filter((invoice) => invoice.effective_status === "overdue")
+          .filter((invoice) => attentionMonths.has(invoice.due_date.slice(0, 7)) && invoice.effective_status === "overdue")
           .slice(0, 2)
           .map((invoice) => ({
             label: `${invoice.credit_card_name}: fatura vencida`,
@@ -81,18 +89,21 @@ export default async function DashboardPage({
             href: `/accounts/${account.id}`,
             tone: "negative" as const,
           })),
-        ...preferredSection.recurrences.slice(0, 1).map((recurrence) => ({
+        ...preferredSection.invoices
+          .filter((invoice) => attentionMonths.has(invoice.due_date.slice(0, 7)) && (invoice.effective_status === "open" || invoice.effective_status === "closed") && invoice.outstanding_amount_minor > 0)
+          .slice(0, 2)
+          .map((invoice) => ({
+            label: `${invoice.credit_card_name}: fatura a pagar`,
+            detail: `Vence em ${formatFinancialDate(invoice.due_date)} · ${formatMoney(invoice.outstanding_amount_minor, invoice.currency, CURRENCY_LOCALES[invoice.currency])}`,
+            href: `/credit-cards/${invoice.credit_card_id}/invoices/${invoice.id}`,
+            tone: "warning" as const,
+          })),
+        ...preferredSection.recurrences.filter((recurrence) => attentionMonths.has(recurrence.next_occurrence.slice(0, 7))).slice(0, 1).map((recurrence) => ({
           label: `Próxima recorrência: ${recurrence.description}`,
           detail: `${formatFinancialDate(recurrence.next_occurrence)} · ${formatMoney(recurrence.amount_minor, recurrence.currency, CURRENCY_LOCALES[recurrence.currency])}`,
           href: "/recurring-transactions",
           tone: "info" as const,
         })),
-        {
-          label: "Confira a qualidade dos seus dados",
-          detail: "Categorias, importações, reconciliações e cotações.",
-          href: "/data-quality",
-          tone: "info" as const,
-        },
       ].slice(0, 5)
     : [];
 
@@ -172,7 +183,7 @@ export default async function DashboardPage({
             {section === preferredSection ? (
       <section aria-labelledby="attention-title" className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="attention-title" className="text-base font-semibold text-slate-950">Sua atenção hoje</h2>
+          <h2 id="attention-title" className="text-base font-semibold text-slate-950">Sua atenção · {formatReferenceMonth(referenceMonth)}{includeNextMonth ? " e próximo mês" : ""}</h2>
           <Link href="/data-quality" className="text-xs font-bold text-emerald-700 hover:underline">Central de qualidade</Link>
         </div>
         {attentionItems.length ? <div className="mt-3 grid gap-2 md:grid-cols-2">{attentionItems.map((item) => <Link key={`${item.href}:${item.label}`} href={item.href} className={`rounded-xl border px-3 py-2.5 transition hover:border-slate-400 ${item.tone === "negative" ? "border-rose-200 bg-rose-50" : item.tone === "warning" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><p className="text-sm font-bold text-slate-950">{item.label}</p><p className="mt-0.5 text-xs text-slate-600">{item.detail}</p></Link>)}</div> : <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Nenhuma ação identificada nos dados disponíveis.</p>}

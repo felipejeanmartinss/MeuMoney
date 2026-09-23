@@ -57,6 +57,7 @@ function normalizeSchedule<T extends FinancingScheduleEntry | FinancingImportSch
 ): T {
   return {
     ...row,
+    extra_amortization_minor: coerceMinorUnits(row.extra_amortization_minor ?? 0),
     total_amount_minor: coerceMinorUnits(row.total_amount_minor),
     principal_minor: coerceMinorUnits(row.principal_minor),
     interest_minor: coerceMinorUnits(row.interest_minor),
@@ -178,7 +179,7 @@ export async function getCurrentUserFinancingImport(id: string) {
 
   return {
     job: jobResult.data ? normalizeJob(jobResult.data) : null,
-    schedule: (scheduleResult.data ?? []).map(normalizeSchedule),
+    schedule: (scheduleResult.data ?? []).map((row) => normalizeSchedule(row)),
     extraAmortizations: (extraResult.data ?? []).map(normalizeExtra),
     hasError: Boolean(jobResult.error || scheduleResult.error || extraResult.error),
   };
@@ -219,6 +220,8 @@ export async function cancelCurrentUserFinancingImport(id: string) {
 
 export async function createCurrentUserManualFinancingContract(
   input: ManualFinancingContractInput,
+  contractId: string | null = null,
+  expectedUpdatedAt: string | null = null,
 ) {
   const { supabase } = await requireUser();
   const contract = {
@@ -241,6 +244,10 @@ export async function createCurrentUserManualFinancingContract(
     cet_annual_rate: input.cetAnnualRate,
   };
   const schedule = input.schedule.map((row, index) => ({
+    id: row.id ?? null,
+    extra_amortization_minor: row.extraAmortizationMinor,
+    installments_reduced: row.installmentsReduced,
+    linked_transaction_id: row.linkedTransactionId,
     source_sequence: index + 1,
     installment_number: row.installmentNumber,
     due_date: row.dueDate,
@@ -262,8 +269,10 @@ export async function createCurrentUserManualFinancingContract(
     source_pages: [],
   }));
   const { data, error } = await supabase.rpc(
-    "create_manual_financing_contract",
+    "save_financing_contract",
     {
+      target_contract_id: contractId,
+      expected_updated_at: expectedUpdatedAt,
       target_contract: contract as unknown as Json,
       target_schedule: schedule as unknown as Json,
     },
@@ -273,7 +282,9 @@ export async function createCurrentUserManualFinancingContract(
     ? {
         ok: false as const,
         message:
-          error?.code === "PGRST202" || error?.code === "42883"
+          error?.message?.includes("financing_conflict") ? "Este contrato mudou em outra aba. Reabra a página antes de salvar."
+          : error?.message?.includes("invalid_financing_link") ? "Revise os lançamentos vinculados: use despesas realizadas na mesma moeda, sem repetir vínculos."
+          : error?.code === "PGRST202" || error?.code === "42883"
             ? "O cadastro histórico ainda não foi habilitado neste ambiente."
             : "Não foi possível cadastrar o histórico do financiamento.",
       }
@@ -298,6 +309,17 @@ export async function listCurrentUserFinancingContracts() {
 
 export async function getCurrentUserFinancingContract(id: string) {
   const { supabase, user } = await requireUser();
+  async function loadSchedule() {
+    const data: FinancingScheduleEntry[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const page = await supabase.from("financing_schedule_entries")
+        .select(`${scheduleColumns}, extra_amortization_minor, installments_reduced, linked_transaction_id`)
+        .eq("user_id", user.id).eq("contract_id", id).order("source_sequence").range(offset, offset + 999);
+      if (page.error) return { data: [], error: page.error };
+      data.push(...page.data);
+      if (page.data.length < 1000) return { data, error: null };
+    }
+  }
   const [contractResult, scheduleResult, extraResult] = await Promise.all([
     supabase
       .from("financing_contract_summaries")
@@ -305,12 +327,7 @@ export async function getCurrentUserFinancingContract(id: string) {
       .eq("user_id", user.id)
       .eq("id", id)
       .maybeSingle(),
-    supabase
-      .from("financing_schedule_entries")
-      .select(scheduleColumns)
-      .eq("user_id", user.id)
-      .eq("contract_id", id)
-      .order("source_sequence"),
+    loadSchedule(),
     supabase
       .from("financing_extra_amortizations")
       .select(extraColumns)
@@ -323,7 +340,7 @@ export async function getCurrentUserFinancingContract(id: string) {
     contract: contractResult.data
       ? normalizeSummary(contractResult.data)
       : null,
-    schedule: (scheduleResult.data ?? []).map(normalizeSchedule),
+    schedule: (scheduleResult.data ?? []).map((row) => normalizeSchedule(row)),
     extraAmortizations: (extraResult.data ?? []).map(normalizeExtra),
     hasError: Boolean(
       contractResult.error || scheduleResult.error || extraResult.error,
