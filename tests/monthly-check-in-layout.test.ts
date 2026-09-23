@@ -30,7 +30,7 @@ describe("monthly check-in presentation", () => {
   it("counts recurrence-only attention and links to each review module", () => {
     const html = render();
     expect(html).toContain("1 etapa para revisar");
-    for (const route of ["/transactions", "/accounts", "/budgets", "/investments/prices", "/dashboard"]) {
+    for (const route of ["/transactions", "/accounts", "/budgets", "/investments/prices"]) {
       expect(html).toContain(`href="${route}"`);
     }
   });

@@ -58,6 +58,7 @@ export default async function EditRecurringTransactionPage({
             description: recurrence.description,
             amountMinor: minorUnitsToInput(recurrence.amount_minor),
             isAmountFixed: recurrence.is_amount_fixed,
+            isSubscription: recurrence.is_subscription,
             frequency: recurrence.frequency,
             startDate: recurrence.start_date,
             endDate: recurrence.end_date ?? "",

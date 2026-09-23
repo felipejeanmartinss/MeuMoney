@@ -199,7 +199,7 @@ async function loadCategoryMonthlyEntries(input: {
       categoryLabel: parent?.name ?? category?.name ?? row.row_name,
       subcategoryKey,
       subcategoryLabel: parent ? category?.name ?? null : null,
-      isFixedExpense: category?.is_fixed_expense ?? false,
+      isFixedExpense: Boolean(category?.is_fixed_expense || parent?.is_fixed_expense),
       referenceMonth: row.reference_month,
       amountMinor: convertedAmount,
     }];

@@ -193,7 +193,8 @@ export type Transaction = {
   amount_minor: number;
   transaction_date: string;
   status: TransactionStatus;
-  notes: string | null;
+    notes: string | null;
+    is_subscription: boolean;
   is_active: boolean;
   reconciled_at: string | null;
   origin_type: TransactionOriginType;
@@ -212,7 +213,8 @@ export type RecurringTransaction = {
   transaction_type: TransactionType;
   description: string;
   amount_minor: number;
-  is_amount_fixed: boolean;
+    is_amount_fixed: boolean;
+    is_subscription: boolean;
   frequency: RecurrenceFrequency;
   start_date: string;
   end_date: string | null;
@@ -993,6 +995,7 @@ export type Database = {
           transaction_date: string;
           status?: TransactionStatus;
           notes?: string | null;
+          is_subscription?: boolean;
           is_active?: boolean;
           reconciled_at?: string | null;
           origin_type?: TransactionOriginType;
@@ -1027,6 +1030,7 @@ export type Database = {
           description: string;
           amount_minor: number;
           is_amount_fixed?: boolean;
+          is_subscription?: boolean;
           frequency: RecurrenceFrequency;
           start_date: string;
           end_date?: string | null;

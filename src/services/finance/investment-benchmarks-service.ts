@@ -49,7 +49,11 @@ export async function getInvestmentBenchmarks(input: { selection: string; from: 
     }
   }
   const [history, cash, references] = await Promise.all([snapshots(), flows(), benchmarks()]);
-  return { positions, hasError: Boolean(positionResult.error || history.error || cash.error || references.error),
+  return { positions,
+    hasPositionError: Boolean(positionResult.error),
+    hasHistoryError: Boolean(history.error || cash.error),
+    hasReferenceError: Boolean(references.error),
+    hasError: Boolean(positionResult.error || history.error || cash.error || references.error),
     latestSync: references.rows.map((row) => row.synced_at).sort().at(-1) ?? null,
     result: compareInvestmentBenchmarks({ months, positions: selected.map((row) => ({ id: row.id, name: row.asset_name, historyIsComplete: row.history_is_complete, currency: row.currency })),
       snapshots: [...history.rows.map((row) => ({ positionId: row.position_id, date: row.position_date, valueMinor: coerceMinorUnits(row.current_value_minor) })),

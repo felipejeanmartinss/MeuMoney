@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { PwaRegistration } from "@/components/pwa/pwa-registration";
 import { TableSortController } from "@/components/tables/table-sort-controller";
+import { PreserveFormScroll } from "@/components/layout/preserve-form-scroll";
+import { Suspense } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,5 +18,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="pt-BR"><body>{children}<TableSortController /><PwaRegistration /></body></html>;
+  return <html lang="pt-BR"><body>{children}<TableSortController /><Suspense fallback={null}><PreserveFormScroll /></Suspense><PwaRegistration /></body></html>;
 }

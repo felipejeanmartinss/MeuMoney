@@ -66,6 +66,7 @@ export const transactionFormSchema = z.object({
     error: "Selecione o status.",
   }),
   notes: optionalText(1000, "Use até 1.000 caracteres."),
+  isSubscription: z.preprocess((value) => value === "true" || value === true, z.boolean()),
 });
 
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>

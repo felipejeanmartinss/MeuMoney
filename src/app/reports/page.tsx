@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { CheckboxFilter } from "@/components/reports/checkbox-filter";
+import { IncomeExpenseColumnChart } from "@/components/reports/income-expense-column-chart";
 import Link from "next/link";
 import {
   deleteSavedFinancialReport,
@@ -57,7 +58,7 @@ const REPORT_GROUPS = [
     reports: ["income-expense", "fixed-expenses", "period-comparison"],
   },
   {
-    label: "Investimentos",
+    label: "Ativos e passivos",
     reports: ["asset-performance", "asset-performance-general"],
   },
   {
@@ -70,7 +71,7 @@ const REPORT_GROUPS = [
 }>;
 
 const inputClass =
-  "min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 
 function currentYear() {
   return Number(
@@ -580,10 +581,21 @@ export default async function ReportsPage({
 
       <nav
         aria-label="Tipos de relatório"
-        className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]"
+        className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2"
       >
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className="px-1 text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Favoritos</span>
+          <div className="flex flex-wrap gap-1.5">
+            {savedReportsResult.reports.length ? savedReportsResult.reports.map((saved) => (
+              <span key={saved.id} className="inline-flex min-h-8 items-center overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50">
+                <Link href={savedReportHref(saved.report_type, saved.filters)} className="px-2.5 py-1 text-xs font-semibold text-emerald-900">{saved.name}</Link>
+                <form action={deleteSavedFinancialReport}><input type="hidden" name="id" value={saved.id} /><button type="submit" aria-label={`Excluir relatório salvo ${saved.name}`} className="min-h-8 border-l border-emerald-200 px-2 text-sm text-rose-700">×</button></form>
+              </span>
+            )) : <span className="px-1 text-xs text-slate-500">Nenhum relatório salvo.</span>}
+          </div>
+        </div>
         {REPORT_GROUPS.map((group) => (
-          <div key={group.label} className="flex min-w-0 flex-col gap-2">
+          <div key={group.label} className="flex min-w-0 flex-col gap-1.5">
             <span className="px-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-slate-500">
               {group.label}
             </span>
@@ -606,34 +618,10 @@ export default async function ReportsPage({
                   </Link>
                 );
               })}
-              {savedReportsResult.reports
-                .filter((saved) =>
-                  (group.reports as readonly string[]).includes(saved.report_type),
-                )
-                .map((saved) => (
-                  <span key={saved.id} className="inline-flex min-h-9 items-center overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50">
-                    <Link
-                      href={savedReportHref(saved.report_type, saved.filters)}
-                      className="px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-                    >
-                      {saved.name}
-                    </Link>
-                    <form action={deleteSavedFinancialReport}>
-                      <input type="hidden" name="id" value={saved.id} />
-                      <button
-                        type="submit"
-                        aria-label={`Excluir relatório salvo ${saved.name}`}
-                        className="min-h-9 border-l border-emerald-200 px-2 text-sm font-black text-rose-700 hover:bg-rose-50"
-                      >
-                        ×
-                      </button>
-                    </form>
-                  </span>
-                ))}
             </div>
           </div>
         ))}
-        <details className="self-end rounded-xl border border-slate-200 bg-slate-50">
+        <details className="self-end rounded-xl border border-slate-200 bg-slate-50 md:col-span-2">
           <summary className="cursor-pointer list-none px-3 py-2 text-xs font-black text-slate-700 marker:hidden">
             + Salvar visualização atual
           </summary>
@@ -898,21 +886,32 @@ async function IncomeExpenseReport({
     allDates: period.period === "all",
   });
   const totals = summarizeIncomeExpenseReport(result.rows);
+  const view = raw.view === "chart" ? "chart" : "table";
+  const viewHref = (target: "chart" | "table") => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(raw)) {
+      for (const item of Array.isArray(value) ? value : value ? [value] : []) query.append(key, item);
+    }
+    query.set("report", "income-expense");
+    query.set("view", target);
+    return `/reports?${query.toString()}`;
+  };
   return (
     <>
       <ReportHeading
         title="Receitas x despesas"
-        description="Valores anuais por grupo, categoria e subcategoria, com totais mensais."
       />
+      <div className="flex items-center gap-1 border-t border-slate-200 px-3 py-2 text-xs font-semibold"><Link href={viewHref("table")} aria-current={view === "table" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${view === "table" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}>Tabela</Link><Link href={viewHref("chart")} aria-current={view === "chart" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${view === "chart" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}>Gráfico</Link></div>
       <details className="group border-t border-slate-200 bg-slate-50">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
           Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
         </summary>
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_150px_auto]"
+        className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-4"
       >
         <input type="hidden" name="report" value="income-expense" />
+        <input type="hidden" name="view" value={view} />
         <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
           Período
           <select name="period" defaultValue={period.period} className={inputClass}>
@@ -925,12 +924,12 @@ async function IncomeExpenseReport({
         <ApplyFiltersButton />
       </form>
       </details>
-      <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
+      <details className="border-t border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-950"><summary className="cursor-pointer font-semibold">Como este relatório calcula os valores</summary><p className="mt-1">
         <strong>
           {filters.basis === "competence" ? "Competência" : "Caixa"}:
         </strong>{" "}
         {reportBasisDescription(filters.basis)}
-      </p>
+      </p></details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice
         currency={filters.currency}
@@ -957,7 +956,7 @@ async function IncomeExpenseReport({
           }
         />
       </div>
-      <MonthlyFinancialMatrix
+      {view === "chart" ? <IncomeExpenseColumnChart rows={result.rows} currency={filters.currency} /> : <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
         drilldownYear={filters.year}
@@ -966,7 +965,7 @@ async function IncomeExpenseReport({
         months={result.months}
         timeGrouping={filters.timeGrouping}
         categoryGrouping={filters.categoryGrouping}
-      />
+      />}
     </>
   );
 }
@@ -1228,12 +1227,12 @@ function ReportHeading({
   description,
 }: {
   title: string;
-  description: string;
+  description?: string;
 }) {
   return (
     <header className="px-4 py-4 sm:px-5">
       <h2 className="text-xl font-black text-slate-950">{title}</h2>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+      {description ? <p className="mt-1 text-sm text-slate-600">{description}</p> : null}
     </header>
   );
 }

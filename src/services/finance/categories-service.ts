@@ -303,7 +303,6 @@ export async function setCurrentUserCategoryFixedExpense(
     .eq("user_id", user.id)
     .eq("id", id)
     .eq("kind", "expense")
-    .not("parent_id", "is", null)
     .select("id")
     .maybeSingle();
 

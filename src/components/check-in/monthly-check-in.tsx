@@ -61,7 +61,6 @@ export function MonthlyCheckIn({
     <main className="app-page max-w-4xl">
       <PageHeader
         title="Check-in"
-        back={{ href: "/dashboard", label: "Início" }}
         actions={
           <form method="get" className="flex w-full items-center gap-2 sm:w-auto">
             <label htmlFor="check-in-month" className="sr-only">Mês do check-in</label>

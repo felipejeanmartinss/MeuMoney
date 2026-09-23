@@ -27,6 +27,7 @@ const transactionInputFrom = (formData: FormData) => ({
   transactionDate: formData.get("transactionDate"),
   status: formData.get("status"),
   notes: formData.get("notes") ?? "",
+  isSubscription: formData.get("isSubscription") === "true",
 });
 
 function revalidateFinancialPaths() {
@@ -43,6 +44,7 @@ function recurringTransactionHref(input: {
   amountMinor: number;
   transactionDate: string;
   notes: string | null;
+  isSubscription: boolean;
 }) {
   const query = new URLSearchParams({
     accountId: input.accountId,
@@ -58,6 +60,7 @@ function recurringTransactionHref(input: {
     }),
   });
   if (input.notes) query.set("notes", input.notes);
+  if (input.isSubscription) query.set("isSubscription", "true");
   return `/recurring-transactions/new?${query.toString()}`;
 }
 

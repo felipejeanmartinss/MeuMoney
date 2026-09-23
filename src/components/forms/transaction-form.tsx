@@ -57,6 +57,7 @@ type TransactionFormValues = {
   transactionDate?: string;
   status?: TransactionStatus;
   notes?: string;
+  isSubscription?: boolean;
 };
 
 const initialState: FinancialFormState = { status: "idle" };
@@ -301,6 +302,11 @@ export function TransactionForm({
           aria-invalid={Boolean(state.fieldErrors?.notes)}
         />
       </Field>
+
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" name="isSubscription" value="true" defaultChecked={values.isSubscription} className="size-4 accent-emerald-700" />
+          Assinatura
+        </label>
 
         <label
           className={`flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 ${compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm"} font-semibold text-slate-700`}

@@ -130,6 +130,9 @@ describe("recurring transaction generation", () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) expect(parsed.data.amountMinor).toBe(150000);
     if (parsed.success) expect(parsed.data.isAmountFixed).toBe(true);
+    if (parsed.success) expect(parsed.data.isSubscription).toBe(false);
+    const subscription = recurringTransactionFormSchema.safeParse({ ...validBase, isSubscription: true });
+    expect(subscription.success && subscription.data.isSubscription).toBe(true);
 
     const approximate = recurringTransactionFormSchema.safeParse({
       ...validBase,
