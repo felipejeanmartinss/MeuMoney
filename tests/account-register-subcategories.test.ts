@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   accountRegisterReconciliationSchema,
+  accountRegisterMatchesBalance,
   buildAccountRegister,
   canReconcileAccountEntry,
   summarizeAccountRegisterBalances,
@@ -201,6 +202,33 @@ describe("account register and subcategories", () => {
       ["overdue-pending", false],
     ]);
     expect(register[0]?.runningBalanceMinor).toBe(10_000);
+  });
+
+  it("rejects an incomplete register rather than displaying a false balance", () => {
+    const calculated = summarizeAccountRegisterBalances(
+      [entry({ id: "transfer", transactionDate: "2026-09-01", direction: "outflow", amountMinor: 2_000 })],
+      5_000,
+      "2026-09-22",
+    );
+    expect(accountRegisterMatchesBalance(calculated, {
+      current_balance_minor: 3_000,
+      projected_balance_minor: 3_000,
+    })).toBe(true);
+    expect(accountRegisterMatchesBalance(calculated, {
+      current_balance_minor: 8_000,
+      projected_balance_minor: 8_000,
+    })).toBe(false);
+  });
+
+  it("does not make the account statement depend on subscription flags or secondary tabs", () => {
+    const service = readFileSync(resolve("src/services/finance/accounts-service.ts"), "utf8");
+    const page = readFileSync(resolve("src/app/accounts/[id]/page.tsx"), "utf8");
+    expect(service).not.toContain("notes, is_subscription, is_active");
+    expect(service).not.toContain('.from("import_jobs")');
+    expect(service).not.toContain('.from("recurring_transactions")');
+    expect(page).not.toContain('activeTab === "recurrences"');
+    expect(page).not.toContain('activeTab === "import"');
+    expect(page).toContain("result.statementHasError");
   });
 
   it("renders the full category path and restricts eligible parents", () => {

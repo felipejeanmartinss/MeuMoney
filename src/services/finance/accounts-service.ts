@@ -1,6 +1,7 @@
 import "server-only";
 import {
   buildAccountRegister,
+  accountRegisterMatchesBalance,
   summarizeAccountRegisterBalances,
   type AccountRegisterSourceEntry,
 } from "@/domain/account-register";
@@ -58,19 +59,20 @@ export async function getCurrentUserAccountHub(id: string) {
   const { supabase, user } = await requireUser();
 
   async function getAllAccountTransactions() {
-    const rows: Transaction[] = [];
+    const rows: Omit<Transaction, "is_subscription">[] = [];
     const pageSize = 1000;
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabase
         .from("transactions")
         .select(
-          "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_subscription, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
+          "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
         )
         .eq("user_id", user.id)
         .eq("account_id", id)
         .eq("is_active", true)
         .order("transaction_date", { ascending: true })
         .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) return { data: rows, error };
       rows.push(...(data ?? []));
@@ -92,6 +94,7 @@ export async function getCurrentUserAccountHub(id: string) {
         .eq("is_active", true)
         .order("transaction_date", { ascending: true })
         .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) return { data: rows, error };
       rows.push(...(data ?? []));
@@ -106,8 +109,6 @@ export async function getCurrentUserAccountHub(id: string) {
     transfersResult,
     accountsResult,
     creditCardsResult,
-    recurrencesResult,
-    importsResult,
     categoriesResult,
     categoryGroupsResult,
     investmentLinksResult,
@@ -137,25 +138,6 @@ export async function getCurrentUserAccountHub(id: string) {
       .from("credit_cards")
       .select("id, name")
       .eq("user_id", user.id),
-    supabase
-      .from("recurring_transactions")
-      .select(
-        "id, user_id, account_id, category_id, transaction_type, description, amount_minor, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at",
-      )
-      .eq("user_id", user.id)
-      .eq("account_id", id)
-      .is("ended_at", null)
-      .order("next_occurrence")
-      .limit(50),
-    supabase
-      .from("import_jobs")
-      .select(
-        "id, user_id, account_id, file_name, file_type, source_adapter_id, source_document_type, status, source_row_count, valid_row_count, duplicate_row_count, imported_row_count, original_file_discarded_at, confirmed_at, cancelled_at, created_at, updated_at",
-      )
-      .eq("user_id", user.id)
-      .eq("account_id", id)
-      .order("created_at", { ascending: false })
-      .limit(20),
     supabase
       .from("categories")
       .select(
@@ -299,18 +281,34 @@ export async function getCurrentUserAccountHub(id: string) {
     openingBalanceMinor,
     asOfDate,
   );
-  const balanceSummary = summarizeAccountRegisterBalances(
+  const calculatedBalanceSummary = summarizeAccountRegisterBalances(
     registerSource,
     openingBalanceMinor,
     asOfDate,
+  );
+  const balanceSummary = accountResult.data
+    ? {
+        asOfDate,
+        currentBalanceMinor: accountResult.data.current_balance_minor,
+        projectedBalanceMinor: accountResult.data.projected_balance_minor,
+      }
+    : calculatedBalanceSummary;
+  const statementHasError = Boolean(
+    accountResult.error ||
+      transactionsResult.error ||
+      transferEntriesResult.error ||
+      (accountResult.data &&
+        !accountRegisterMatchesBalance(
+          calculatedBalanceSummary,
+          accountResult.data,
+        )),
   );
 
   return {
     account: accountResult.data,
     registerEntries,
     balanceSummary,
-    recurrences: recurrencesResult.data ?? [],
-    imports: importsResult.data ?? [],
+    statementHasError,
     categories,
     hasError: Boolean(
       accountResult.error ||
@@ -319,11 +317,9 @@ export async function getCurrentUserAccountHub(id: string) {
         transfersResult.error ||
         accountsResult.error ||
         creditCardsResult.error ||
-        recurrencesResult.error ||
-      importsResult.error ||
-      categoriesResult.error ||
-      categoryGroupsResult.error ||
-      investmentLinksResult.error,
+        categoriesResult.error ||
+        categoryGroupsResult.error ||
+        investmentLinksResult.error,
     ),
   };
 }
