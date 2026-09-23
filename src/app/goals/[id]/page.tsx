@@ -1,0 +1,35 @@
+import { PageHeader } from "@/components/layout/page-header";
+import { notFound } from "next/navigation";
+import { GoalContributionForm } from "@/components/forms/financial-goal-form";
+import { linkGoalSource, unlinkGoalSource } from "@/app/actions/financial-goals";
+import { FINANCIAL_GOAL_STATUS_LABELS } from "@/domain/financial-goals";
+import { formatMoney } from "@/domain/money";
+import { listCurrentUserFinancialGoals } from "@/services/finance/financial-goals-service";
+import { formatIsoDatePtBr } from "@/utils/dates";
+
+export const metadata = { title: "Detalhe da meta" };
+
+const sourceLabels = { account: "Conta", investment: "Investimento", financing: "Financiamento" } as const;
+
+export default async function GoalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ message?: string }> }) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const data = await listCurrentUserFinancialGoals();
+  const goal = data.goals.find((item) => item.id === id);
+  if (!goal) notFound();
+  const availableSources = data.sourceOptions.filter((source) => !source.linked);
+  const messages: Record<string, string> = { created: "Meta criada com sucesso.", contribution: "Contribuição registrada.", linked: "Fonte vinculada.", unlinked: "Vínculo removido.", "link-error": "Não foi possível atualizar os vínculos." };
+  return (
+    <main className="app-page max-w-[1280px]">
+      <PageHeader title={goal.name} back={{ href: "/goals", label: "Metas" }}
+        description={`Prazo ${formatIsoDatePtBr(goal.target_date)} · ${FINANCIAL_GOAL_STATUS_LABELS[goal.status]}`}
+        actions={<span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800">{goal.progress.percentage}% concluída</span>}
+      />
+      {query.message && messages[query.message] ? <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{messages[query.message]}</div> : null}
+      <section className="grid gap-4 sm:grid-cols-3"><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Acumulado</p><p className="mt-2 text-2xl font-black text-emerald-700">{formatMoney(goal.accumulated_amount_minor, goal.currency)}</p><p className="mt-1 text-xs text-slate-500">de {formatMoney(goal.target_amount_minor, goal.currency)}</p></article><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Falta atingir</p><p className="mt-2 text-2xl font-black text-slate-950">{formatMoney(goal.progress.remainingAmountMinor, goal.currency)}</p><p className="mt-1 text-xs text-slate-500">{goal.progress.isOverdue ? "Prazo ultrapassado" : `${goal.progress.monthsRemaining + 1} meses pela frente`}</p></article><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Contribuição necessária</p><p className="mt-2 text-2xl font-black text-slate-950">{formatMoney(goal.progress.monthlyContributionMinor, goal.currency)}</p><p className="mt-1 text-xs text-slate-500">por mês até o prazo</p></article></section>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-5"><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-center justify-between"><h2 className="text-lg font-black text-slate-950">Fontes vinculadas</h2><span className="text-sm text-slate-500">{goal.sources.length}</span></div><div className="mt-4 grid gap-2">{goal.sources.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Nenhuma conta ou investimento vinculado ainda.</p> : goal.sources.map((source) => { const link = goal.links.find((item) => item.source_type === source.sourceType && (item.account_id ?? item.investment_position_id ?? item.financing_contract_id) === source.sourceId); return <div key={`${source.sourceType}:${source.sourceId}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3"><div><p className="text-sm font-bold text-slate-900">{source.name}</p><p className="text-xs text-slate-500">{sourceLabels[source.sourceType]} · {formatMoney(source.amountMinor, source.currency)}{source.sourceType === "financing" ? " de saldo restante" : ""}</p></div><form action={unlinkGoalSource}><input type="hidden" name="goalId" value={goal.id} /><input type="hidden" name="linkId" value={link?.id ?? ""} /><button className="min-h-11 px-2 text-xs font-bold text-red-700 hover:text-red-900">Remover</button></form></div>; })}</div></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-black text-slate-950">Registrar contribuição</h2><p className="mt-1 text-sm text-slate-500">Use para aportes que ainda não estão refletidos em uma fonte vinculada.</p><div className="mt-4"><GoalContributionForm goalId={goal.id} currency={goal.currency} /></div></section></div>
+        <aside className="grid h-fit gap-5"><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-black text-slate-950">Vincular fonte</h2><p className="mt-1 text-sm text-slate-500">O saldo atual será convertido para a moeda da meta.</p><div className="mt-4 grid gap-2">{availableSources.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Todas as fontes ativas já estão vinculadas.</p> : availableSources.map((source) => <form key={`${source.sourceType}:${source.sourceId}`} action={linkGoalSource} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2"><div><p className="text-sm font-bold text-slate-900">{source.name}</p><p className="text-xs text-slate-500">{sourceLabels[source.sourceType]} · {formatMoney(source.amountMinor, source.currency)}</p></div><input type="hidden" name="goalId" value={goal.id} /><input type="hidden" name="sourceType" value={source.sourceType} /><input type="hidden" name="sourceId" value={source.sourceId} /><button className="min-h-11 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800">Vincular</button></form>)}</div></section><section className="rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white"><h2 className="text-lg font-black">Histórico recente</h2><div className="mt-4 grid gap-3">{goal.contributions.slice(0, 5).map((contribution) => <div key={contribution.id} className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 text-sm"><div><p className="font-bold">{contribution.description || "Contribuição"}</p><p className="text-xs text-slate-400">{formatIsoDatePtBr(contribution.contribution_date)}</p></div><span className="font-bold text-emerald-300">+{formatMoney(contribution.amount_minor, contribution.currency)}</span></div>)}{goal.contributions.length === 0 ? <p className="text-sm text-slate-400">Nenhuma contribuição manual registrada.</p> : null}</div></section></aside>
+      </div>
+    </main>
+  );
+}

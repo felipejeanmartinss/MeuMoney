@@ -13,13 +13,17 @@ export type NavigationIcon =
   | "imports"
   | "security"
   | "financing"
-  | "reports";
+  | "reports"
+  | "target"
+  | "checkin";
 
 export type NavigationItem = {
   href: string;
   label: string;
   icon: NavigationIcon;
   match: readonly string[];
+  exclude?: readonly string[];
+  group?: string;
 };
 
 export type NavigationSection =
@@ -39,6 +43,20 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     label: "Início",
     icon: "home",
     match: ["/dashboard"],
+  },
+  {
+    section: "home",
+    href: "/check-in",
+    label: "Check-in",
+    icon: "checkin",
+    match: ["/check-in"],
+  },
+  {
+    section: "home",
+    href: "/goals",
+    label: "Metas",
+    icon: "target",
+    match: ["/goals"],
   },
   {
     section: "accounts",
@@ -71,7 +89,7 @@ export const MAIN_NAVIGATION: ReadonlyArray<
   },
   {
     section: "reports",
-    href: "/reports",
+    href: "/reports?report=income-expense",
     label: "Relatórios",
     icon: "reports",
     match: ["/reports"],
@@ -81,12 +99,12 @@ export const MAIN_NAVIGATION: ReadonlyArray<
     href: "/settings",
     label: "Perfil",
     icon: "profile",
-    match: ["/settings", "/imports"],
+    match: ["/settings", "/imports", "/data-quality"],
   },
 ];
 
 export const SECONDARY_NAVIGATION: Record<
-  Exclude<NavigationSection, "home" | "net-worth" | "reports">,
+  Exclude<NavigationSection, "home" | "net-worth">,
   readonly NavigationItem[]
 > = {
   accounts: [
@@ -127,13 +145,36 @@ export const SECONDARY_NAVIGATION: Record<
       label: "Posições",
       icon: "investments",
       match: ["/investments"],
+      exclude: ["/investments/prices", "/investments/benchmarks", "/investments/financing-imports", "/investments/financings"],
+    },
+    {
+      href: "/investments/prices",
+      label: "Cotações",
+      icon: "investments",
+      match: ["/investments/prices"],
+    },
+    {
+      href: "/investments/benchmarks",
+      label: "Benchmarks",
+      icon: "reports",
+      match: ["/investments/benchmarks"],
     },
     {
       href: "/investments?tab=financing",
       label: "Financiamentos",
       icon: "financing",
-      match: [],
+      match: ["/investments/financing-imports", "/investments/financings"],
     },
+  ],
+  reports: [
+    { href: "/reports?area=favorites", label: "Favoritos", icon: "reports", match: [], group: "Favoritos" },
+    { href: "/reports?report=income-expense", label: "Receitas x despesas", icon: "reports", match: [], group: "Receitas e despesas" },
+    { href: "/reports?report=fixed-expenses", label: "Despesas fixas", icon: "reports", match: [] },
+    { href: "/reports?report=period-comparison", label: "Comparativo entre períodos", icon: "reports", match: [] },
+    { href: "/reports?report=asset-performance", label: "Performance (ativos)", icon: "reports", match: [], group: "Ativos e passivos" },
+    { href: "/reports?report=asset-performance-general", label: "Performance (geral)", icon: "reports", match: [] },
+    { href: "/reports?report=net-worth-evolution", label: "Evolução patrimonial", icon: "reports", match: [], group: "Patrimônio" },
+    { href: "/reports?report=cash-flow-forecast", label: "Projeção de fluxo de caixa", icon: "reports", match: [] },
   ],
   profile: [
     {
@@ -147,6 +188,12 @@ export const SECONDARY_NAVIGATION: Record<
       label: "Importações",
       icon: "imports",
       match: ["/imports"],
+    },
+    {
+      href: "/data-quality",
+      label: "Qualidade dos dados",
+      icon: "security",
+      match: ["/data-quality"],
     },
     {
       href: "/settings/security",
@@ -174,26 +221,35 @@ export function isNavigationItemActive(
   item: NavigationItem,
   searchParams = "",
 ) {
+  if (item.exclude?.some((prefix) => matchesPath(pathname, prefix))) return false;
   if (item.href.includes("?")) {
     const [path, query] = item.href.split("?");
-    return pathname === path && searchParams === query;
+    const actual = new URLSearchParams(searchParams);
+    return (pathname === path && [...new URLSearchParams(query)].every(
+      ([key, value]) => actual.get(key) === value,
+    )) || item.match.some((prefix) => matchesPath(pathname, prefix));
   }
   if (
     item.href === "/investments" &&
     pathname === "/investments" &&
-    searchParams === "tab=financing"
+    item.label === "Posições" &&
+    new URLSearchParams(searchParams).get("tab") === "financing"
   ) {
     return false;
   }
   return item.match.some((prefix) => matchesPath(pathname, prefix));
 }
 
+// Keep one row of reachable destinations on narrow screens; the menu holds all routes.
+export const MOBILE_NAVIGATION = MAIN_NAVIGATION.filter((item) =>
+  ["/dashboard", "/check-in", "/goals", "/accounts", "/investments"].includes(item.href),
+);
+
 export function secondaryNavigationFor(pathname: string) {
   const section = resolveNavigationSection(pathname);
   if (
     section === "home" ||
-    section === "net-worth" ||
-    section === "reports"
+    section === "net-worth"
   ) {
     return [];
   }

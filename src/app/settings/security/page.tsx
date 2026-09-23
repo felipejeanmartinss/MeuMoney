@@ -2,7 +2,6 @@ import { AccountDeletionForm } from "@/components/forms/account-deletion-form";
 import { BackupRestoreForm } from "@/components/forms/backup-restore-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { listCriticalOperations } from "@/services/security/personal-data-service";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Segurança e dados" };
@@ -22,15 +21,9 @@ export default async function SecurityPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto grid max-w-4xl gap-7 px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto grid max-w-4xl gap-5 px-4 py-6 sm:px-6">
         <header>
-          <Link
-            href="/settings"
-            className="text-sm font-bold text-emerald-700 hover:underline"
-          >
-            ← Voltar para Perfil
-          </Link>
-          <p className="mt-6 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
             Segurança e dados
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">

@@ -28,7 +28,19 @@ describe("Sprint 3 financial movement validation", () => {
     });
 
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.amountMinor).toBe(123456);
+    if (result.success) {
+      expect(result.data.amountMinor).toBe(123456);
+      expect(result.data.isSubscription).toBe(false);
+    }
+  });
+
+  it("keeps an explicit subscription marker on account entries", () => {
+    const result = transactionFormSchema.safeParse({
+      accountId: accountA, categoryId: category, transactionType: "expense",
+      description: "Streaming", amountMinor: "29,90", transactionDate: "2026-07-23",
+      status: "completed", notes: "", isSubscription: "true",
+    });
+    expect(result.success && result.data.isSubscription).toBe(true);
   });
 
   it("rejects zero, negative values, impossible dates and invalid statuses", () => {

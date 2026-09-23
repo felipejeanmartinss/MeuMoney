@@ -1,5 +1,9 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
-import { deleteTransaction } from "@/app/actions/transactions";
+import {
+  clearInactiveAutomaticTransactions,
+  deleteTransaction,
+} from "@/app/actions/transactions";
 import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import { inputClass } from "@/components/forms/form-control-styles";
 import { CURRENCY_LOCALES } from "@/domain/currencies";
@@ -26,6 +30,7 @@ const messages: Record<string, string> = {
   updated: "Lançamento atualizado com sucesso.",
   deleted: "Lançamento excluído com sucesso.",
   "delete-error": "Não foi possível excluir o lançamento.",
+  "inactive-automatic-cleared": "Lançamentos automáticos inativos removidos.",
 };
 
 export default async function TransactionsPage({
@@ -43,7 +48,7 @@ export default async function TransactionsPage({
   const parsedFilters = transactionFiltersSchema.safeParse(singleParams);
   const filters = parsedFilters.success
     ? parsedFilters.data
-    : { activity: "active" as const };
+    : { activity: "active" as const, uncategorized: false };
   const { transactions, accounts, categories, groups, hasError } =
     await listCurrentUserTransactions(filters);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
@@ -54,21 +59,16 @@ export default async function TransactionsPage({
     typeof rawParams.message === "string" ? rawParams.message : undefined;
   const feedback = messageCode ? messages[messageCode] : undefined;
   const feedbackIsError = messageCode === "delete-error";
+  const unclassifiedCount = transactions.filter(
+    (transaction) =>
+      transaction.is_active &&
+      transaction.origin_type === "manual" &&
+      !transaction.category_id,
+  ).length;
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
-            Fluxo financeiro
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-            Lançamentos
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Registre receitas e despesas previstas ou realizadas.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Lançamentos" actions={
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
             href="/transfers"
@@ -83,7 +83,7 @@ export default async function TransactionsPage({
             Novo lançamento
           </Link>
         </div>
-      </div>
+      } />
 
       {feedback ? (
         <p
@@ -98,7 +98,43 @@ export default async function TransactionsPage({
         </p>
       ) : null}
 
+      {(filters.activity === "inactive" || filters.activity === "all") &&
+      transactions.some(
+        (transaction) =>
+          !transaction.is_active && transaction.origin_type === "system",
+      ) ? (
+        <form
+          action={clearInactiveAutomaticTransactions}
+          className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <p className="text-sm text-amber-950">
+            Há previsões automáticas inativas que já não afetam saldos.
+          </p>
+          <ConfirmSubmitButton
+            confirmation="Excluir definitivamente todos os lançamentos automáticos inativos?"
+            className="min-h-9 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold text-amber-900"
+          >
+            Limpar automáticos inativos
+          </ConfirmSubmitButton>
+        </form>
+      ) : null}
+
+      {unclassifiedCount > 0 && !filters.uncategorized ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-950">
+            {unclassifiedCount} lançamento{unclassifiedCount === 1 ? "" : "s"} sem categoria precisa{unclassifiedCount === 1 ? "" : "m"} de revisão.
+          </p>
+          <Link
+            href="/transactions?uncategorized=true"
+            className="inline-flex min-h-10 items-center rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold text-amber-900 hover:bg-amber-100"
+          >
+            Revisar sem categoria
+          </Link>
+        </div>
+      ) : null}
+
       <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        {filters.uncategorized ? <input type="hidden" name="uncategorized" value="true" /> : null}
         <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
           Tipo
           <select
@@ -223,7 +259,7 @@ export default async function TransactionsPage({
         </section>
       ) : null}
 
-      <section className="grid gap-3">
+      <section className="grid gap-1.5">
         {transactions.map((transaction) => {
           const account = accountById.get(transaction.account_id);
           const category = transaction.category_id
@@ -236,15 +272,16 @@ export default async function TransactionsPage({
           return (
             <article
               key={transaction.id}
-              className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${
+              className={`rounded-xl border border-slate-200 bg-white px-3 py-2 ${
                 transaction.is_active ? "" : "opacity-65"
               }`}
             >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <h2 className="mr-1 truncate text-sm font-semibold text-slate-950">{transaction.description}</h2>
                     <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
                         income
                           ? "bg-emerald-100 text-emerald-800"
                           : "bg-rose-100 text-rose-800"
@@ -252,24 +289,22 @@ export default async function TransactionsPage({
                     >
                       {TRANSACTION_TYPE_LABELS[transaction.transaction_type]}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
                       {TRANSACTION_STATUS_LABELS[transaction.status]}
                     </span>
                     {!transaction.is_active ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                         Inativo
                       </span>
                     ) : null}
                     {transaction.reconciled_at ? (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
                         Reconciliado
                       </span>
                     ) : null}
+                    {transaction.is_subscription ? <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800">Assinatura</span> : null}
                   </div>
-                  <h2 className="mt-2 truncate text-lg font-bold text-slate-950">
-                    {transaction.description}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 truncate text-xs text-slate-600">
                     {account?.name ?? "Conta indisponível"} ·{" "}
                     {isTechnical
                       ? isRecurring
@@ -287,7 +322,7 @@ export default async function TransactionsPage({
                   </p>
                 </div>
                 <p
-                  className={`shrink-0 text-xl font-extrabold ${
+                  className={`shrink-0 text-sm font-semibold tabular-nums ${
                     income ? "text-emerald-700" : "text-rose-700"
                   }`}
                 >
@@ -299,9 +334,9 @@ export default async function TransactionsPage({
                   )}
                 </p>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
                 {isTechnical && transaction.origin_type !== "system" ? (
-                  <span className="text-sm font-semibold text-slate-500">
+                  <span className="text-xs text-slate-500">
                     {isRecurring
                       ? "Gerenciado pela recorrência"
                       : "Gerenciado pela fatura"}
@@ -311,7 +346,7 @@ export default async function TransactionsPage({
                     <input type="hidden" name="id" value={transaction.id} />
                     <ConfirmSubmitButton
                       confirmation={`Excluir definitivamente o lançamento automático “${transaction.description}”?`}
-                      className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      className="min-h-7 rounded-lg px-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                     >
                       Excluir automático
                     </ConfirmSubmitButton>
@@ -320,7 +355,7 @@ export default async function TransactionsPage({
                   <>
                     <Link
                       href={`/transactions/${transaction.id}/edit`}
-                      className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       Editar
                     </Link>
@@ -328,7 +363,7 @@ export default async function TransactionsPage({
                       <input type="hidden" name="id" value={transaction.id} />
                       <ConfirmSubmitButton
                         confirmation={`Excluir definitivamente “${transaction.description}”?`}
-                        className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        className="min-h-7 rounded-lg px-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                       >
                         Excluir
                       </ConfirmSubmitButton>

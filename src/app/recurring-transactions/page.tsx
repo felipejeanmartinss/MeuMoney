@@ -1,18 +1,26 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   changeRecurringTransactionState,
   generateRecurringTransactions,
 } from "@/app/actions/recurring-transactions";
 import { inputClass } from "@/components/forms/form-control-styles";
-import { CURRENCY_LOCALES } from "@/domain/currencies";
-import { formatMoney } from "@/domain/money";
 import {
+  RecurrenceCalendar,
+  type RecurrenceCalendarEvent,
+} from "@/components/recurrences/recurrence-calendar";
+import { CURRENCY_LOCALES } from "@/domain/currencies";
+import { sumAmountsByCurrency } from "@/domain/currency-totals";
+import { formatMoney, minorUnitsToInput } from "@/domain/money";
+import {
+  collectDueRecurrenceDates,
+  RECURRENCE_AMOUNT_MODE_LABELS,
   RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
 import { getCategoryQualifiedName } from "@/domain/categories";
 import { TRANSACTION_TYPE_LABELS } from "@/domain/transactions";
-import { listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
+import { getSubscriptionOverview, listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
 import type {
   RecurringTransactionState,
   SupportedCurrency,
@@ -49,6 +57,16 @@ function defaultGenerationDate() {
 
 function currentReferenceMonth() {
   return toIsoDate(new Date()).slice(0, 7);
+}
+
+function referenceMonthEnd(referenceMonth: string) {
+  const [year, month] = referenceMonth.split("-").map(Number);
+  const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${referenceMonth}-${String(day).padStart(2, "0")}`;
+}
+
+function stableColorIndex(value: string) {
+  return [...value].reduce((total, character) => total + character.charCodeAt(0), 0) % 6;
 }
 
 function CurrencyAmounts({
@@ -146,6 +164,7 @@ export default async function RecurringTransactionsPage({
     hasError,
   } =
     await listCurrentUserRecurringTransactions();
+  const subscriptionOverview = await getSubscriptionOverview();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
@@ -162,6 +181,15 @@ export default async function RecurringTransactionsPage({
   const today = toIsoDate(new Date());
   const timelineMonth =
     period && /^\d{4}-\d{2}$/.test(period) ? period : currentReferenceMonth();
+  const groupFilter = asString(rawParams.group) === "recurrence" ? "recurrence" : "subscription";
+  const groupRows = [
+    ...recurrences.filter((item) => recurrenceState(item) === "active" && item.transaction_type === "expense" && item.is_subscription === (groupFilter === "subscription")).map((item) => {
+      const account = accountById.get(item.account_id);
+      return { id: item.id, name: item.description, source: account?.name ?? "Conta", currency: (account?.currency ?? "BRL") as SupportedCurrency, amountMinor: item.amount_minor, detail: RECURRENCE_FREQUENCY_LABELS[item.frequency], href: `/recurring-transactions/${item.id}/edit` };
+    }),
+    ...(groupFilter === "subscription" ? subscriptionOverview.rows.map((item) => ({ ...item, detail: item.kind === "card" ? "Cartão" : "Lançamento na conta" })) : []),
+  ];
+  const groupTotals = sumAmountsByCurrency(groupRows);
 
   const filtered = recurrences.filter((recurrence) => {
     const state = recurrenceState(recurrence);
@@ -193,13 +221,55 @@ export default async function RecurringTransactionsPage({
     target.set(currency, (target.get(currency) ?? 0) + recurrence.amount_minor);
   }
 
-  const timeline = filtered
-    .filter((recurrence) =>
-      recurrence.next_occurrence.startsWith(timelineMonth),
-    )
+  const timelineStart = `${timelineMonth}-01`;
+  const timelineEnd = referenceMonthEnd(timelineMonth);
+  const timelineEvents = recurrences
+    .filter((recurrence) => {
+      const state = recurrenceState(recurrence);
+      return (
+        state === "active" &&
+        (!accountFilter || recurrence.account_id === accountFilter) &&
+        (!typeFilter || recurrence.transaction_type === typeFilter) &&
+        (!stateFilter || state === stateFilter)
+      );
+    })
+    .flatMap((recurrence) => {
+      if (recurrence.next_occurrence > timelineEnd) return [];
+      const account = accountById.get(recurrence.account_id);
+      const currency =
+        (account?.currency as SupportedCurrency | undefined) ?? "BRL";
+      const dates = collectDueRecurrenceDates({
+        startDate: recurrence.start_date,
+        nextOccurrence: recurrence.next_occurrence,
+        endDate: recurrence.end_date,
+        frequency: recurrence.frequency,
+        targetDate: timelineEnd,
+      }).dueDates.filter((date) => date >= timelineStart);
+      return dates.map(
+        (date): RecurrenceCalendarEvent => ({
+          id: `${recurrence.id}:${date}`,
+          date,
+          description: recurrence.description,
+          accountName: account?.name ?? "Conta indisponível",
+          amountLabel: formatMoney(
+            recurrence.amount_minor,
+            currency,
+            CURRENCY_LOCALES[currency],
+          ),
+          transactionType: recurrence.transaction_type,
+          colorIndex: stableColorIndex(recurrence.account_id),
+        }),
+      );
+    })
     .sort((left, right) =>
-      left.next_occurrence.localeCompare(right.next_occurrence),
+      left.date.localeCompare(right.date) ||
+      left.description.localeCompare(right.description, "pt-BR"),
     );
+  const reviewableRecurrences = recurrences.filter(
+    (recurrence) =>
+      recurrenceState(recurrence) === "active" &&
+      !recurrence.is_amount_fixed,
+  );
   const messageCode = asString(rawParams.message);
   const rawCount = Number(asString(rawParams.count) ?? 0);
   const generatedCount =
@@ -214,27 +284,15 @@ export default async function RecurringTransactionsPage({
     messageCode === "status-error" || messageCode === "generation-error";
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Agenda financeira
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Recorrências
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Acompanhe compromissos futuros e gere previsões sem alterar o saldo
-            realizado.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Recorrências" actions={
         <Link
           href="/recurring-transactions/new"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
           Nova recorrência
         </Link>
-      </header>
+      } />
 
       {feedback ? (
         <p
@@ -361,7 +419,7 @@ export default async function RecurringTransactionsPage({
         </div>
         <form
           action={generateRecurringTransactions}
-          className="grid gap-2 sm:grid-cols-[auto_auto] sm:items-end"
+          className="grid gap-2 sm:min-w-[390px] sm:grid-cols-[1fr_auto] sm:items-end"
         >
           <label className="grid gap-1 text-sm font-bold text-emerald-950">
             Gerar até
@@ -376,6 +434,61 @@ export default async function RecurringTransactionsPage({
           <button className="min-h-11 rounded-xl bg-emerald-800 px-4 font-bold text-white hover:bg-emerald-900">
             Gerar previstos
           </button>
+          {reviewableRecurrences.length ? (
+            <details className="sm:col-span-2 rounded-xl border border-emerald-300 bg-white/80">
+              <summary className="cursor-pointer list-none px-3 py-2 text-xs font-extrabold text-emerald-950 marker:hidden">
+                Revisar valores aproximados ({reviewableRecurrences.length})
+              </summary>
+              <div className="grid max-h-64 gap-3 overflow-auto border-t border-emerald-200 p-3">
+                {reviewableRecurrences.map((recurrence) => {
+                  const account = accountById.get(recurrence.account_id);
+                  return (
+                    <fieldset
+                      key={recurrence.id}
+                      className="grid gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[1fr_9rem_9rem]"
+                    >
+                      <legend className="px-1 text-xs font-bold text-slate-800">
+                        {recurrence.description} · {account?.name}
+                      </legend>
+                      <input
+                        type="hidden"
+                        name="reviewRecurringId"
+                        value={recurrence.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="reviewScheduledDate"
+                        value={recurrence.next_occurrence}
+                      />
+                      <p className="self-center text-xs text-slate-500">
+                        Próxima previsão aproximada
+                      </p>
+                      <label className="grid gap-1 text-[0.68rem] font-bold text-slate-600">
+                        Data
+                        <input
+                          className="h-9 rounded-lg border border-slate-300 px-2 text-xs"
+                          type="date"
+                          name="reviewTransactionDate"
+                          defaultValue={recurrence.next_occurrence}
+                          required
+                        />
+                      </label>
+                      <label className="grid gap-1 text-[0.68rem] font-bold text-slate-600">
+                        Valor
+                        <input
+                          className="h-9 rounded-lg border border-slate-300 px-2 text-right text-xs"
+                          name="reviewAmountMinor"
+                          defaultValue={minorUnitsToInput(recurrence.amount_minor)}
+                          inputMode="decimal"
+                          required
+                        />
+                      </label>
+                    </fieldset>
+                  );
+                })}
+              </div>
+            </details>
+          ) : null}
         </form>
       </section>
 
@@ -409,8 +522,9 @@ export default async function RecurringTransactionsPage({
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-5 py-3 font-bold">Descrição</th>
-                  <th className="px-4 py-3 font-bold">Valor</th>
+                  <th className="px-4 py-3 font-bold">Valor-base</th>
                   <th className="px-4 py-3 font-bold">Frequência</th>
+                  <th className="px-4 py-3 font-bold">Regra</th>
                   <th className="px-4 py-3 font-bold">Próxima</th>
                   <th className="px-4 py-3 font-bold">Conta</th>
                   <th className="px-4 py-3 font-bold">Tipo</th>
@@ -451,6 +565,11 @@ export default async function RecurringTransactionsPage({
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {RECURRENCE_FREQUENCY_LABELS[recurrence.frequency]}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {recurrence.is_amount_fixed
+                          ? RECURRENCE_AMOUNT_MODE_LABELS.fixed
+                          : RECURRENCE_AMOUNT_MODE_LABELS.approximate}
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 text-slate-600">
                         {formatFinancialDate(recurrence.next_occurrence)}
@@ -493,7 +612,10 @@ export default async function RecurringTransactionsPage({
                       </h2>
                       <p className="mt-1 text-sm text-slate-500">
                         {account?.name ?? "Conta indisponível"} ·{" "}
-                        {RECURRENCE_FREQUENCY_LABELS[recurrence.frequency]}
+                        {RECURRENCE_FREQUENCY_LABELS[recurrence.frequency]} ·{" "}
+                        {recurrence.is_amount_fixed
+                          ? RECURRENCE_AMOUNT_MODE_LABELS.fixed
+                          : RECURRENCE_AMOUNT_MODE_LABELS.approximate}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs font-bold text-slate-500">
@@ -535,53 +657,22 @@ export default async function RecurringTransactionsPage({
             Linha do tempo de {timelineMonth}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Próximas ocorrências do mês, apresentadas também em texto.
+            Passe o mouse por uma ocorrência para destacar sua data no calendário.
           </p>
         </div>
-        {timeline.length === 0 ? (
-          <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-            Nenhum compromisso nesta linha do tempo.
-          </p>
-        ) : (
-          <ol className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {timeline.map((recurrence) => {
-              const account = accountById.get(recurrence.account_id);
-              const currency =
-                (account?.currency as SupportedCurrency | undefined) ?? "BRL";
-              return (
-                <li
-                  key={recurrence.id}
-                  className="grid grid-cols-[auto_1fr] gap-3 rounded-xl border border-slate-200 p-4"
-                >
-                  <time
-                    dateTime={recurrence.next_occurrence}
-                    className="flex size-12 flex-col items-center justify-center rounded-xl bg-slate-950 text-white"
-                  >
-                    <span className="text-lg font-black">
-                      {recurrence.next_occurrence.slice(8, 10)}
-                    </span>
-                    <span className="text-[0.6rem] font-bold uppercase">
-                      dia
-                    </span>
-                  </time>
-                  <div className="min-w-0">
-                    <p className="truncate font-bold text-slate-950">
-                      {recurrence.description}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {formatMoney(
-                        recurrence.amount_minor,
-                        currency,
-                        CURRENCY_LOCALES[currency],
-                      )}{" "}
-                      · {account?.name}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        )}
+        <RecurrenceCalendar month={timelineMonth} events={timelineEvents} />
+      </section>
+      <section className="rounded-xl border border-slate-200 bg-white p-3" aria-labelledby="subscriptions-title">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><h2 id="subscriptions-title" className="text-base font-semibold">Assinaturas e recorrências</h2><p className="text-xs text-slate-500">Revise cobranças nas contas e nos cartões para identificar o que pode reduzir.</p></div>
+          <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+            <Link href="/recurring-transactions?group=subscription#subscriptions-title" aria-current={groupFilter === "subscription" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${groupFilter === "subscription" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600"}`}>Assinaturas</Link>
+            <Link href="/recurring-transactions?group=recurrence#subscriptions-title" aria-current={groupFilter === "recurrence" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${groupFilter === "recurrence" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600"}`}>Recorrências</Link>
+          </div>
+        </div>
+        {subscriptionOverview.hasError ? <p role="alert" className="mt-2 text-xs text-amber-800">Algumas assinaturas não puderam ser carregadas.</p> : null}
+        {groupRows.length ? <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-slate-100 py-2 text-sm"><span className="font-semibold text-slate-600">Total dos valores exibidos</span>{groupTotals.map(([currency, total]) => <strong key={currency} className="tabular-nums text-slate-950">{formatMoney(total, currency, CURRENCY_LOCALES[currency])}</strong>)}<span className="text-xs text-slate-500">Soma por moeda, sem ajustar a frequência.</span></div> : null}
+        {groupRows.length ? <div className="mt-2 divide-y divide-slate-100">{groupRows.map((item) => <Link key={item.id} href={item.href} className="flex items-center justify-between gap-3 py-2 hover:bg-slate-50"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.source} · {item.detail}</p></div><span className="shrink-0 text-sm font-semibold tabular-nums">{formatMoney(item.amountMinor, item.currency, CURRENCY_LOCALES[item.currency])}</span></Link>)}</div> : <p className="mt-3 text-sm text-slate-500">Nenhum item neste grupo.</p>}
       </section>
     </main>
   );

@@ -66,7 +66,7 @@ describe("financial foundation validation", () => {
     ).toBe(false);
   });
 
-  it("allows fixed-expense classification only for expense subcategories", () => {
+  it("allows fixed-expense classification for personal and professional expenses at either level", () => {
     const base = {
       name: "Energia elétrica",
       kind: "expense",
@@ -82,6 +82,12 @@ describe("financial foundation validation", () => {
     ).toBe(true);
     expect(
       categoryFormSchema.safeParse({ ...base, parentId: "" }).success,
+    ).toBe(true);
+    expect(
+      categoryFormSchema.safeParse({ ...base, context: "professional", parentId: "" }).success,
+    ).toBe(true);
+    expect(
+      categoryFormSchema.safeParse({ ...base, kind: "income", parentId: "" }).success,
     ).toBe(false);
   });
 });

@@ -62,7 +62,7 @@ export function AppShell({
             </Suspense>
             <form action={logout}>
               <button
-                className="min-h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600"
+                className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600"
                 aria-label="Sair da conta"
               >
                 Sair

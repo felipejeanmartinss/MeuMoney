@@ -64,10 +64,11 @@ export async function getCurrentUserAccountHub(id: string) {
       const { data, error } = await supabase
         .from("transactions")
         .select(
-          "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
+          "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_subscription, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at",
         )
         .eq("user_id", user.id)
         .eq("account_id", id)
+        .eq("is_active", true)
         .order("transaction_date", { ascending: true })
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);
@@ -88,6 +89,7 @@ export async function getCurrentUserAccountHub(id: string) {
         )
         .eq("user_id", user.id)
         .eq("account_id", id)
+        .eq("is_active", true)
         .order("transaction_date", { ascending: true })
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);

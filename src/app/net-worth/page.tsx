@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   deleteNetWorthItem,
@@ -249,20 +250,8 @@ export default async function NetWorthPage({
   const liabilities = result.items.filter((item) => item.kind === "liability");
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Visão patrimonial
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Patrimônio
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Contas, investimentos, bens e passivos consolidados separadamente
-            por moeda.
-          </p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Patrimônio" description="Valores separados por moeda." actions={<>
         {activeTab === "overview" ? (
           <Link
             href="/net-worth/new"
@@ -271,11 +260,11 @@ export default async function NetWorthPage({
             Novo item
           </Link>
         ) : null}
-      </header>
+      </>} />
 
       <nav
         aria-label="Seções do patrimônio"
-        className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
+        className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
       >
         <Link
           href="/net-worth"

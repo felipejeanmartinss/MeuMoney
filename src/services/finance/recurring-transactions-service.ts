@@ -1,10 +1,41 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
 import type {
+  Json,
   RecurrenceFrequency,
   RecurringTransactionState,
   TransactionType,
+  SupportedCurrency,
 } from "@/types/database";
+
+export async function getSubscriptionOverview() {
+  const { supabase, user } = await requireUser();
+  const [cards, purchases, transactions] = await Promise.all([
+    supabase.from("credit_cards").select("id,name,currency").eq("user_id", user.id),
+    supabase.from("credit_card_purchases").select("id,credit_card_id,description,total_amount,purchase_date").eq("user_id", user.id).eq("is_recurring", true).eq("entry_kind", "purchase").eq("status", "active").order("purchase_date", { ascending: false }).limit(500),
+    supabase.from("transactions").select("id,account_id,description,amount_minor,transaction_date").eq("user_id", user.id).eq("is_subscription", true).eq("is_active", true).eq("transaction_type", "expense").is("recurring_transaction_id", null).order("transaction_date", { ascending: false }).limit(500),
+  ]);
+  const cardById = new Map((cards.data ?? []).map((card) => [card.id, card]));
+  const accounts = await supabase.from("accounts").select("id,name,currency").eq("user_id", user.id);
+  const accountById = new Map((accounts.data ?? []).map((account) => [account.id, account]));
+  const unique = new Set<string>();
+  const rows = [
+    ...(purchases.data ?? []).flatMap((purchase) => {
+      const card = cardById.get(purchase.credit_card_id);
+      if (!card) return [];
+      return [{ id: purchase.id, name: purchase.description, source: card.name, currency: card.currency as SupportedCurrency, amountMinor: purchase.total_amount, kind: "card" as const, href: `/credit-cards/${card.id}` }];
+    }),
+    ...(transactions.data ?? []).flatMap((transaction) => {
+      const account = accountById.get(transaction.account_id);
+      if (!account) return [];
+      const key = `${transaction.account_id}:${transaction.description.trim().toLowerCase()}`;
+      if (unique.has(key)) return [];
+      unique.add(key);
+      return [{ id: transaction.id, name: transaction.description, source: account.name, currency: account.currency as SupportedCurrency, amountMinor: transaction.amount_minor, kind: "account" as const, href: `/accounts/${account.id}` }];
+    }),
+  ];
+  return { rows, hasError: Boolean(cards.error || purchases.error || transactions.error || accounts.error) };
+}
 
 export type RecurringTransactionMutationInput = {
   accountId: string;
@@ -12,6 +43,8 @@ export type RecurringTransactionMutationInput = {
   transactionType: TransactionType;
   description: string;
   amountMinor: number;
+  isAmountFixed: boolean;
+  isSubscription: boolean;
   frequency: RecurrenceFrequency;
   startDate: string;
   endDate: string | null;
@@ -19,8 +52,15 @@ export type RecurringTransactionMutationInput = {
   notes: string | null;
 };
 
+export type RecurringTransactionReviewInput = {
+  recurringId: string;
+  scheduledDate: string;
+  transactionDate: string;
+  amountMinor: number;
+};
+
 const recurringTransactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at";
+  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, is_amount_fixed, is_subscription, frequency, start_date, end_date, next_occurrence, notes, is_active, ended_at, created_at, updated_at";
 
 function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -38,6 +78,9 @@ function mutationErrorMessage(error: { message?: string } | null) {
   }
   if (message.includes("recurring_transaction_generation_limit")) {
     return "O período solicitado é muito extenso. Escolha uma data mais próxima.";
+  }
+  if (message.includes("recurrence_review")) {
+    return "Revise a data e o valor das recorrências aproximadas.";
   }
   return "Não foi possível concluir a operação com a recorrência.";
 }
@@ -149,6 +192,8 @@ export async function createCurrentUserRecurringTransaction(
     transaction_type: input.transactionType,
     description: input.description,
     amount_minor: input.amountMinor,
+    is_amount_fixed: input.isAmountFixed,
+    is_subscription: input.isSubscription,
     frequency: input.frequency,
     start_date: input.startDate,
     end_date: input.endDate,
@@ -174,6 +219,8 @@ export async function updateCurrentUserRecurringTransaction(
       transaction_type: input.transactionType,
       description: input.description,
       amount_minor: input.amountMinor,
+      is_amount_fixed: input.isAmountFixed,
+      is_subscription: input.isSubscription,
       frequency: input.frequency,
       start_date: input.startDate,
       end_date: input.endDate,
@@ -208,11 +255,15 @@ export async function setCurrentUserRecurringTransactionState(
 
 export async function generateCurrentUserRecurringTransactions(
   targetUntil: string,
+  reviews: RecurringTransactionReviewInput[] = [],
 ) {
   const { supabase } = await requireUser();
   const { data, error } = await supabase.rpc(
-    "generate_recurring_transactions",
-    { target_until: targetUntil },
+    "generate_recurring_transactions_reviewed",
+    {
+      target_until: targetUntil,
+      review_overrides: reviews as unknown as Json,
+    },
   );
 
   return error

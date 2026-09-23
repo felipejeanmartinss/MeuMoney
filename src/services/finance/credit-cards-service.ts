@@ -412,6 +412,20 @@ export async function createCurrentUserCreditCardPurchase(
   input: CreditCardPurchaseMutationInput,
 ) {
   const { supabase } = await requireUser();
+  if (input.targetInvoiceId) {
+    const { error } = await supabase.rpc("create_credit_card_invoice_entry", {
+      target_invoice_id: input.targetInvoiceId,
+      target_category_id: input.categoryId,
+      target_entry_kind: input.entryKind,
+      target_description: input.description,
+      target_amount_minor: input.totalAmount,
+      target_entry_date: input.purchaseDate,
+      target_notes: input.notes,
+    });
+    return error
+      ? { ok: false as const, message: mutationErrorMessage(error) }
+      : { ok: true as const };
+  }
   const { error } = await supabase.rpc("create_credit_card_purchase_custom", {
     target_credit_card_id: cardId,
     target_category_id: input.categoryId,
@@ -514,6 +528,7 @@ export async function getCurrentUserCreditCardInvoice(
     installmentsResult,
     purchasesResult,
     accountsResult,
+    categoriesResult,
   ] =
     await Promise.all([
       supabase
@@ -549,6 +564,12 @@ export async function getCurrentUserCreditCardInvoice(
         .eq("user_id", user.id)
         .is("archived_at", null)
         .order("name"),
+      supabase
+        .from("categories")
+        .select("id, parent_id, name, kind, context")
+        .eq("user_id", user.id)
+        .is("archived_at", null)
+        .order("name"),
     ]);
   return {
     card: cardResult.data,
@@ -556,12 +577,14 @@ export async function getCurrentUserCreditCardInvoice(
     installments: installmentsResult.data ?? [],
     purchases: purchasesResult.data ?? [],
     accounts: accountsResult.data ?? [],
+    categories: categoriesResult.data ?? [],
     hasError: Boolean(
       cardResult.error ||
         invoiceResult.error ||
         installmentsResult.error ||
         purchasesResult.error ||
-        accountsResult.error,
+        accountsResult.error ||
+        categoriesResult.error,
     ),
   };
 }

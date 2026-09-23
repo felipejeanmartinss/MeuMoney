@@ -764,6 +764,7 @@ const optionalFactorInput = z
 
 const manualScheduleRowSchema = z
   .object({
+    id: z.uuid().optional(),
     installmentNumber: z.coerce.number().int().min(0).max(10000),
     dueDate: z.string().refine(isValidIsoDate, "Informe uma data válida."),
     totalAmountMinor: manualMoneyInput.refine((value) => value >= 0),
@@ -775,8 +776,14 @@ const manualScheduleRowSchema = z
     paymentStatus: z.enum(["paid", "scheduled"]),
     paymentDate: z.string(),
     paidAmountMinor: manualMoneyInput.refine((value) => value >= 0),
+    extraAmortizationMinor: manualMoneyInput.refine((value) => value >= 0).default(0),
+    installmentsReduced: z.coerce.number().int().min(0).max(1200).default(0),
+    linkedTransactionId: z.preprocess((value) => value === "" || value == null ? null : value, z.uuid().nullable()).default(null),
   })
   .superRefine((row, context) => {
+    if (row.paymentStatus === "scheduled" && row.paidAmountMinor !== 0) {
+      context.addIssue({ code: "custom", path: ["paidAmountMinor"], message: "Parcela a vencer não deve ter valor pago." });
+    }
     if (row.paymentStatus === "paid" && !isValidIsoDate(row.paymentDate)) {
       context.addIssue({
         code: "custom",
@@ -806,7 +813,8 @@ const manualScheduleInput = z
       return z.NEVER;
     }
   })
-  .pipe(z.array(manualScheduleRowSchema).min(1, "Inclua ao menos uma parcela."));
+  .pipe(z.array(manualScheduleRowSchema).min(1, "Inclua ao menos uma parcela.").max(1200))
+  .refine((rows) => new Set(rows.map((row) => row.installmentNumber)).size === rows.length, "Não repita o número de uma parcela.");
 
 export const manualFinancingContractSchema = z.object({
   name: z.string().trim().min(1, "Informe um nome.").max(100),

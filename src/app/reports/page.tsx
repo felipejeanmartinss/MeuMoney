@@ -1,3 +1,6 @@
+import { PageHeader } from "@/components/layout/page-header";
+import { CheckboxFilter } from "@/components/reports/checkbox-filter";
+import { IncomeExpenseColumnChart } from "@/components/reports/income-expense-column-chart";
 import Link from "next/link";
 import {
   deleteSavedFinancialReport,
@@ -12,7 +15,10 @@ import {
   type ReportTimeGrouping,
 } from "@/components/reports/financial-report-matrices";
 import {
-  FINANCIAL_REPORT_LABELS,
+  CashFlowForecastChart,
+  CashFlowForecastEventTable,
+} from "@/components/reports/cash-flow-forecast";
+import {
   financialReportFilterSchema,
   financialReportTypeSchema,
   periodComparisonFilterSchema,
@@ -30,6 +36,7 @@ import { listCurrentUserCategories } from "@/services/finance/categories-service
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 import {
   getCurrentUserAssetPerformanceReport,
+  getCurrentUserCashFlowForecast,
   getCurrentUserFixedExpenseReport,
   getCurrentUserIncomeExpenseMatrix,
   getCurrentUserNetWorthEvolutionReport,
@@ -44,26 +51,8 @@ import type {
 
 export const metadata = { title: "Relatórios" };
 
-const REPORT_GROUPS = [
-  {
-    label: "Receitas e despesas",
-    reports: ["income-expense", "fixed-expenses", "period-comparison"],
-  },
-  {
-    label: "Investimentos",
-    reports: ["asset-performance", "asset-performance-general"],
-  },
-  {
-    label: "Patrimônio",
-    reports: ["net-worth-evolution"],
-  },
-] as const satisfies ReadonlyArray<{
-  label: string;
-  reports: readonly FinancialReportType[];
-}>;
-
 const inputClass =
-  "min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 
 function currentYear() {
   return Number(
@@ -180,37 +169,59 @@ function monthLabel(start: string, end: string) {
   return start === end ? format(start) : format(start) + " a " + format(end);
 }
 
-function reportHref(
-  report: FinancialReportType,
-  filters: {
-    year: number;
-    currency: SupportedCurrency;
-    basis: FinancialReportBasis;
-    context: FinancialContext | "all";
-    sourceCurrencies: SupportedCurrency[];
-    sourceKeys?: string[];
-    categoryIds?: string[];
-    subcategoryIds?: string[];
-    timeGrouping?: ReportTimeGrouping;
-    categoryGrouping?: ReportCategoryGrouping;
-  },
+function currentDate() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : `${currentYear()}-01-01`;
+}
+
+function shiftDate(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+const CASH_FLOW_PERIODS = [
+  ["next-30", "Próximos 30 dias", 29],
+  ["next-90", "Próximos 90 dias", 89],
+  ["next-180", "Próximos 6 meses", 179],
+  ["next-365", "Próximos 12 meses", 364],
+  ["custom", "Período personalizado", 89],
+] as const;
+
+function resolveCashFlowPeriod(
+  raw: Record<string, string | string[] | undefined>,
 ) {
-  const query = new URLSearchParams({
-    report,
-    year: String(filters.year),
-    currency: filters.currency,
-    basis: filters.basis,
-    context: filters.context,
-  });
-  for (const sourceCurrency of filters.sourceCurrencies) {
-    query.append("sourceCurrencies", sourceCurrency);
-  }
-  for (const sourceKey of filters.sourceKeys ?? []) query.append("sourceKeys", sourceKey);
-  for (const categoryId of filters.categoryIds ?? []) query.append("categoryIds", categoryId);
-  for (const subcategoryId of filters.subcategoryIds ?? []) query.append("subcategoryIds", subcategoryId);
-  if (filters.timeGrouping) query.set("timeGrouping", filters.timeGrouping);
-  if (filters.categoryGrouping) query.set("categoryGrouping", filters.categoryGrouping);
-  return "/reports?" + query.toString();
+  const today = currentDate();
+  const requested = typeof raw.cashPeriod === "string" ? raw.cashPeriod : "next-90";
+  const preset = CASH_FLOW_PERIODS.find(([value]) => value === requested) ?? CASH_FLOW_PERIODS[1];
+  const validDate = (value: unknown) => {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return false;
+    }
+    const date = new Date(`${value}T12:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  let startDate =
+    preset[0] === "custom" && validDate(raw.startDate)
+      ? (raw.startDate as string)
+      : today;
+  let endDate =
+    preset[0] === "custom" && validDate(raw.endDate)
+      ? (raw.endDate as string)
+      : shiftDate(today, preset[2]);
+  if (startDate < today) startDate = today;
+  if (endDate < startDate) endDate = startDate;
+  const maximumEnd = shiftDate(startDate, 731);
+  if (endDate > maximumEnd) endDate = maximumEnd;
+  return { period: preset[0], startDate, endDate };
 }
 
 function savedReportHref(
@@ -380,46 +391,6 @@ function CommonReportFields({
   );
 }
 
-function CheckboxFilter({
-  label,
-  name,
-  options,
-  selected,
-}: {
-  label: string;
-  name: string;
-  options: Array<{ value: string; label: string }>;
-  selected: string[];
-}) {
-  return (
-    <fieldset className="grid min-w-0 gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-      <legend>{label}</legend>
-      <details className="relative">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 normal-case tracking-normal text-slate-900 marker:hidden">
-          <span className="truncate font-semibold">
-            {selected.length === 0 ? "Todos" : `${selected.length} selecionados`}
-          </span>
-          <span aria-hidden="true" className="text-slate-400">▾</span>
-        </summary>
-        <div className="absolute left-0 top-full z-30 mt-1 grid max-h-72 min-w-72 gap-1 overflow-auto rounded-lg border border-slate-200 bg-white p-2 normal-case tracking-normal shadow-xl">
-          {options.length ? options.map((option) => (
-            <label key={option.value} className="flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              <input
-                type="checkbox"
-                name={name}
-                value={option.value}
-                defaultChecked={selected.length === 0 || selected.includes(option.value)}
-                className="size-4 accent-emerald-700"
-              />
-              <span className="truncate">{option.label}</span>
-            </label>
-          )) : <span className="px-2 py-1 text-sm font-normal text-slate-500">Nenhuma opção</span>}
-        </div>
-      </details>
-    </fieldset>
-  );
-}
-
 function ApplyFiltersButton() {
   return (
     <button className="min-h-10 self-end rounded-lg bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2">
@@ -465,6 +436,7 @@ export default async function ReportsPage({
   const report =
     financialReportTypeSchema.safeParse(value("report")).data ??
     "income-expense";
+  const showFavorites = value("area") === "favorites";
   const common = financialReportFilterSchema.safeParse({
     year: value("year") ?? currentYear(),
     currency: profileResult.profile?.preferred_currency ?? "BRL",
@@ -539,7 +511,6 @@ export default async function ReportsPage({
     categoryGrouping,
     filterOptions,
   };
-  const commonFilters = { ...appliedFilters, context, sourceCurrencies };
   const savedFilters = Object.fromEntries(
     Object.entries(raw).filter(([key, item]) => key !== "message" && item !== undefined),
   );
@@ -553,97 +524,35 @@ export default async function ReportsPage({
           : null;
 
   return (
-    <main className="mx-auto grid max-w-[1700px] gap-5 px-3 py-6 sm:px-5 lg:px-7">
-      <header>
-        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-          Análise financeira
-        </p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-          Central de relatórios
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600 sm:text-base">
-          Matrizes consolidadas na moeda de referência do perfil.
-        </p>
-      </header>
-
-      <nav
-        aria-label="Tipos de relatório"
-        className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]"
-      >
-        {REPORT_GROUPS.map((group) => (
-          <div key={group.label} className="flex min-w-0 flex-col gap-2">
-            <span className="px-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-slate-500">
-              {group.label}
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {group.reports.map((item) => {
-                const active = report === item;
-                return (
-                  <Link
-                    key={item}
-                    href={reportHref(item, commonFilters)}
-                    aria-current={active ? "page" : undefined}
-                    className={
-                      "inline-flex min-h-9 items-center rounded-lg px-3 py-1.5 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1 " +
-                      (active
-                        ? "bg-emerald-700 text-white shadow-sm"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200")
-                    }
-                  >
-                    {FINANCIAL_REPORT_LABELS[item]}
-                  </Link>
-                );
-              })}
-              {savedReportsResult.reports
-                .filter((saved) =>
-                  (group.reports as readonly string[]).includes(saved.report_type),
-                )
-                .map((saved) => (
-                  <span key={saved.id} className="inline-flex min-h-9 items-center overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50">
-                    <Link
-                      href={savedReportHref(saved.report_type, saved.filters)}
-                      className="px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-                    >
-                      {saved.name}
-                    </Link>
-                    <form action={deleteSavedFinancialReport}>
-                      <input type="hidden" name="id" value={saved.id} />
-                      <button
-                        type="submit"
-                        aria-label={`Excluir relatório salvo ${saved.name}`}
-                        className="min-h-9 border-l border-emerald-200 px-2 text-sm font-black text-rose-700 hover:bg-rose-50"
-                      >
-                        ×
-                      </button>
-                    </form>
-                  </span>
-                ))}
-            </div>
-          </div>
-        ))}
-        <details className="self-end rounded-xl border border-slate-200 bg-slate-50">
-          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-black text-slate-700 marker:hidden">
-            + Salvar visualização atual
-          </summary>
-          <form action={saveFinancialReport} className="flex flex-col gap-2 border-t border-slate-200 p-3">
-            <input type="hidden" name="reportType" value={report} />
-            <input type="hidden" name="filters" value={JSON.stringify(savedFilters)} />
-            <label className="grid gap-1 text-xs font-bold text-slate-600">
-              Nome do relatório
-              <input name="name" maxLength={80} required className={inputClass} placeholder="Ex.: Gastos da casa" />
-            </label>
-            <button className="min-h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">
-              Salvar e fixar
-            </button>
-          </form>
-        </details>
-      </nav>
+    <main className="app-page max-w-[1700px]">
+      <PageHeader title="Relatórios" description="Valores consolidados na moeda do perfil." />
 
       {reportMessage ? (
         <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
           {reportMessage}
         </p>
       ) : null}
+
+      {showFavorites ? (
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <h2 className="border-b border-slate-200 px-4 py-3 text-base font-semibold">Favoritos</h2>
+          {savedReportsResult.reports.length ? <div className="divide-y divide-slate-100">{savedReportsResult.reports.map((saved) => (
+            <div key={saved.id} className="flex items-center justify-between gap-3 px-4 py-2">
+              <Link href={savedReportHref(saved.report_type, saved.filters)} className="min-w-0 truncate py-2 text-sm font-semibold text-emerald-800 hover:underline">{saved.name}</Link>
+              <form action={deleteSavedFinancialReport}><input type="hidden" name="id" value={saved.id} /><button type="submit" aria-label={`Excluir relatório salvo ${saved.name}`} className="min-h-9 rounded-lg px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50">Excluir</button></form>
+            </div>
+          ))}</div> : <p className="px-4 py-5 text-sm text-slate-500">Nenhum relatório salvo. Salve uma visualização para encontrá-la aqui.</p>}
+        </section>
+      ) : <>
+        <details className="rounded-xl border border-slate-200 bg-white">
+          <summary className="cursor-pointer list-none px-4 py-2.5 text-sm font-semibold text-emerald-800 marker:hidden">+ Salvar visualização atual</summary>
+          <form action={saveFinancialReport} className="flex flex-wrap items-end gap-2 border-t border-slate-200 p-3">
+            <input type="hidden" name="reportType" value={report} />
+            <input type="hidden" name="filters" value={JSON.stringify(savedFilters)} />
+            <label className="grid min-w-48 flex-1 gap-1 text-xs font-bold text-slate-600">Nome do relatório<input name="name" maxLength={80} required className={inputClass} placeholder="Ex.: Gastos da casa" /></label>
+            <button className="min-h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Salvar e fixar</button>
+          </form>
+        </details>
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {report === "income-expense" ? (
@@ -652,6 +561,17 @@ export default async function ReportsPage({
           <FixedExpensesReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} />
         ) : report === "period-comparison" ? (
           <ComparisonReport filters={appliedFilters} context={context} sourceCurrencies={sourceCurrencies} raw={raw} />
+        ) : report === "cash-flow-forecast" ? (
+          <CashFlowForecastReport
+            currency={filters.currency}
+            raw={raw}
+            accountOptions={accountsResult.accounts
+              .filter((account) => !account.archived_at)
+              .map((account) => ({
+                value: account.id,
+                label: `${account.name} · ${account.currency}`,
+              }))}
+          />
         ) : report === "net-worth-evolution" ? (
           <NetWorthEvolutionReport
             filters={appliedFilters}
@@ -669,7 +589,136 @@ export default async function ReportsPage({
           />
         )}
       </section>
+      </>}
     </main>
+  );
+}
+
+async function CashFlowForecastReport({
+  currency,
+  raw,
+  accountOptions,
+}: {
+  currency: SupportedCurrency;
+  raw: Record<string, string | string[] | undefined>;
+  accountOptions: Array<{ value: string; label: string }>;
+}) {
+  const period = resolveCashFlowPeriod(raw);
+  const requestedAccounts = arrayParam(raw, "accountIds").filter((id) =>
+    accountOptions.some((account) => account.value === id),
+  );
+  const accountIds =
+    requestedAccounts.length === accountOptions.length ? [] : requestedAccounts;
+  const scenario =
+    (typeof raw.scenario === "string" ? raw.scenario : "base") ===
+    "conservative"
+      ? "conservative"
+      : "base";
+  const rawAverageMonths = Number(
+    typeof raw.averageMonths === "string" ? raw.averageMonths : 6,
+  );
+  const averageMonths = ([3, 6, 12] as const).includes(
+    rawAverageMonths as 3 | 6 | 12,
+  )
+    ? (rawAverageMonths as 3 | 6 | 12)
+    : 6;
+  const result = await getCurrentUserCashFlowForecast({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    currency,
+    accountIds,
+    scenario,
+    averageMonths,
+  });
+  return (
+    <>
+      <ReportHeading
+        title="Projeção de fluxo de caixa"
+        description="Saldos futuros por conta, com recorrências, faturas e um cenário conservador sem duplicar compromissos já cadastrados."
+      />
+      <details className="group border-t border-slate-200 bg-slate-50">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
+          Filtros
+          <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span>
+          <span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
+        </summary>
+        <form
+          method="get"
+          className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_180px_220px_150px_auto]"
+        >
+          <input type="hidden" name="report" value="cash-flow-forecast" />
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Período
+            <select name="cashPeriod" defaultValue={period.period} className={inputClass}>
+              {CASH_FLOW_PERIODS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Início
+            <input name="startDate" type="date" defaultValue={period.startDate} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Fim
+            <input name="endDate" type="date" defaultValue={period.endDate} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Cenário
+            <select name="scenario" defaultValue={scenario} className={inputClass}>
+              <option value="base">Base</option>
+              <option value="conservative">Conservador</option>
+            </select>
+          </label>
+          <CheckboxFilter
+            label="Contas consideradas"
+            name="accountIds"
+            options={accountOptions}
+            selected={accountIds}
+          />
+          <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            Média histórica
+            <select name="averageMonths" defaultValue={averageMonths} className={inputClass}>
+              <option value="3">3 meses</option>
+              <option value="6">6 meses</option>
+              <option value="12">12 meses</option>
+            </select>
+          </label>
+          <ApplyFiltersButton />
+        </form>
+      </details>
+      <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
+        <strong>{scenario === "base" ? "Cenário base" : "Cenário conservador"}:</strong>{" "}
+        {scenario === "base"
+          ? "saldo fechado + lançamentos futuros + recorrências ativas + pagamento das faturas e assinaturas projetadas."
+          : `cenário base + parcela ainda não coberta da média variável dos últimos ${averageMonths} meses completos.`}
+      </p>
+      {result.hasError ? <ReportError /> : null}
+      <ReportCurrencyNotice currency={currency} missingCurrencies={result.missingCurrencies} />
+      <div className="grid border-t border-slate-200 sm:grid-cols-3">
+        <SummaryCell
+          label="Saldo inicial"
+          value={formatMoney(result.openingTotalMinor, currency)}
+          color={result.openingTotalMinor < 0 ? "text-rose-700" : "text-slate-950"}
+        />
+        <SummaryCell
+          label="Menor saldo projetado"
+          value={formatMoney(result.lowestTotalMinor, currency)}
+          color={result.lowestTotalMinor < 0 ? "text-rose-700" : "text-amber-700"}
+        />
+        <SummaryCell
+          label="Saldo final"
+          value={formatMoney(result.closingTotalMinor, currency)}
+          color={result.closingTotalMinor < 0 ? "text-rose-700" : "text-emerald-700"}
+        />
+      </div>
+      <CashFlowForecastChart
+        accounts={result.accounts}
+        points={result.points}
+        currency={currency}
+      />
+      <CashFlowForecastEventTable events={result.events} currency={currency} />
+    </>
   );
 }
 
@@ -747,21 +796,32 @@ async function IncomeExpenseReport({
     allDates: period.period === "all",
   });
   const totals = summarizeIncomeExpenseReport(result.rows);
+  const view = raw.view === "chart" ? "chart" : "table";
+  const viewHref = (target: "chart" | "table") => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(raw)) {
+      for (const item of Array.isArray(value) ? value : value ? [value] : []) query.append(key, item);
+    }
+    query.set("report", "income-expense");
+    query.set("view", target);
+    return `/reports?${query.toString()}`;
+  };
   return (
     <>
       <ReportHeading
         title="Receitas x despesas"
-        description="Valores anuais por grupo, categoria e subcategoria, com totais mensais."
       />
+      <div className="flex items-center gap-1 border-t border-slate-200 px-3 py-2 text-xs font-semibold"><Link href={viewHref("table")} aria-current={view === "table" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${view === "table" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}>Tabela</Link><Link href={viewHref("chart")} aria-current={view === "chart" ? "page" : undefined} className={`rounded-md px-3 py-1.5 ${view === "chart" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}>Gráfico</Link></div>
       <details className="group border-t border-slate-200 bg-slate-50">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-black text-slate-800 marker:hidden">
           Filtros <span className="text-xs text-slate-500 group-open:hidden">Mostrar</span><span className="hidden text-xs text-slate-500 group-open:inline">Ocultar</span>
         </summary>
       <form
         method="get"
-        className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-[180px_150px_150px_220px_160px_150px_auto]"
+        className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-4"
       >
         <input type="hidden" name="report" value="income-expense" />
+        <input type="hidden" name="view" value={view} />
         <label className="grid gap-1 text-xs font-extrabold uppercase tracking-wide text-slate-600">
           Período
           <select name="period" defaultValue={period.period} className={inputClass}>
@@ -774,12 +834,12 @@ async function IncomeExpenseReport({
         <ApplyFiltersButton />
       </form>
       </details>
-      <p className="border-t border-blue-100 bg-blue-50 px-4 py-2.5 text-xs leading-5 text-blue-950">
+      <details className="border-t border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-950"><summary className="cursor-pointer font-semibold">Como este relatório calcula os valores</summary><p className="mt-1">
         <strong>
           {filters.basis === "competence" ? "Competência" : "Caixa"}:
         </strong>{" "}
         {reportBasisDescription(filters.basis)}
-      </p>
+      </p></details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice
         currency={filters.currency}
@@ -806,7 +866,7 @@ async function IncomeExpenseReport({
           }
         />
       </div>
-      <MonthlyFinancialMatrix
+      {view === "chart" ? <IncomeExpenseColumnChart rows={result.rows} currency={filters.currency} /> : <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
         drilldownYear={filters.year}
@@ -815,7 +875,7 @@ async function IncomeExpenseReport({
         months={result.months}
         timeGrouping={filters.timeGrouping}
         categoryGrouping={filters.categoryGrouping}
-      />
+      />}
     </>
   );
 }
@@ -1077,12 +1137,12 @@ function ReportHeading({
   description,
 }: {
   title: string;
-  description: string;
+  description?: string;
 }) {
   return (
     <header className="px-4 py-4 sm:px-5">
       <h2 className="text-xl font-black text-slate-950">{title}</h2>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+      {description ? <p className="mt-1 text-sm text-slate-600">{description}</p> : null}
     </header>
   );
 }

@@ -224,7 +224,7 @@ export async function getFinancialDashboard(
           .eq("currency", currency)
           .gte("next_occurrence", today)
           .order("next_occurrence")
-          .limit(5),
+          .limit(30),
       ),
     ),
     Promise.all(
@@ -234,8 +234,9 @@ export async function getFinancialDashboard(
           .select(invoiceColumns)
           .eq("user_id", user.id)
           .eq("currency", currency)
+          .gte("due_date", `${referenceMonth}-01`)
           .order("due_date")
-          .limit(5),
+          .limit(30),
       ),
     ),
     supabase

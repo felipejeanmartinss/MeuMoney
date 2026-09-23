@@ -1,9 +1,3 @@
-import { AppShell } from "@/components/layout/app-shell";
+export { AuthenticatedLayout as default } from "@/components/layout/authenticated-layout";
 
 export const dynamic = "force-dynamic";
-
-export default function TransfersLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  return <AppShell>{children}</AppShell>;
-}

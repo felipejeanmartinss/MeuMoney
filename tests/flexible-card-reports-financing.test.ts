@@ -76,9 +76,9 @@ describe("financing and account management", () => {
 
   it("projects an editable SAC or PRICE schedule from the manual form", () => {
     const form = source("src", "components", "forms", "manual-financing-form.tsx");
-    expect(form).toContain("simulateFinancing");
+    expect(form).toContain("projectFinancingSchedule");
     expect(form).toContain("Projetar parcelas");
-    expect(form).toContain("monthlyDueDate");
+    expect(form).toContain("monthlyDate");
   });
 
   it("allows deleting manual and system account transactions", () => {

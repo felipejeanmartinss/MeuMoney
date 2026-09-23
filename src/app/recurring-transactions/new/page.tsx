@@ -18,6 +18,7 @@ export default async function NewRecurringTransactionPage({
     startDate?: string;
     nextOccurrence?: string;
     notes?: string;
+    isSubscription?: string;
   }>;
 }) {
   const query = await searchParams;
@@ -89,6 +90,8 @@ export default async function NewRecurringTransactionPage({
               transactionType,
               description: query.description?.slice(0, 180),
               amountMinor,
+              isAmountFixed: true,
+              isSubscription: query.isSubscription === "true",
               frequency: "monthly",
               startDate,
               nextOccurrence,

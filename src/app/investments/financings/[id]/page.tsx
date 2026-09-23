@@ -8,10 +8,11 @@ import { formatFinancialDate } from "@/utils/financial-formatters";
 const messages: Record<string, string> = {
   imported: "Financiamento criado a partir do PDF revisado.",
   created: "Financiamento e histórico cadastrados.",
+  updated: "Financiamento e fluxo de parcelas atualizados.",
 };
 
 function formatRate(value: string | null, suffix = "a.a.") {
-  return value ? `${value.replace(".", ",")}% ${suffix}` : "Não informado";
+  return value ? `${String(value).replace(".", ",")}% ${suffix}` : "Não informado";
 }
 
 export default async function FinancingDetailPage({
@@ -36,6 +37,7 @@ export default async function FinancingDetailPage({
           Fluxo financeiro do contrato
         </p>
         <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">{contract.name}</h1>
+        <Link href={`/investments/financings/${id}/edit`} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white">Editar contrato e parcelas</Link>
         <p className="mt-2 text-slate-600">
           {contract.institution} · {contract.amortization_system ?? "Sistema não informado"} · saldo em {formatFinancialDate(contract.balance_date)}
         </p>
@@ -147,15 +149,15 @@ export default async function FinancingDetailPage({
                   <tr key={entry.id}>
                     <td className="px-3 py-2 font-bold">{entry.installment_number}</td>
                     <td className="px-3 py-2">{formatFinancialDate(entry.due_date)}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}{(entry.extra_amortization_minor ?? 0) > 0 ? <p className="mt-1 text-emerald-800">Extra: {formatMoney(entry.extra_amortization_minor ?? 0, contract.currency)}{(entry.installments_reduced ?? 0) > 0 ? ` · ${entry.installments_reduced} parcelas amortizadas` : ""}</p> : null}</td>
                     <td className="px-3 py-2 font-bold">{formatMoney(entry.total_amount_minor, contract.currency)}</td>
                     <td className="px-3 py-2">{formatMoney(entry.interest_minor, contract.currency)}</td>
-                    <td className="px-3 py-2">{entry.correction_factor?.replace(".", ",") ?? "—"}</td>
+                    <td className="px-3 py-2">{entry.correction_factor == null ? "—" : String(entry.correction_factor).replace(".", ",")}</td>
                     <td className="px-3 py-2">{formatMoney(charges, contract.currency)}</td>
                     <td className="px-3 py-2">{formatMoney(entry.outstanding_balance_minor, contract.currency)}</td>
                     <td className="px-3 py-2">{entry.payment_status === "paid" ? "Paga" : "A vencer"}</td>
                     <td className="px-3 py-2">{entry.payment_date ? formatFinancialDate(entry.payment_date) : "—"}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.paid_amount_minor, contract.currency)}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.paid_amount_minor, contract.currency)}{entry.linked_transaction_id ? <p className="mt-1 text-slate-500">Lançamento vinculado</p> : null}</td>
                   </tr>
                 );
               })}

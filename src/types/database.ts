@@ -34,7 +34,26 @@ export type SavedFinancialReportType =
   | "period-comparison"
   | "asset-performance"
   | "asset-performance-general"
-  | "net-worth-evolution";
+  | "net-worth-evolution"
+  | "cash-flow-forecast";
+export type FinancialGoalType =
+  | "emergency_fund"
+  | "travel"
+  | "home_purchase"
+  | "renovation"
+  | "financial_independence"
+  | "financing_payoff";
+export type FinancialGoalStatus =
+  | "active"
+  | "paused"
+  | "completed"
+  | "archived";
+export type FinancialGoalLinkType = "account" | "investment" | "financing";
+export type MonthlyCheckinStatus = "open" | "closed";
+export type FinancialGoalContributionSource =
+  | "manual"
+  | "transaction"
+  | "investment";
 export type CreditCardInstallmentStatus =
   | "pending"
   | "invoiced"
@@ -174,7 +193,8 @@ export type Transaction = {
   amount_minor: number;
   transaction_date: string;
   status: TransactionStatus;
-  notes: string | null;
+    notes: string | null;
+    is_subscription: boolean;
   is_active: boolean;
   reconciled_at: string | null;
   origin_type: TransactionOriginType;
@@ -193,6 +213,8 @@ export type RecurringTransaction = {
   transaction_type: TransactionType;
   description: string;
   amount_minor: number;
+    is_amount_fixed: boolean;
+    is_subscription: boolean;
   frequency: RecurrenceFrequency;
   start_date: string;
   end_date: string | null;
@@ -617,6 +639,9 @@ export type FinancingImportJob = {
 };
 
 export type FinancingScheduleEntry = {
+  extra_amortization_minor?: number;
+  installments_reduced?: number;
+  linked_transaction_id?: string | null;
   id: string;
   contract_id: string;
   user_id: string;
@@ -706,6 +731,54 @@ export type FinancingContractSummary = FinancingContract & {
   extra_fgts_minor: number;
   paid_installments: number;
   scheduled_installments: number;
+};
+
+export type FinancialGoal = {
+  id: string;
+  user_id: string;
+  name: string;
+  goal_type: FinancialGoalType;
+  currency: SupportedCurrency;
+  target_amount_minor: number;
+  target_date: string;
+  status: FinancialGoalStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialGoalContribution = {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  contribution_date: string;
+  amount_minor: number;
+  currency: SupportedCurrency;
+  source: FinancialGoalContributionSource;
+  description: string | null;
+  created_at: string;
+};
+
+export type FinancialGoalLink = {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  source_type: FinancialGoalLinkType;
+  account_id: string | null;
+  investment_position_id: string | null;
+  financing_contract_id: string | null;
+  created_at: string;
+};
+
+export type MonthlyFinancialCheckin = {
+  id: string;
+  user_id: string;
+  reference_month: string;
+  status: MonthlyCheckinStatus;
+  observation: string | null;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ImportJob = {
@@ -922,6 +995,7 @@ export type Database = {
           transaction_date: string;
           status?: TransactionStatus;
           notes?: string | null;
+          is_subscription?: boolean;
           is_active?: boolean;
           reconciled_at?: string | null;
           origin_type?: TransactionOriginType;
@@ -955,6 +1029,8 @@ export type Database = {
           transaction_type: TransactionType;
           description: string;
           amount_minor: number;
+          is_amount_fixed?: boolean;
+          is_subscription?: boolean;
           frequency: RecurrenceFrequency;
           start_date: string;
           end_date?: string | null;
@@ -1172,6 +1248,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      investment_benchmark_months: {
+        Row: { code: string; reference_month: string; return_percent: number; source: string; synced_at: string };
+        Insert: { code: string; reference_month: string; return_percent: number; source: string; synced_at?: string };
+        Update: { return_percent?: number; source?: string; synced_at?: string };
+        Relationships: [];
+      };
       financing_schedule_entries: {
         Row: FinancingScheduleEntry;
         Insert: never;
@@ -1182,6 +1264,78 @@ export type Database = {
         Row: FinancingExtraAmortization;
         Insert: never;
         Update: never;
+        Relationships: [];
+      };
+      financial_goals: {
+        Row: FinancialGoal;
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          goal_type: FinancialGoalType;
+          currency: SupportedCurrency;
+          target_amount_minor: number;
+          target_date: string;
+          status?: FinancialGoalStatus;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<FinancialGoal, "id" | "user_id" | "created_at" | "updated_at">
+        >;
+        Relationships: [];
+      };
+      financial_goal_contributions: {
+        Row: FinancialGoalContribution;
+        Insert: {
+          id?: string;
+          user_id: string;
+          goal_id: string;
+          contribution_date: string;
+          amount_minor: number;
+          currency: SupportedCurrency;
+          source?: FinancialGoalContributionSource;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Omit<FinancialGoalContribution, "id" | "user_id" | "goal_id" | "created_at">
+        >;
+        Relationships: [];
+      };
+      financial_goal_links: {
+        Row: FinancialGoalLink;
+        Insert: {
+          id?: string;
+          user_id: string;
+          goal_id: string;
+          source_type: FinancialGoalLinkType;
+          account_id?: string | null;
+          investment_position_id?: string | null;
+          financing_contract_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Omit<FinancialGoalLink, "id" | "user_id" | "goal_id" | "created_at">
+        >;
+        Relationships: [];
+      };
+      monthly_financial_checkins: {
+        Row: MonthlyFinancialCheckin;
+        Insert: {
+          id?: string;
+          user_id: string;
+          reference_month: string;
+          status?: MonthlyCheckinStatus;
+          observation?: string | null;
+          closed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<MonthlyFinancialCheckin, "id" | "user_id" | "created_at">
+        >;
         Relationships: [];
       };
       import_jobs: {
@@ -1465,6 +1619,18 @@ export type Database = {
         };
         Returns: string;
       };
+      create_credit_card_invoice_entry: {
+        Args: {
+          target_invoice_id: string;
+          target_category_id: string | null;
+          target_entry_kind: CreditCardEntryKind;
+          target_description: string;
+          target_amount_minor: number;
+          target_entry_date: string;
+          target_notes?: string | null;
+        };
+        Returns: string;
+      };
       update_credit_card_purchase_custom: {
         Args: {
           target_purchase_id: string;
@@ -1536,6 +1702,10 @@ export type Database = {
         };
         Returns: string;
       };
+      save_financing_contract: {
+        Args: { target_contract_id: string | null; expected_updated_at: string | null; target_contract: Json; target_schedule: Json };
+        Returns: string;
+      };
       cancel_financing_import: {
         Args: { target_job_id: string };
         Returns: boolean;
@@ -1557,6 +1727,10 @@ export type Database = {
       };
       generate_recurring_transactions: {
         Args: { target_until: string };
+        Returns: number;
+      };
+      generate_recurring_transactions_reviewed: {
+        Args: { target_until: string; review_overrides?: Json };
         Returns: number;
       };
       copy_previous_month_budgets: {

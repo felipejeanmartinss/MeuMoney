@@ -14,6 +14,7 @@ export type TransactionMutationInput = {
   transactionDate: string;
   status: TransactionStatus;
   notes: string | null;
+  isSubscription: boolean;
 };
 
 export type TransactionFilters = {
@@ -21,13 +22,14 @@ export type TransactionFilters = {
   status?: TransactionStatus;
   accountId?: string;
   categoryId?: string;
+  uncategorized?: boolean;
   dateFrom?: string;
   dateTo?: string;
   activity: "active" | "inactive" | "all";
 };
 
 const transactionColumns =
-  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
+  "id, user_id, account_id, category_id, transaction_type, description, amount_minor, transaction_date, status, notes, is_subscription, is_active, reconciled_at, origin_type, origin_id, credit_card_invoice_id, recurring_transaction_id, created_at, updated_at";
 
 export async function listCurrentUserTransactions(
   filters: TransactionFilters,
@@ -48,6 +50,9 @@ export async function listCurrentUserTransactions(
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
   if (filters.categoryId) {
     query = query.eq("category_id", filters.categoryId);
+  }
+  if (filters.uncategorized) {
+    query = query.eq("origin_type", "manual").is("category_id", null);
   }
   if (filters.dateFrom) {
     query = query.gte("transaction_date", filters.dateFrom);
@@ -177,6 +182,7 @@ export async function createCurrentUserTransaction(
     transaction_date: input.transactionDate,
     status: input.status,
     notes: input.notes,
+    is_subscription: input.isSubscription,
   });
 
   return error
@@ -200,6 +206,7 @@ export async function updateCurrentUserTransaction(
       transaction_date: input.transactionDate,
       status: input.status,
       notes: input.notes,
+      is_subscription: input.isSubscription,
     })
     .eq("user_id", user.id)
     .eq("id", id)
@@ -229,6 +236,24 @@ export async function deleteCurrentUserTransaction(id: string) {
         message: "Não foi possível excluir o lançamento.",
       }
     : { ok: true as const };
+}
+
+export async function clearCurrentUserInactiveAutomaticTransactions() {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("is_active", false)
+    .eq("origin_type", "system")
+    .select("id");
+
+  return error
+    ? {
+        ok: false as const,
+        message: "Não foi possível limpar os automáticos inativos.",
+      }
+    : { ok: true as const, deletedCount: data?.length ?? 0 };
 }
 
 export async function setCurrentUserTransactionActive(

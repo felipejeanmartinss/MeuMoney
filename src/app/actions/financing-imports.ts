@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import {
   financingImportConfirmationSchema,
   financingImportJobIdSchema,
@@ -11,7 +12,6 @@ import {
   cancelCurrentUserFinancingImport,
   confirmCurrentUserFinancingImport,
   createCurrentUserManualFinancingContract,
-  createCurrentUserFinancingImport,
 } from "@/services/finance/financing-imports-service";
 
 export type FinancingImportFormState = {
@@ -20,21 +20,8 @@ export type FinancingImportFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
 };
 
-export async function uploadFinancingPdf(
-  _previousState: FinancingImportFormState,
-  formData: FormData,
-): Promise<FinancingImportFormState> {
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return {
-      status: "error",
-      fieldErrors: { file: ["Selecione o extrato financeiro em PDF."] },
-    };
-  }
-
-  const result = await createCurrentUserFinancingImport(file);
-  if (!result.ok) return { status: "error", message: result.message };
-  redirect(`/investments/financing-imports/${result.id}`);
+export async function uploadFinancingPdf(): Promise<FinancingImportFormState> {
+  return { status: "error", message: "A importação bancária foi descontinuada. Use o cadastro e a edição do fluxo de parcelas." };
 }
 
 export async function confirmFinancingImport(
@@ -112,10 +99,18 @@ export async function createManualFinancingContract(
     };
   }
 
-  const result = await createCurrentUserManualFinancingContract(parsed.data);
+  const contractId = formData.get("contractId");
+  const expectedUpdatedAt = formData.get("expectedUpdatedAt");
+  if (contractId && (!z.uuid().safeParse(contractId).success || !z.iso.datetime({ offset: true }).safeParse(expectedUpdatedAt).success)) {
+    return { status: "error", message: "Contrato inválido. Reabra a página." };
+  }
+  const result = await createCurrentUserManualFinancingContract(parsed.data, contractId ? String(contractId) : null, contractId ? String(expectedUpdatedAt) : null);
   if (!result.ok) return { status: "error", message: result.message };
 
   revalidatePath("/investments");
   revalidatePath("/net-worth");
-  redirect(`/investments/financings/${result.contractId}?message=created`);
+  revalidatePath(`/investments/financings/${result.contractId}`);
+  revalidatePath("/goals");
+  revalidatePath("/dashboard");
+  redirect(`/investments/financings/${result.contractId}?message=${contractId ? "updated" : "created"}`);
 }

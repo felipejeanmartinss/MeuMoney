@@ -1,11 +1,3 @@
-import { AppShell } from "@/components/layout/app-shell";
-import { requireUser } from "@/services/auth/server-auth";
+export { AuthenticatedLayout as default } from "@/components/layout/authenticated-layout";
 
 export const dynamic = "force-dynamic";
-
-export default async function RecurringTransactionsLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  await requireUser();
-  return <AppShell>{children}</AppShell>;
-}

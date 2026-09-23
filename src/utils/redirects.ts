@@ -15,24 +15,15 @@ export function getSafeRedirectPath(
   }
 }
 
+const PRIVATE_ROUTES = [
+  "/dashboard", "/accounts", "/categories", "/transactions",
+  "/recurring-transactions", "/transfers", "/credit-cards", "/settings",
+  "/budgets", "/imports", "/investments", "/net-worth", "/reports",
+  "/goals", "/check-in", "/data-quality",
+] as const;
+
 export function isPrivatePath(pathname: string) {
-  return (
-    pathname === "/dashboard" ||
-    pathname === "/accounts" ||
-    pathname.startsWith("/accounts/") ||
-    pathname === "/categories" ||
-    pathname.startsWith("/categories/") ||
-    pathname === "/transactions" ||
-    pathname.startsWith("/transactions/") ||
-    pathname === "/recurring-transactions" ||
-    pathname.startsWith("/recurring-transactions/") ||
-    pathname === "/transfers" ||
-    pathname.startsWith("/transfers/") ||
-    pathname === "/credit-cards" ||
-    pathname.startsWith("/credit-cards/") ||
-    pathname === "/settings" ||
-    pathname.startsWith("/settings/")
-  );
+  return PRIVATE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
 export function isGuestOnlyPath(pathname: string) {

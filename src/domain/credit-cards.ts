@@ -148,6 +148,18 @@ export const creditCardPurchaseFormSchema = z
         message: "Assinaturas não possuem quantidade fixa de parcelas.",
       });
     }
+    if (
+      data.targetInvoiceId &&
+      (data.installmentCount !== 1 ||
+        data.installmentAmounts.length !== 1 ||
+        data.isRecurring)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["installmentCount"],
+        message: "Lançamentos feitos dentro da fatura devem ser únicos.",
+      });
+    }
     if (data.installmentCount > data.totalAmount) {
       context.addIssue({
         code: "custom",
@@ -307,6 +319,36 @@ export function effectiveInvoiceStatus(
   today: string,
 ): CreditCardInvoiceStatus {
   return status === "closed" && dueDate < today ? "overdue" : status;
+}
+
+export function selectNextCreditCardInvoice<
+  T extends {
+    status: CreditCardInvoiceStatus;
+    total_amount: number;
+    due_date: string;
+  },
+>(invoices: readonly T[]): T | undefined {
+  return [...invoices]
+    .filter((invoice) => invoice.status !== "paid")
+    .sort((left, right) => {
+      const leftPriority =
+        left.status === "open" && left.total_amount > 0
+          ? 0
+          : left.total_amount > 0
+            ? 1
+            : left.status === "open"
+              ? 2
+              : 3;
+      const rightPriority =
+        right.status === "open" && right.total_amount > 0
+          ? 0
+          : right.total_amount > 0
+            ? 1
+            : right.status === "open"
+              ? 2
+              : 3;
+      return leftPriority - rightPriority || left.due_date.localeCompare(right.due_date);
+    })[0];
 }
 
 export type CreditCardInvoiceForecastRow = {

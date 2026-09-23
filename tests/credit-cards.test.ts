@@ -8,6 +8,7 @@ import {
   getInvoiceDueDate,
   getInvoiceBillingMonth,
   getPurchaseReferenceMonth,
+  selectNextCreditCardInvoice,
   splitInstallments,
 } from "../src/domain/credit-cards";
 import {
@@ -69,6 +70,25 @@ describe("invoice presentation status", () => {
     expect(effectiveInvoiceStatus("paid", "2026-07-10", "2026-07-11")).toBe(
       "paid",
     );
+  });
+
+  it("skips an old empty invoice when a later open invoice has value", () => {
+    const selected = selectNextCreditCardInvoice([
+      {
+        id: "old-empty",
+        status: "open",
+        total_amount: 0,
+        due_date: "2026-01-22",
+      },
+      {
+        id: "current",
+        status: "open",
+        total_amount: 70_274,
+        due_date: "2026-10-22",
+      },
+    ]);
+
+    expect(selected?.id).toBe("current");
   });
 });
 

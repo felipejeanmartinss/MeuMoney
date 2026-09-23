@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   isNavigationItemActive,
   MAIN_NAVIGATION,
+  MOBILE_NAVIGATION,
   resolveNavigationSection,
   SECONDARY_NAVIGATION,
   secondaryNavigationFor,
@@ -133,6 +135,19 @@ function NavigationGlyph({
         <path d="M17 7h3v3" />
       </>
     ),
+    target: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
+      </>
+    ),
+    checkin: (
+      <>
+        <rect x="5" y="3" width="14" height="18" rx="2" />
+        <path d="M9 3v3h6V3M8 11l2 2 4-4M8 17h8" />
+      </>
+    ),
   };
 
   return (
@@ -167,11 +182,11 @@ function NavLink({
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={`group flex min-h-10 items-center gap-2.5 rounded-xl font-semibold transition ${
+      className={`group flex min-h-11 items-center gap-2.5 rounded-lg font-semibold transition ${
         compact ? "px-2.5 text-xs" : "px-3 text-sm"
       } ${
         active
-          ? "bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-100"
+          ? "bg-emerald-50 text-emerald-950"
           : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
       }`}
     >
@@ -220,17 +235,12 @@ export function DesktopNavigation() {
       </nav>
       {secondary.length ? (
         <nav aria-label={`Opções de ${sectionLabel}`} className="grid gap-1">
-          <p className="mb-1 px-2.5 text-[0.64rem] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-            {sectionLabel}
-          </p>
+          {section !== "reports" ? <p className="mb-1 px-2.5 text-[0.64rem] font-extrabold uppercase tracking-[0.16em] text-slate-400">{sectionLabel}</p> : null}
           {secondary.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              search={search}
-              compact
-            />
+            <div key={item.href}>
+              {item.group ? <p className="mb-0.5 mt-2 px-2.5 text-[0.62rem] font-extrabold uppercase tracking-[0.13em] text-slate-400">{item.group}</p> : null}
+              <NavLink item={item} pathname={pathname} search={search} compact />
+            </div>
           ))}
         </nav>
       ) : null}
@@ -240,11 +250,17 @@ export function DesktopNavigation() {
 
 export function MobileSecondaryMenu() {
   const { pathname, search } = useNavigationState();
+  const menuRef = useRef<HTMLDetailsElement>(null);
   const groups = Object.entries(SECONDARY_NAVIGATION);
 
   return (
-    <details className="group relative">
-      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm marker:hidden">
+    <details key={pathname + search} ref={menuRef} className="group" onKeyDown={(event) => {
+      if (event.key === "Escape" && menuRef.current) {
+        menuRef.current.open = false;
+        menuRef.current.querySelector("summary")?.focus();
+      }
+    }}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 marker:hidden">
         <span className="grid gap-1" aria-hidden="true">
           <span className="h-0.5 w-4 rounded bg-current" />
           <span className="h-0.5 w-4 rounded bg-current" />
@@ -252,7 +268,12 @@ export function MobileSecondaryMenu() {
         </span>
         Menu
       </summary>
-      <div className="absolute right-0 z-40 mt-2 max-h-[70dvh] w-[min(21rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
+      <div onClick={(event) => {
+        if ((event.target as HTMLElement).closest("a") && menuRef.current) menuRef.current.open = false;
+      }} className="absolute right-4 top-full z-40 mt-2 max-h-[70dvh] w-[min(21rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+        <nav aria-label="Todas as seções" className="grid gap-1 border-b border-slate-100 pb-3">
+          {MAIN_NAVIGATION.map((item) => <NavLink key={item.href} item={item} pathname={pathname} search={search} />)}
+        </nav>
         {groups.map(([section, items]) => (
           <div
             key={section}
@@ -262,13 +283,10 @@ export function MobileSecondaryMenu() {
               {MAIN_NAVIGATION.find((item) => item.section === section)?.label}
             </p>
             {items.map((item) => (
-              <NavLink
-                key={item.href}
-                item={item}
-                pathname={pathname}
-                search={search}
-                compact
-              />
+              <div key={item.href}>
+                {item.group ? <p className="mt-2 px-3 text-[0.62rem] font-bold uppercase tracking-wide text-slate-400">{item.group}</p> : null}
+                <NavLink item={item} pathname={pathname} search={search} compact />
+              </div>
             ))}
           </div>
         ))}
@@ -278,16 +296,15 @@ export function MobileSecondaryMenu() {
 }
 
 export function MobileBottomNavigation() {
-  const { pathname } = useNavigationState();
-  const activeSection = resolveNavigationSection(pathname);
+  const { pathname, search } = useNavigationState();
 
   return (
     <nav
       aria-label="Navegação principal no celular"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-0.4rem_1.5rem_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden"
     >
-      {MAIN_NAVIGATION.map((item) => {
-        const active = item.section === activeSection;
+      {MOBILE_NAVIGATION.map((item) => {
+        const active = isNavigationItemActive(pathname, item, search);
         return (
           <Link
             key={item.href}

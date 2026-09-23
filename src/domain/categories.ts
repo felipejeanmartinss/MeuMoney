@@ -42,12 +42,12 @@ export const categoryFormSchema = z
   .superRefine((value, refinement) => {
     if (
       value.isFixedExpense &&
-      (value.kind !== "expense" || value.parentId === null)
+      value.kind !== "expense"
     ) {
       refinement.addIssue({
         code: "custom",
         path: ["isFixedExpense"],
-        message: "Somente uma subcategoria de despesa pode ser marcada como fixa.",
+        message: "Somente despesas podem ser marcadas como fixas.",
       });
     }
   });

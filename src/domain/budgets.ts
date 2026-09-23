@@ -265,3 +265,71 @@ export function summarizeBudgetProgress(rows: BudgetProgress[]) {
           ) / 100,
   };
 }
+
+export type BudgetHistoryMonth = {
+  referenceMonth: string;
+  amountMinor: number;
+};
+
+export type BudgetHistoryStats = {
+  categoryId: string;
+  categoryName: string;
+  minimumAmountMinor: number;
+  averageAmountMinor: number;
+  medianAmountMinor: number;
+  maximumAmountMinor: number;
+  plannedAmountMinor: number;
+  realizedAmountMinor: number;
+  percentageConsumed: number | null;
+  suggestedAmountMinor: number;
+  seasonal: boolean;
+  seasonalReferenceMonth: string | null;
+};
+
+function median(values: number[]) {
+  if (!values.length) return 0;
+  const ordered = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2
+    ? ordered[middle]
+    : Math.round((ordered[middle - 1] + ordered[middle]) / 2);
+}
+
+export function calculateBudgetHistoryStats(input: {
+  categoryId: string;
+  categoryName: string;
+  history: BudgetHistoryMonth[];
+  plannedAmountMinor: number;
+  realizedAmountMinor: number;
+  referenceMonth: string;
+}): BudgetHistoryStats {
+  const values = input.history.map((row) => Math.max(0, row.amountMinor));
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const average = values.length ? Math.round(total / values.length) : 0;
+  const targetMonth = input.referenceMonth.slice(5, 7);
+  const seasonalRows = input.history.filter((row) => row.referenceMonth.slice(5, 7) === targetMonth);
+  const seasonalAverage = seasonalRows.length
+    ? Math.round(seasonalRows.reduce((sum, row) => sum + Math.max(0, row.amountMinor), 0) / seasonalRows.length)
+    : 0;
+  const maximum = values.length ? Math.max(...values) : 0;
+  const seasonal = maximum > 0 && (maximum >= average * 1.5 || seasonalAverage >= average * 1.25);
+  const suggested = seasonal
+    ? Math.max(average, median(values), seasonalAverage)
+    : Math.max(average, median(values));
+  return {
+    categoryId: input.categoryId,
+    categoryName: input.categoryName,
+    minimumAmountMinor: values.length ? Math.min(...values) : 0,
+    averageAmountMinor: average,
+    medianAmountMinor: median(values),
+    maximumAmountMinor: maximum,
+    plannedAmountMinor: input.plannedAmountMinor,
+    realizedAmountMinor: input.realizedAmountMinor,
+    percentageConsumed: input.plannedAmountMinor > 0
+      ? Math.round((input.realizedAmountMinor / input.plannedAmountMinor) * 10_000) / 100
+      : null,
+    suggestedAmountMinor: suggested,
+    seasonal,
+    seasonalReferenceMonth: seasonal ? targetMonth : null,
+  };
+}

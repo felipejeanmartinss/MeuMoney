@@ -1,6 +1,10 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { toggleCreditCardActivity } from "@/app/actions/credit-cards";
-import { CREDIT_CARD_BRAND_LABELS } from "@/domain/credit-cards";
+import {
+  CREDIT_CARD_BRAND_LABELS,
+  selectNextCreditCardInvoice,
+} from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 
@@ -24,24 +28,15 @@ export default async function CreditCardsPage({
   const feedback = params.message ? messages[params.message] : undefined;
 
   return (
-    <main className="mx-auto grid max-w-[1500px] gap-4 px-4 py-5 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-700">
-            Crédito
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-slate-950 sm:text-4xl">
-            Cartões
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">Faturas e limites comprometidos.</p>
-        </div>
+    <main className="app-page">
+      <PageHeader title="Cartões" actions={
         <Link
           href="/credit-cards/new"
-          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
         >
           Novo cartão
         </Link>
-      </div>
+      } />
 
       {feedback ? (
         <p
@@ -53,7 +48,7 @@ export default async function CreditCardsPage({
       ) : null}
       {hasError ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-          Não foi possível carregar os cartões. Confirme a migration da Sprint 4.
+          Não foi possível carregar os cartões. Tente novamente.
         </p>
       ) : null}
       {!hasError && cards.length === 0 ? (
@@ -67,16 +62,15 @@ export default async function CreditCardsPage({
         </section>
       ) : null}
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => {
-          const nextInvoice = invoices.find(
-            (invoice) =>
-              invoice.credit_card_id === card.id && invoice.status === "open",
+          const nextInvoice = selectNextCreditCardInvoice(
+            invoices.filter((invoice) => invoice.credit_card_id === card.id),
           );
           return (
           <article
             key={card.id}
-            className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+            className={`rounded-xl border border-slate-200 bg-white p-3 ${
               card.is_active ? "" : "opacity-65"
             }`}
           >
@@ -92,7 +86,7 @@ export default async function CreditCardsPage({
                 {card.is_active ? "Ativo" : "Inativo"}
               </span>
             </div>
-            <dl className="mt-3 grid grid-cols-3 gap-3 border-y border-slate-100 py-3">
+            <dl className="mt-2 grid grid-cols-3 gap-2 border-y border-slate-100 py-2">
               <div>
                 <dt className="text-xs text-slate-500">Próxima fatura</dt>
                 <dd className="mt-0.5 text-sm font-extrabold text-rose-700">
@@ -114,16 +108,16 @@ export default async function CreditCardsPage({
                 </dd>
               </div>
             </dl>
-            <div className="mt-3 flex flex-wrap gap-1">
+            <div className="mt-2 flex flex-wrap gap-1">
               <Link
                 href={`/credit-cards/${card.id}`}
-                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold"
+                className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-xs font-bold"
               >
                 Abrir
               </Link>
               <Link
                 href={`/credit-cards/${card.id}/invoices`}
-                className="inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-bold text-blue-700"
+                className="inline-flex min-h-11 items-center rounded-lg px-3 text-xs font-bold text-blue-700"
               >
                 Faturas
               </Link>
@@ -134,7 +128,7 @@ export default async function CreditCardsPage({
                   name="active"
                   value={card.is_active ? "false" : "true"}
                 />
-                <button className="min-h-9 rounded-lg px-3 text-xs font-bold text-blue-700">
+                <button className="min-h-11 rounded-lg px-3 text-xs font-bold text-blue-700">
                   {card.is_active ? "Inativar" : "Reativar"}
                 </button>
               </form>

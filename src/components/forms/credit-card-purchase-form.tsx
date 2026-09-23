@@ -101,12 +101,17 @@ export function CreditCardPurchaseForm({
     ? updateCreditCardPurchase
     : createCreditCardPurchase;
   const [state, formAction, pending] = useActionState(action, initialState);
+  const isDirectInvoiceEntry = Boolean(targetInvoiceId);
   const initialEntryKind = values.entryKind ?? entryKinds[0] ?? "purchase";
   const [entryKind, setEntryKind] = useState(initialEntryKind);
   const [amount, setAmount] = useState(values.totalAmount ?? "");
   const [date, setDate] = useState(values.purchaseDate ?? "");
-  const [count, setCount] = useState(values.installmentCount ?? 1);
-  const [isRecurring, setIsRecurring] = useState(values.isRecurring ?? false);
+  const [count, setCount] = useState(
+    isDirectInvoiceEntry ? 1 : (values.installmentCount ?? 1),
+  );
+  const [isRecurring, setIsRecurring] = useState(
+    isDirectInvoiceEntry ? false : (values.isRecurring ?? false),
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [installmentAmounts, setInstallmentAmounts] = useState(() =>
     values.installmentAmounts ??
@@ -351,11 +356,15 @@ export function CreditCardPurchaseForm({
             required
           />
         </Field>
-        {isCredit || isRecurring ? (
+        {isCredit || isRecurring || isDirectInvoiceEntry ? (
           <div className="grid content-end gap-1.5">
             <span className="text-sm font-semibold text-slate-700">Forma</span>
             <div className="flex min-h-12 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700">
-              {isCredit ? "Crédito único" : "Mensal, sem quantidade fixa"}
+              {isDirectInvoiceEntry
+                ? "Lançamento único nesta fatura"
+                : isCredit
+                  ? "Crédito único"
+                  : "Mensal, sem quantidade fixa"}
             </div>
             <input type="hidden" name="installmentCount" value="1" />
           </div>
@@ -378,7 +387,7 @@ export function CreditCardPurchaseForm({
         )}
       </div>
 
-      {!isCredit ? (
+      {!isCredit && !isDirectInvoiceEntry ? (
         <label className="flex min-h-10 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-800">
           <input
             className="h-4 w-4 accent-blue-700"

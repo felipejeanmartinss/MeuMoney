@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   deleteInvestmentPosition,
@@ -705,16 +706,10 @@ function FinancingsView({
       </section>
       <section className="flex flex-wrap gap-2">
         <Link
-          href="/investments/financing-imports/new"
-          className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
-        >
-          Importar PDF do banco
-        </Link>
-        <Link
           href="/investments/financings/new"
           className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
         >
-          Cadastrar manualmente
+          Novo financiamento
         </Link>
       </section>
 
@@ -722,10 +717,10 @@ function FinancingsView({
         <section className="grid gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">
-              Contratos estruturados
+              Contratos
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Indicadores derivados dos extratos financeiros revisados.
+              Pagamentos e saldo do fluxo cadastrado.
             </p>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -748,9 +743,10 @@ function FinancingsView({
                     {contract.status === "active" ? "Ativo" : contract.status === "settled" ? "Quitado" : "Arquivado"}
                   </span>
                 </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                  <div><dt className="text-slate-500">Total pago</dt><dd className="mt-1 font-semibold text-slate-950">{formatMoney(contract.total_paid_minor, contract.currency)}</dd></div>
                   <div><dt className="text-slate-500">Saldo devedor</dt><dd className="mt-1 font-extrabold text-slate-950">{formatMoney(contract.current_balance_minor, contract.currency)}</dd></div>
-                  <div><dt className="text-slate-500">Juros pagos</dt><dd className="mt-1 font-extrabold text-slate-950">{formatMoney(contract.interest_paid_minor, contract.currency)}</dd></div>
+                  <div><dt className="text-slate-500">Parcelas</dt><dd className="mt-1 font-semibold text-slate-950">{contract.paid_installments}/{contract.original_term_months ?? contract.paid_installments + contract.scheduled_installments}</dd></div>
                 </dl>
               </Link>
             ))}
@@ -858,19 +854,8 @@ export default async function InvestmentsPage({
     financingResult.hasError;
 
   return (
-    <main className="mx-auto grid max-w-[1760px] gap-4 px-3 py-5 sm:px-5 lg:px-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-            Carteira e compromissos
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Investimentos
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Posições por moeda e classe de ativo.
-          </p>
-        </div>
+    <main className="app-page max-w-[1760px]">
+      <PageHeader title="Investimentos" actions={
         <div className="flex flex-wrap gap-2">
           {activeTab === "positions" ? (
             <Link
@@ -891,19 +876,19 @@ export default async function InvestmentsPage({
             </Link>
           ) : null}
           <Link
-            href={activeTab === "positions" ? "/investments/new" : "/investments/financing-imports/new"}
+            href={activeTab === "positions" ? "/investments/new" : "/investments/financings/new"}
             className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
           >
             {activeTab === "positions"
               ? "Nova posição"
-              : "Importar financiamento"}
+              : "Novo financiamento"}
           </Link>
         </div>
-      </header>
+      } />
 
       <nav
         aria-label="Seções de investimentos"
-        className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+        className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
       >
         <Link
           href="/investments"
