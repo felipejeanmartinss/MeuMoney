@@ -46,6 +46,14 @@ export type AccountRegisterBalanceSummary = {
   projectedBalanceMinor: number;
 };
 
+export function accountRegisterMatchesBalance(
+  calculated: AccountRegisterBalanceSummary,
+  account: { current_balance_minor: number; projected_balance_minor: number },
+) {
+  return calculated.currentBalanceMinor === account.current_balance_minor &&
+    calculated.projectedBalanceMinor === account.projected_balance_minor;
+}
+
 export const accountRegisterReconciliationSchema = z.object({
   accountId: z.uuid("Conta inválida."),
   entryType: z.enum(ACCOUNT_REGISTER_ENTRY_TYPES),
