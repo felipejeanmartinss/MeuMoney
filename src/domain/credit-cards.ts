@@ -365,8 +365,8 @@ export type CreditCardCommitment = {
 };
 
 /**
- * Consolida o limite comprometido somente ate a ultima fatura cadastrada.
- * Assinaturas ativas completam os meses ainda nao materializados, sem recriar
+ * Consolida todas as parcelas registradas ainda nao pagas. A ultima fatura
+ * limita somente a projecao de assinaturas nao materializadas, sem recriar
  * meses pagos ou cancelados que ja possuam uma parcela registrada.
  */
 export function calculateCreditCardCommitment(input: {
@@ -394,14 +394,6 @@ export function calculateCreditCardCommitment(input: {
     .sort()
     .at(-1) ?? null;
 
-  if (!lastInvoiceMonth) {
-    return {
-      lastInvoiceMonth: null,
-      committedMinor: 0,
-      availableMinor: creditLimitMinor,
-    };
-  }
-
   const purchaseById = new Map(
     input.purchases.map((purchase) => [purchase.id, purchase]),
   );
@@ -411,7 +403,8 @@ export function calculateCreditCardCommitment(input: {
   for (const installment of input.installments) {
     const purchase = purchaseById.get(installment.purchaseId);
     if (!purchase) continue;
-    if (installment.competenceDate > lastInvoiceMonth) continue;
+    // Parcelas ja registradas comprometem o limite mesmo que a fatura futura
+    // ainda nao tenha sido materializada. O horizonte so limita assinaturas.
 
     const months =
       registeredMonthsByPurchase.get(installment.purchaseId) ??
@@ -429,6 +422,7 @@ export function calculateCreditCardCommitment(input: {
 
   for (const purchase of input.purchases) {
     if (!purchase.isRecurring || purchase.entryKind !== "purchase") continue;
+    if (!lastInvoiceMonth) continue;
     const amountMinor = Math.max(0, assertMinorUnits(purchase.totalAmountMinor));
     const firstReference = parseIsoDate(
       getPurchaseReferenceMonth(purchase.purchaseDate, input.closingDay),
@@ -451,6 +445,17 @@ export function calculateCreditCardCommitment(input: {
     committedMinor: normalizedCommitment,
     availableMinor: assertMinorUnits(creditLimitMinor - normalizedCommitment),
   };
+}
+
+export function remainingCreditCardInvoiceAmount(invoice: {
+  status: CreditCardInvoiceStatus;
+  total_amount: number;
+  paid_amount: number;
+}): number {
+  if (invoice.status === "paid") return 0;
+  return Math.max(0,
+    assertMinorUnits(invoice.total_amount) - assertMinorUnits(invoice.paid_amount),
+  );
 }
 
 export function buildCreditCardInvoiceForecast(input: {

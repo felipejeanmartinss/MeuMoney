@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
+import { isValidIsoDate } from "@/domain/dates";
+import { parseMoneyInputToMinor } from "@/domain/money";
 import {
   recurringGenerationDateSchema,
   recurringGenerationReviewSchema,
@@ -13,6 +15,7 @@ import {
 import {
   createCurrentUserRecurringTransaction,
   generateCurrentUserRecurringTransactions,
+  generateCurrentUserSingleRecurringTransaction,
   setCurrentUserRecurringTransactionState,
   updateCurrentUserRecurringTransaction,
 } from "@/services/finance/recurring-transactions-service";
@@ -154,4 +157,23 @@ export async function generateRecurringTransactions(formData: FormData) {
       ? `/recurring-transactions?message=generated&count=${result.generatedCount}`
       : "/recurring-transactions?message=generation-error",
   );
+}
+
+export async function generateSingleRecurringTransaction(formData: FormData) {
+  const parsedId = recurringTransactionIdSchema.safeParse(formData.get("id"));
+  const date = String(formData.get("transactionDate") ?? "");
+  let amountMinor = 0;
+  try {
+    amountMinor = parseMoneyInputToMinor(String(formData.get("amount") ?? ""));
+  } catch {
+    redirect("/recurring-transactions?message=generation-error");
+  }
+  if (!parsedId.success || !isValidIsoDate(date) || amountMinor <= 0) {
+    redirect("/recurring-transactions?message=generation-error");
+  }
+  const result = await generateCurrentUserSingleRecurringTransaction(
+    parsedId.data, date, amountMinor,
+  );
+  revalidateRecurringPaths();
+  redirect(`/recurring-transactions?message=${result.ok ? "single-generated" : "generation-error"}`);
 }

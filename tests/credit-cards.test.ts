@@ -8,6 +8,7 @@ import {
   getInvoiceDueDate,
   getInvoiceBillingMonth,
   getPurchaseReferenceMonth,
+  remainingCreditCardInvoiceAmount,
   selectNextCreditCardInvoice,
   splitInstallments,
 } from "../src/domain/credit-cards";
@@ -199,7 +200,7 @@ describe("credit card commitment horizon", () => {
     },
   ];
 
-  it("limits installments and subscriptions to the last registered invoice", () => {
+  it("includes future installments even beyond the last registered invoice", () => {
     const result = calculateCreditCardCommitment({
       creditLimitMinor: 1_000_00,
       closingDay: 20,
@@ -218,8 +219,8 @@ describe("credit card commitment horizon", () => {
     });
 
     expect(result.lastInvoiceMonth).toBe("2026-11-01");
-    expect(result.committedMinor).toBe(350_00);
-    expect(result.availableMinor).toBe(650_00);
+    expect(result.committedMinor).toBe(450_00);
+    expect(result.availableMinor).toBe(550_00);
   });
 
   it("does not project a paid subscription month again", () => {
@@ -249,6 +250,17 @@ describe("credit card commitment horizon", () => {
 
     expect(result.committedMinor).toBe(0);
     expect(result.availableMinor).toBe(210_00);
+  });
+
+  it("counts registered installments without any invoice and nets partial invoice payments", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 500_00, closingDay: 20, invoices: [],
+      purchases: [{ id: "purchase", totalAmountMinor: 200_00, purchaseDate: "2026-09-01", isRecurring: false, entryKind: "purchase" }],
+      installments: [{ purchaseId: "purchase", amountMinor: 200_00, competenceDate: "2026-10-01", status: "pending" }],
+    });
+    expect(result.committedMinor).toBe(200_00);
+    expect(remainingCreditCardInvoiceAmount({ status: "open", total_amount: 200_00, paid_amount: 50_00 })).toBe(150_00);
+    expect(remainingCreditCardInvoiceAmount({ status: "paid", total_amount: 200_00, paid_amount: 200_00 })).toBe(0);
   });
 
   it("subtracts statement credits from the committed limit", () => {

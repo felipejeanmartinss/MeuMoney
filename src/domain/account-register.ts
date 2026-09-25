@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseMoneyInputToMinor } from "@/domain/money";
 import type { TransactionStatus } from "@/types/database";
 
 export const ACCOUNT_REGISTER_ENTRY_TYPES = [
@@ -29,6 +30,7 @@ export type AccountRegisterSourceEntry = {
   direction: AccountRegisterDirection;
   amountMinor: number;
   editHref: string | null;
+  automaticDateOnly?: boolean;
   canDelete?: boolean;
   investmentPositionId?: string | null;
   investmentCashFlowId?: string | null;
@@ -45,6 +47,81 @@ export type AccountRegisterBalanceSummary = {
   currentBalanceMinor: number;
   projectedBalanceMinor: number;
 };
+
+export type AccountRegisterFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  description?: string;
+  category?: string;
+  income?: string;
+  expense?: string;
+};
+
+export type PendingRecurrenceMatch = {
+  id: string;
+  accountId: string;
+  categoryId: string | null;
+  transactionType: "income" | "expense";
+  description: string;
+  amountMinor: number;
+  transactionDate: string;
+};
+
+function normalizedWords(value: string) {
+  return normalizedSearch(value).split(/[^a-z0-9]+/).filter((word) => word.length > 2);
+}
+
+export function findSimilarPendingRecurrence(
+  candidates: readonly PendingRecurrenceMatch[],
+  input: Omit<PendingRecurrenceMatch, "id">,
+) {
+  const words = normalizedWords(input.description);
+  const inputDate = Date.parse(`${input.transactionDate}T00:00:00Z`);
+  if (!words.length || !Number.isFinite(inputDate) || input.amountMinor <= 0) return null;
+  const ranked = candidates.flatMap((candidate) => {
+    if (candidate.accountId !== input.accountId || candidate.categoryId !== input.categoryId || candidate.transactionType !== input.transactionType) return [];
+    const days = Math.abs(Date.parse(`${candidate.transactionDate}T00:00:00Z`) - inputDate) / 86_400_000;
+    const amountDifference = Math.abs(candidate.amountMinor - input.amountMinor);
+    if (days > 14 || amountDifference > Math.max(500, Math.floor(candidate.amountMinor / 5))) return [];
+    const candidateWords = new Set(normalizedWords(candidate.description));
+    const overlap = words.filter((word) => candidateWords.has(word)).length;
+    if (!overlap && normalizedSearch(input.description) !== normalizedSearch(candidate.description)) return [];
+    return [{ candidate, score: overlap * 10 - days - amountDifference / 100 }];
+  });
+  ranked.sort((a, b) => b.score - a.score);
+  return ranked[0]?.candidate ?? null;
+}
+
+function normalizedSearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
+}
+
+function moneyFilter(value?: string) {
+  if (!value?.trim()) return undefined;
+  try {
+    return parseMoneyInputToMinor(value);
+  } catch {
+    return Number.NaN;
+  }
+}
+
+export function filterAccountRegisterEntries(
+  entries: readonly AccountRegisterEntry[],
+  filters: AccountRegisterFilters,
+): AccountRegisterEntry[] {
+  const description = normalizedSearch(filters.description ?? "");
+  const category = normalizedSearch(filters.category ?? "");
+  const income = moneyFilter(filters.income);
+  const expense = moneyFilter(filters.expense);
+  return entries.filter((entry) =>
+    (!filters.dateFrom || entry.transactionDate >= filters.dateFrom) &&
+    (!filters.dateTo || entry.transactionDate <= filters.dateTo) &&
+    (!description || normalizedSearch(entry.description).includes(description)) &&
+    (!category || normalizedSearch(entry.detail).includes(category)) &&
+    (income === undefined || (entry.signedAmountMinor > 0 && entry.amountMinor === income)) &&
+    (expense === undefined || (entry.signedAmountMinor < 0 && entry.amountMinor === expense))
+  );
+}
 
 export function accountRegisterMatchesBalance(
   calculated: AccountRegisterBalanceSummary,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountRegister } from "@/components/accounts/account-register";
+import type { AccountRegisterFilters } from "@/domain/account-register";
 import { ACCOUNT_TYPE_LABELS, CONTEXT_LABELS } from "@/domain/accounts";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserAccountHub } from "@/services/finance/accounts-service";
@@ -16,7 +17,7 @@ export default async function AccountDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; message?: string }>;
+  searchParams: Promise<{ page?: string; message?: string } & AccountRegisterFilters>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const [result, formOptions, creditCardOptions, investmentOptions] =
@@ -51,7 +52,7 @@ export default async function AccountDetailPage({
   }
 
   return (
-    <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">
+    <main className="mx-auto grid max-w-[1600px] gap-3 px-3 py-3 sm:px-5 lg:px-6">
       <div>
         <Link
           href="/accounts"
@@ -59,24 +60,24 @@ export default async function AccountDetailPage({
         >
           ← Voltar para Contas
         </Link>
-        <header className="mt-4 flex flex-col gap-4 rounded-3xl bg-slate-950 p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <header className="mt-2 flex flex-col gap-3 rounded-2xl bg-slate-950 p-4 text-white sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-300">
+            <p className="text-xs font-bold uppercase tracking-wide text-emerald-300">
               {ACCOUNT_TYPE_LABELS[account.type]} ·{" "}
               {CONTEXT_LABELS[account.context]}
             </p>
-            <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">
+            <h1 className="mt-0.5 text-2xl font-black tracking-tight">
               {account.name}
             </h1>
           </div>
           <div className="sm:text-right">
-            <div className="grid grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                   Saldo atual
                 </p>
                 <p
-                  className={`mt-1.5 text-2xl font-black ${
+                  className={`mt-0.5 text-xl font-black ${
                     result.balanceSummary.currentBalanceMinor < 0
                       ? "text-rose-300"
                       : "text-white"
@@ -88,12 +89,12 @@ export default async function AccountDetailPage({
                   )}
                 </p>
               </div>
-              <div className="border-l border-slate-700 pl-5 sm:pl-7">
+              <div className="border-l border-slate-700 pl-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                   Saldo projetado
                 </p>
                 <p
-                  className={`mt-1.5 text-2xl font-black ${
+                  className={`mt-0.5 text-xl font-black ${
                     result.balanceSummary.projectedBalanceMinor < 0
                       ? "text-rose-300"
                       : "text-white"
@@ -108,7 +109,7 @@ export default async function AccountDetailPage({
             </div>
             <Link
               href={`/accounts/${account.id}/edit`}
-              className="mt-2.5 inline-flex min-h-9 items-center rounded-lg border border-slate-600 px-3 text-sm font-bold hover:bg-slate-800"
+              className="mt-1.5 inline-flex min-h-8 items-center rounded-lg border border-slate-600 px-2.5 text-xs font-bold hover:bg-slate-800"
             >
               Editar conta
             </Link>
@@ -130,6 +131,14 @@ export default async function AccountDetailPage({
           asOfDate={result.balanceSummary.asOfDate}
           requestedPage={query.page}
           message={query.message}
+          filters={{
+            dateFrom: query.dateFrom,
+            dateTo: query.dateTo,
+            description: query.description,
+            category: query.category,
+            income: query.income,
+            expense: query.expense,
+          }}
           entryComposer={
             account.archived_at
               ? undefined
@@ -142,6 +151,7 @@ export default async function AccountDetailPage({
                   groups: formOptions.groups,
                   creditCards: creditCardOptions.destinations,
                   investmentPositions: investmentOptions.positions,
+                  pendingRecurrences: result.pendingRecurrences,
                   hasError:
                     formOptions.hasError ||
                     creditCardOptions.hasError ||

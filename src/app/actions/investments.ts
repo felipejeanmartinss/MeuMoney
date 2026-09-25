@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   investmentAccountEntryFormSchema,
+  INVESTMENT_INCOME_TYPE_LABELS,
   investmentCashFlowIdSchema,
   investmentCashFlowFormSchema,
   investmentPositionFormSchema,
@@ -20,11 +21,14 @@ import {
   deleteCurrentUserInvestmentPosition,
   deleteCurrentUserInvestmentPositionSnapshot,
   linkCurrentUserInvestmentTransferEntry,
+  linkCurrentUserBankIncome,
   setCurrentUserInvestmentPositionArchived,
   updateCurrentUserInvestmentPosition,
   updateCurrentUserInvestmentUnitPrices,
 } from "@/services/finance/investments-service";
 import { accountIdSchema } from "@/domain/accounts";
+import { transactionIdSchema } from "@/domain/transactions";
+import type { InvestmentIncomeType } from "@/types/database";
 
 export type InvestmentFormState = {
   status: "idle" | "error";
@@ -172,6 +176,22 @@ export async function createInvestmentCashFlow(
   revalidatePath("/investments");
   revalidatePath(`/investments/${parsed.data.positionId}/history`);
   redirect(`/investments/${parsed.data.positionId}/history?message=flow-created`);
+}
+
+export async function linkInvestmentBankIncome(formData: FormData) {
+  const position = investmentPositionIdSchema.safeParse(formData.get("positionId"));
+  const transaction = transactionIdSchema.safeParse(formData.get("transactionId"));
+  const incomeType = String(formData.get("incomeType") ?? "") as InvestmentIncomeType;
+  if (!position.success || !transaction.success || !(incomeType in INVESTMENT_INCOME_TYPE_LABELS)) {
+    redirect("/investments?message=link-error");
+  }
+  const result = await linkCurrentUserBankIncome(position.data, transaction.data, incomeType);
+  revalidatePath("/investments");
+  revalidatePath(`/investments/${position.data}/history`);
+  revalidatePath("/accounts");
+  redirect(result.ok
+    ? `/investments/${position.data}/history?message=income-linked`
+    : `/investments/${position.data}/history/new?message=link-error`);
 }
 
 export async function deleteInvestmentCashFlow(formData: FormData) {

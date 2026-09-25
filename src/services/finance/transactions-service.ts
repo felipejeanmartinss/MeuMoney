@@ -163,6 +163,53 @@ export async function getCurrentUserTransaction(id: string) {
   };
 }
 
+export async function getCurrentUserAutomaticTransaction(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id, account_id, description, transaction_date, origin_type, status")
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .eq("is_active", true)
+    .in("origin_type", ["system", "credit_card_invoice_payment"])
+    .maybeSingle();
+  return { transaction: data, hasError: Boolean(error) };
+}
+
+export async function updateCurrentUserAutomaticTransactionDate(
+  id: string,
+  date: string,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("update_automatic_transaction_date", {
+    target_transaction_id: id,
+    target_transaction_date: date,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function confirmCurrentUserRecurringForecast(
+  forecastId: string,
+  input: TransactionMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("confirm_recurring_transaction", {
+    target_transaction_id: forecastId,
+    target_account_id: input.accountId,
+    target_transaction_type: input.transactionType,
+    target_category_id: input.categoryId,
+    target_description: input.description,
+    target_amount_minor: input.amountMinor,
+    target_transaction_date: input.transactionDate,
+    target_notes: input.notes,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
 function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
   if (message.includes("invalid_transaction_category")) {

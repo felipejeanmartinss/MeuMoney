@@ -306,3 +306,19 @@ export async function generateCurrentUserRecurringTransactions(
     ? { ok: false as const, message: mutationErrorMessage(error) }
     : { ok: true as const, generatedCount: data ?? 0 };
 }
+
+export async function generateCurrentUserSingleRecurringTransaction(
+  id: string,
+  date: string,
+  amountMinor: number,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("generate_one_recurring_transaction", {
+    target_recurring_id: id,
+    target_transaction_date: date,
+    target_amount_minor: amountMinor,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}

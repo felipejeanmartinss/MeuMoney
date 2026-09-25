@@ -4,6 +4,7 @@ import {
   accountRegisterMatchesBalance,
   summarizeAccountRegisterBalances,
   type AccountRegisterSourceEntry,
+  type PendingRecurrenceMatch,
 } from "@/domain/account-register";
 import { getCategoryQualifiedName } from "@/domain/categories";
 import { requireUser } from "@/services/auth/server-auth";
@@ -57,6 +58,17 @@ export async function getCurrentUserAccount(id: string) {
 
 export async function getCurrentUserAccountHub(id: string) {
   const { supabase, user } = await requireUser();
+
+  async function getInvestmentLinks() {
+    const result = await supabase.from("investment_cash_flows")
+      .select("id, position_id, transaction_id, source_transfer_id, source_account_id, source_transaction_id")
+      .eq("user_id", user.id).limit(5000);
+    if (!result.error || !/source_transaction_id/i.test(result.error.message)) return result;
+    const fallback = await supabase.from("investment_cash_flows")
+      .select("id, position_id, transaction_id, source_transfer_id, source_account_id")
+      .eq("user_id", user.id).limit(5000);
+    return { ...fallback, data: fallback.data?.map((flow) => ({ ...flow, source_transaction_id: null })) ?? null };
+  }
 
   async function getAllAccountTransactions() {
     const rows: Omit<Transaction, "is_subscription">[] = [];
@@ -148,16 +160,21 @@ export async function getCurrentUserAccountHub(id: string) {
       .from("category_groups")
       .select("id, user_id, name, kind, context, is_system, archived_at, created_at, updated_at")
       .eq("user_id", user.id),
-    supabase
-      .from("investment_cash_flows")
-      .select(
-        "id, position_id, transaction_id, source_transfer_id, source_account_id",
-      )
-      .eq("user_id", user.id)
-      .limit(5000),
+    getInvestmentLinks(),
   ]);
 
   const categories = (categoriesResult.data ?? []) as Category[];
+  const pendingRecurrences: PendingRecurrenceMatch[] = transactionsResult.data
+    .filter((transaction) => transaction.origin_type === "system" && transaction.recurring_transaction_id && transaction.status === "pending")
+    .map((transaction) => ({
+      id: transaction.id,
+      accountId: transaction.account_id,
+      categoryId: transaction.category_id,
+      transactionType: transaction.transaction_type,
+      description: transaction.description,
+      amountMinor: transaction.amount_minor,
+      transactionDate: transaction.transaction_date,
+    }));
   const categoryGroups = (categoryGroupsResult.data ?? []) as CategoryGroup[];
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
@@ -186,9 +203,9 @@ export async function getCurrentUserAccountHub(id: string) {
   );
   const investmentLinkByTransaction = new Map(
     (investmentLinksResult.data ?? []).flatMap((flow) =>
-      flow.transaction_id
+      flow.transaction_id || flow.source_transaction_id
         ? [[
-            flow.transaction_id,
+            (flow.transaction_id ?? flow.source_transaction_id)!,
             { positionId: flow.position_id, cashFlowId: flow.id },
           ] as const]
         : [],
@@ -223,7 +240,10 @@ export async function getCurrentUserAccountHub(id: string) {
         editHref:
           transaction.origin_type === "manual"
             ? `/transactions/${transaction.id}/edit`
+            : transaction.origin_type === "system" || transaction.origin_type === "credit_card_invoice_payment"
+              ? `/transactions/${transaction.id}/edit-date`
             : null,
+        automaticDateOnly: transaction.origin_type === "system" || transaction.origin_type === "credit_card_invoice_payment",
         canDelete:
           transaction.origin_type === "manual" ||
           transaction.origin_type === "system",
@@ -307,6 +327,7 @@ export async function getCurrentUserAccountHub(id: string) {
   return {
     account: accountResult.data,
     registerEntries,
+    pendingRecurrences,
     balanceSummary,
     statementHasError,
     categories,

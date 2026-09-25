@@ -1,5 +1,7 @@
 # Investimentos
 
+Uma receita manual já realizada no extrato bancário (por exemplo, dividendo ou juros sobre capital) pode ser vinculada ao histórico de uma posição da mesma moeda e contexto. O vínculo gera apenas o fluxo da posição, sem criar outra entrada na conta. A receita só pode pertencer a uma posição por vez; desvincular reverte o efeito na posição, preservando o lançamento bancário. Enquanto vinculada, a data, o valor e o estado da receita não podem ser alterados no extrato.
+
 ## Escopo da Sprint 9
 
 O módulo mantém posições atualizadas manualmente para renda fixa, ações,

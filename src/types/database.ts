@@ -192,6 +192,7 @@ export type Transaction = {
   description: string;
   amount_minor: number;
   transaction_date: string;
+  scheduled_date?: string | null;
   status: TransactionStatus;
     notes: string | null;
     is_subscription: boolean;
@@ -556,6 +557,7 @@ export type InvestmentCashFlow = {
   income_type: InvestmentIncomeType | null;
   transaction_id: string | null;
   source_transfer_id: string | null;
+  source_transaction_id: string | null;
   source_account_id: string | null;
   amount_minor: number;
   quantity: string | null;
@@ -993,6 +995,7 @@ export type Database = {
           description: string;
           amount_minor: number;
           transaction_date: string;
+          scheduled_date?: string | null;
           status?: TransactionStatus;
           notes?: string | null;
           is_subscription?: boolean;
@@ -1015,6 +1018,7 @@ export type Database = {
             | "origin_id"
             | "credit_card_invoice_id"
             | "recurring_transaction_id"
+            | "scheduled_date"
           >
         >;
         Relationships: [];
@@ -1438,6 +1442,36 @@ export type Database = {
       };
     };
     Functions: {
+      generate_one_recurring_transaction: {
+        Args: { target_recurring_id: string; target_transaction_date: string; target_amount_minor: number };
+        Returns: string;
+      };
+      update_automatic_transaction_date: {
+        Args: { target_transaction_id: string; target_transaction_date: string };
+        Returns: string;
+      };
+      confirm_recurring_transaction: {
+        Args: {
+          target_transaction_id: string;
+          target_account_id: string;
+          target_transaction_type: TransactionType;
+          target_category_id: string;
+          target_description: string;
+          target_amount_minor: number;
+          target_transaction_date: string;
+          target_notes: string | null;
+        };
+        Returns: string;
+      };
+      link_investment_bank_income: {
+        Args: {
+          target_position_id: string;
+          target_transaction_id: string;
+          target_income_type: InvestmentIncomeType;
+          target_notes?: string | null;
+        };
+        Returns: string;
+      };
       create_investment_account_entry: {
           Args: {
             target_account_id: string;

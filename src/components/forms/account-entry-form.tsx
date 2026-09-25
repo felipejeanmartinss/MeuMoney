@@ -11,6 +11,7 @@ import type {
   TransactionType,
 } from "@/types/database";
 import { TransactionForm } from "./transaction-form";
+import type { PendingRecurrenceMatch } from "@/domain/account-register";
 import { TransferForm } from "./transfer-form";
 import { InvestmentAccountEntryForm } from "./investment-account-entry-form";
 
@@ -48,6 +49,7 @@ export function AccountEntryForm({
   groups,
   creditCards,
   investmentPositions,
+  pendingRecurrences = [],
   accountId,
   transactionDate,
   initialMode,
@@ -59,6 +61,7 @@ export function AccountEntryForm({
   groups: CategoryGroupItem[];
   creditCards: CreditCardTransferDestination[];
   investmentPositions: InvestmentPositionSummary[];
+  pendingRecurrences?: PendingRecurrenceMatch[];
   accountId?: string;
   transactionDate: string;
   initialMode: AccountEntryMode;
@@ -144,6 +147,7 @@ export function AccountEntryForm({
             amountMinor: "0,00",
           }}
           returnAccountId={returnAccountId}
+          pendingRecurrences={pendingRecurrences}
           compact={compact}
         />
       )}

@@ -79,9 +79,11 @@
 - O extrato pertence à conta e combina receitas, despesas e o lado correspondente de cada transferência em ordem cronológica. O saldo linha a linha usa o realizado até ontem e passa a representar a projeção a partir de hoje; uma divisória visual separa os dois períodos.
 - O cabeçalho do extrato usa o saldo consolidado da mesma visão que alimenta Contas. Se a leitura das movimentações falhar ou o saldo reconstruído divergir do consolidado, o extrato é ocultado com aviso para não apresentar um histórico parcial como correto. A listagem não depende de campos de assinatura que não utiliza.
 - A página da conta mostra somente o extrato; recorrências permanecem em Recorrências e importações em Perfil > Importações.
+- O extrato oferece filtros locais por data, descrição, categoria/subcategoria e valor exato de entrada ou saída; os saldos exibidos nas linhas continuam calculados sobre o histórico completo.
+- Lançamentos automáticos de recorrência e de pagamento técnico de fatura podem ter a data ajustada pelo proprietário. Para recorrências, a data original da ocorrência fica em `scheduled_date`, preservando a chave idempotente mesmo depois do ajuste. O pagamento da fatura continua vinculado à fatura; a edição não altera seu valor nem reabre a fatura.
 - A conciliação confirma um item realizado e ativo contra o extrato externo. Cada lado de uma transferência possui estado próprio, porque contas diferentes podem ser conciliadas em momentos diferentes.
 - `reconciled_at` registra quando ocorreu a última conciliação. Alterar conta, tipo, direção, moeda, valor, data, status ou atividade remove automaticamente essa confirmação e exige nova conferência.
-- Itens inativos permanecem visíveis no extrato, mas não podem ser reconciliados nem alterar o saldo realizado. Um lançamento previsto e ativo pode ser marcado como reconciliado; a mesma operação o promove atomicamente para Realizado e remove a identificação de Previsto. Transferências previstas continuam bloqueadas para preservar a consistência entre seus dois lados.
+- Itens inativos não aparecem no extrato e não alteram o saldo realizado. Um lançamento previsto e ativo pode ser marcado como reconciliado; a mesma operação o promove atomicamente para Realizado e remove a identificação de Previsto. Transferências previstas continuam bloqueadas para preservar a consistência entre seus dois lados.
 
 ## Cartões de crédito — Sprint 4
 
@@ -91,7 +93,8 @@
 - Compra realizada até o dia de fechamento pertence à competência atual; após esse dia, pertence à seguinte. Dias inexistentes em um mês são limitados ao último dia real.
 - A fatura mantém internamente o mês do ciclo de fechamento, mas é apresentada pelo mês imediatamente anterior ao vencimento. Assim, o ciclo que fecha e vence em janeiro aparece como fatura de dezembro, sem mover nem duplicar suas parcelas.
 - O extrato do cartão aceita somente três naturezas: compra, estorno e cashback. Estorno e cashback são créditos únicos, sem categoria, parcelamento ou recorrência; reduzem a fatura e o limite comprometido e aparecem como receita apenas no relatório por competência.
-- O limite comprometido soma parcelas pendentes ou faturadas de compras ativas somente até o último mês de fatura cadastrada. Assinaturas ativas completam os meses ainda não materializados dentro desse mesmo horizonte, sem recriar competências já pagas. O limite disponível é `limite total - comprometido` e não é artificialmente liberado por transferências sem baixa das parcelas. O saldo devedor pode deduzir transferências livres realizadas para o cartão.
+- O limite comprometido soma todas as parcelas registradas ainda pendentes ou faturadas, mesmo quando o mês futuro ainda não tem fatura. Assinaturas ativas completam os meses ainda não materializados até a última fatura cadastrada, sem recriar competências já pagas. Créditos e estornos reduzem o comprometido. “Faturas a pagar” soma o valor restante de todas as faturas não pagas (`total - pago`); difere do comprometido porque este também inclui parcelas futuras sem fatura. O limite disponível é `limite total - comprometido` e não é artificialmente liberado por transferências sem baixa das parcelas.
+- O resumo dos cartões carrega todas as páginas de faturas, compras ativas e parcelas antes de calcular os totais; uma falha em qualquer página não exibe somas parciais como se fossem completas.
 - Fechamento é idempotente. Uma fatura fechada ou paga impede mudanças estruturais nas compras que a compõem.
 - A transferência para cartão exige conta ativa, mesmo usuário e mesma moeda. Ela não recebe categoria nem altera a competência das compras. O fluxo integral de uma fatura continua disponível quando for necessário marcar parcelas e fatura como pagas.
 - Estorno de pagamento inativa a transação técnica e devolve fatura e parcelas ao estado fechado/faturado na mesma transação SQL.
@@ -107,6 +110,8 @@
 - Toda ocorrência gerada é um lançamento `pending` (Previsto). Nenhuma recorrência cria um lançamento Realizado automaticamente.
 - A geração é idempotente. A combinação entre recorrência e data da ocorrência é única, e chamadas repetidas ou concorrentes não criam duplicidades.
 - A próxima ocorrência indica a primeira data ainda não processada pelo gerador.
+- Cada regra ativa também pode gerar apenas sua próxima ocorrência pelas ações, com revisão de data e valor. A previsão guarda a data programada separada da data de lançamento ajustável.
+- Ao registrar um lançamento realizado na mesma conta, categoria e natureza, com descrição semelhante, valor próximo e até 14 dias de distância de uma previsão pendente, o formulário pede confirmação. “É o mesmo” realiza a previsão existente sem criar outro lançamento; “Criar separado” preserva os dois registros.
 - Suspender impede novas gerações e permite reativação. Encerrar é definitivo e não permite reativação.
 - Recorrências encerradas permanecem preservadas para auditoria, mas são removidas da agenda operacional e das listas por conta.
 - Editar uma recorrência altera somente gerações futuras. Lançamentos previstos já gerados permanecem como registro histórico.

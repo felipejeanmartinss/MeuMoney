@@ -335,22 +335,27 @@ export default async function TransactionsPage({
                 </p>
               </div>
               <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
-                {isTechnical && transaction.origin_type !== "system" ? (
+                {transaction.is_active && transaction.origin_type === "credit_card_invoice_payment" ? (
+                  <Link href={`/transactions/${transaction.id}/edit-date`} className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar data</Link>
+                ) : isTechnical && transaction.origin_type !== "system" ? (
                   <span className="text-xs text-slate-500">
                     {isRecurring
                       ? "Gerenciado pela recorrência"
                       : "Gerenciado pela fatura"}
                   </span>
                 ) : transaction.origin_type === "system" ? (
-                  <form action={deleteTransaction}>
-                    <input type="hidden" name="id" value={transaction.id} />
-                    <ConfirmSubmitButton
-                      confirmation={`Excluir definitivamente o lançamento automático “${transaction.description}”?`}
-                      className="min-h-7 rounded-lg px-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      Excluir automático
-                    </ConfirmSubmitButton>
-                  </form>
+                  <>
+                    {transaction.is_active ? <Link href={`/transactions/${transaction.id}/edit-date`} className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar data</Link> : null}
+                    <form action={deleteTransaction}>
+                      <input type="hidden" name="id" value={transaction.id} />
+                      <ConfirmSubmitButton
+                        confirmation={`Excluir definitivamente o lançamento automático “${transaction.description}”?`}
+                        className="min-h-7 rounded-lg px-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Excluir automático
+                      </ConfirmSubmitButton>
+                    </form>
+                  </>
                 ) : (
                   <>
                     <Link

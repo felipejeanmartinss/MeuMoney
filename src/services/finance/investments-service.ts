@@ -16,6 +16,7 @@ import type {
   FinancialContext,
   InvestmentAccountEventType,
   InvestmentCashFlowType,
+  InvestmentIncomeType,
   InvestmentClass,
   InvestmentPositionPerformanceSummary,
   InvestmentType,
@@ -522,6 +523,59 @@ export async function createCurrentUserInvestmentCashFlow(
           "Não foi possível registrar o aporte, resgate ou renda desta posição.",
       }
     : { ok: true as const, id: data };
+}
+
+export async function listCurrentUserBankIncomeCandidates(positionId: string) {
+  const { supabase, user } = await requireUser();
+  const positionResult = await supabase.from("investment_positions")
+    .select("id, currency, context").eq("user_id", user.id)
+    .eq("id", positionId).eq("is_active", true).maybeSingle();
+  if (positionResult.error || !positionResult.data) return { candidates: [], hasError: true };
+  const accountsResult = await supabase.from("accounts")
+    .select("id, name").eq("user_id", user.id)
+    .eq("currency", positionResult.data.currency)
+    .eq("context", positionResult.data.context)
+    .neq("type", "credit_card").is("archived_at", null);
+  if (accountsResult.error) return { candidates: [], hasError: true };
+  const accounts = accountsResult.data ?? [];
+  if (!accounts.length) return { candidates: [], hasError: false };
+  const [transactionsResult, linksResult] = await Promise.all([
+    supabase.from("transactions")
+      .select("id, account_id, description, amount_minor, transaction_date")
+      .eq("user_id", user.id).eq("origin_type", "manual")
+      .eq("transaction_type", "income").eq("status", "completed")
+      .eq("is_active", true).lte("transaction_date", currentIsoDate())
+      .in("account_id", accounts.map((account) => account.id))
+      .order("transaction_date", { ascending: false }).limit(500),
+    supabase.from("investment_cash_flows")
+      .select("source_transaction_id").eq("user_id", user.id)
+      .not("source_transaction_id", "is", null),
+  ]);
+  if (transactionsResult.error || linksResult.error) return { candidates: [], hasError: true };
+  const linked = new Set((linksResult.data ?? []).map((flow) => flow.source_transaction_id));
+  const accountById = new Map(accounts.map((account) => [account.id, account.name]));
+  return {
+    candidates: (transactionsResult.data ?? []).filter((transaction) => !linked.has(transaction.id))
+      .map((transaction) => ({ ...transaction, accountName: accountById.get(transaction.account_id) ?? "Conta" })),
+    hasError: false,
+  };
+}
+
+export async function linkCurrentUserBankIncome(
+  positionId: string,
+  transactionId: string,
+  incomeType: InvestmentIncomeType,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("link_investment_bank_income", {
+    target_position_id: positionId,
+    target_transaction_id: transactionId,
+    target_income_type: incomeType,
+    target_notes: null,
+  });
+  return error
+    ? { ok: false as const, message: "Não foi possível vincular esta receita à posição. Confira se ela ainda está disponível." }
+    : { ok: true as const };
 }
 
 export async function deleteCurrentUserInvestmentCashFlow(id: string) {

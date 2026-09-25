@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useState } from "react";
+import { useActionState, useCallback, useRef, useState } from "react";
 import {
   createTransaction,
   updateTransaction,
@@ -14,6 +14,8 @@ import {
 } from "@/domain/transactions";
 import type { CategoryGroupItem } from "@/domain/categories";
 import type { CreditCardTransferDestination } from "@/domain/transfers";
+import { findSimilarPendingRecurrence, type PendingRecurrenceMatch } from "@/domain/account-register";
+import { parseMoneyInputToMinor } from "@/domain/money";
 import { CategoryCombobox } from "./category-combobox";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 import {
@@ -73,6 +75,7 @@ export function TransactionForm({
   onTransferSelected,
   returnAccountId,
   compact = false,
+  pendingRecurrences = [],
 }: {
   accounts: AccountOption[];
   categories: CategoryOption[];
@@ -84,6 +87,7 @@ export function TransactionForm({
   onTransferSelected?: (destinationTarget: string) => void;
   returnAccountId?: string;
   compact?: boolean;
+  pendingRecurrences?: PendingRecurrenceMatch[];
 }) {
   const action = values.id ? updateTransaction : createTransaction;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -102,6 +106,43 @@ export function TransactionForm({
   ];
   const [categoryId, setCategoryId] = useState(values.categoryId ?? "");
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const matchInputRef = useRef<HTMLInputElement>(null);
+  const confirmationChoice = useRef<"same" | "separate" | null>(null);
+  const [pendingMatch, setPendingMatch] = useState<PendingRecurrenceMatch | null>(null);
+
+  function interceptPotentialDuplicate(event: React.FormEvent<HTMLFormElement>) {
+    if (values.id || !pendingRecurrences.length) return;
+    if (confirmationChoice.current) {
+      if (matchInputRef.current) matchInputRef.current.value = confirmationChoice.current === "same" ? pendingMatch?.id ?? "" : "";
+      confirmationChoice.current = null;
+      setPendingMatch(null);
+      return;
+    }
+    const data = new FormData(event.currentTarget);
+    if (data.get("status") !== "completed") return;
+    let amountMinor: number;
+    try {
+      amountMinor = parseMoneyInputToMinor(String(data.get("amountMinor") ?? ""));
+    } catch { return; }
+    const match = findSimilarPendingRecurrence(pendingRecurrences, {
+      accountId: String(data.get("accountId") ?? ""),
+      categoryId: String(data.get("categoryId") ?? "") || null,
+      transactionType: String(data.get("transactionType") ?? "") as TransactionType,
+      description: String(data.get("description") ?? ""),
+      amountMinor,
+      transactionDate: String(data.get("transactionDate") ?? ""),
+    });
+    if (match) {
+      event.preventDefault();
+      setPendingMatch(match);
+    }
+  }
+
+  function confirmPotentialDuplicate(choice: "same" | "separate") {
+    confirmationChoice.current = choice;
+    formRef.current?.requestSubmit();
+  }
 
   const handleCategoryCreated = useCallback(
     (category: QuickCreatedCategory) => {
@@ -166,7 +207,8 @@ export function TransactionForm({
 
   return (
     <div className={`grid ${compact ? "gap-2" : "gap-5"}`}>
-      <form action={formAction} className={`grid ${compact ? "gap-2" : "gap-5"}`}>
+      <form ref={formRef} action={formAction} onSubmit={interceptPotentialDuplicate} className={`grid ${compact ? "gap-2" : "gap-5"}`}>
+        <input ref={matchInputRef} type="hidden" name="matchedRecurringTransactionId" defaultValue="" />
         {values.id ? (
           <input type="hidden" name="id" value={values.id} />
         ) : null}
@@ -327,6 +369,19 @@ export function TransactionForm({
           {values.id ? "Salvar alterações" : "Criar lançamento"}
         </SubmitButton>
       </form>
+      {pendingMatch ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="recurrence-match-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <h2 id="recurrence-match-title" className="text-lg font-bold text-slate-950">É o mesmo lançamento previsto?</h2>
+            <p className="mt-2 text-sm text-slate-700">Encontramos a recorrência “{pendingMatch.description}”, prevista para {pendingMatch.transactionDate}. Vincular evita uma entrada duplicada no extrato.</p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => setPendingMatch(null)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600">Cancelar</button>
+              <button type="button" onClick={() => confirmPotentialDuplicate("separate")} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800">Criar separado</button>
+              <button type="button" onClick={() => confirmPotentialDuplicate("same")} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Sim, é o mesmo</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <QuickCategoryCreate
         key={transactionType}
         open={quickCreateOpen}
