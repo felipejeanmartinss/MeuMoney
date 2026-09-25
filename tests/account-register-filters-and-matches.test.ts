@@ -30,7 +30,7 @@ describe("account statement filters", () => {
 });
 
 describe("recurring forecast matching", () => {
-  const candidates = [{ id: "forecast", accountId: "account", categoryId: "energy", transactionType: "expense" as const, description: "Conta de energia", amountMinor: 150_00, transactionDate: "2026-09-20" }];
+  const candidates = [{ id: "forecast", kind: "forecast" as const, accountId: "account", categoryId: "energy", transactionType: "expense" as const, description: "Conta de energia", amountMinor: 150_00, transactionDate: "2026-09-20" }];
 
   it("suggests a similar forecast within the date and amount tolerance", () => {
     expect(findSimilarPendingRecurrence(candidates, {
@@ -39,14 +39,44 @@ describe("recurring forecast matching", () => {
     })?.id).toBe("forecast");
   });
 
-  it("does not suggest another account or an unrelated merchant", () => {
+  it("does not suggest another account or a distant unrelated merchant", () => {
     expect(findSimilarPendingRecurrence(candidates, {
       accountId: "other", categoryId: "energy", transactionType: "expense", description: "Conta de energia",
       amountMinor: 150_00, transactionDate: "2026-09-20",
     })).toBeNull();
     expect(findSimilarPendingRecurrence(candidates, {
       accountId: "account", categoryId: "energy", transactionType: "expense", description: "Restaurante",
-      amountMinor: 150_00, transactionDate: "2026-09-20",
+      amountMinor: 150_00, transactionDate: "2026-10-05",
     })).toBeNull();
+  });
+
+  it("offers a review for a different description when amount and date are close", () => {
+    expect(findSimilarPendingRecurrence(candidates, {
+      accountId: "account", categoryId: "energy", transactionType: "expense", description: "Pagamento automático",
+      amountMinor: 151_00, transactionDate: "2026-09-22",
+    })?.id).toBe("forecast");
+  });
+
+  it("suggests an active rule when no forecast was generated", () => {
+    const rules = [{ ...candidates[0], id: "rule", kind: "rule" as const }];
+    expect(findSimilarPendingRecurrence(rules, {
+      accountId: "account", categoryId: "energy", transactionType: "expense",
+      description: "Conta de energia", amountMinor: 150_00, transactionDate: "2026-09-20",
+    })?.id).toBe("rule");
+  });
+
+  it("recognizes short recurring descriptions such as TV", () => {
+    expect(findSimilarPendingRecurrence([{ ...candidates[0], id: "tv", description: "TV" }], {
+      accountId: "account", categoryId: "energy", transactionType: "expense",
+      description: "TV", amountMinor: 150_00, transactionDate: "2026-09-20",
+    })?.id).toBe("tv");
+  });
+
+  it("prefers an existing forecast to the rule for the same occurrence", () => {
+    const rules = [{ ...candidates[0], id: "rule", kind: "rule" as const }];
+    expect(findSimilarPendingRecurrence([...rules, ...candidates], {
+      accountId: "account", categoryId: "energy", transactionType: "expense",
+      description: "Conta de energia", amountMinor: 150_00, transactionDate: "2026-09-20",
+    })?.id).toBe("forecast");
   });
 });

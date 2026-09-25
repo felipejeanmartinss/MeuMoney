@@ -108,13 +108,15 @@ export function TransactionForm({
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const matchInputRef = useRef<HTMLInputElement>(null);
+  const ruleMatchInputRef = useRef<HTMLInputElement>(null);
   const confirmationChoice = useRef<"same" | "separate" | null>(null);
   const [pendingMatch, setPendingMatch] = useState<PendingRecurrenceMatch | null>(null);
 
   function interceptPotentialDuplicate(event: React.FormEvent<HTMLFormElement>) {
     if (values.id || !pendingRecurrences.length) return;
     if (confirmationChoice.current) {
-      if (matchInputRef.current) matchInputRef.current.value = confirmationChoice.current === "same" ? pendingMatch?.id ?? "" : "";
+      if (matchInputRef.current) matchInputRef.current.value = confirmationChoice.current === "same" && pendingMatch?.kind === "forecast" ? pendingMatch.id : "";
+      if (ruleMatchInputRef.current) ruleMatchInputRef.current.value = confirmationChoice.current === "same" && pendingMatch?.kind === "rule" ? pendingMatch.id : "";
       confirmationChoice.current = null;
       setPendingMatch(null);
       return;
@@ -209,6 +211,7 @@ export function TransactionForm({
     <div className={`grid ${compact ? "gap-2" : "gap-5"}`}>
       <form ref={formRef} action={formAction} onSubmit={interceptPotentialDuplicate} className={`grid ${compact ? "gap-2" : "gap-5"}`}>
         <input ref={matchInputRef} type="hidden" name="matchedRecurringTransactionId" defaultValue="" />
+        <input ref={ruleMatchInputRef} type="hidden" name="matchedRecurringRuleId" defaultValue="" />
         {values.id ? (
           <input type="hidden" name="id" value={values.id} />
         ) : null}
@@ -372,11 +375,11 @@ export function TransactionForm({
       {pendingMatch ? (
         <div role="dialog" aria-modal="true" aria-labelledby="recurrence-match-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h2 id="recurrence-match-title" className="text-lg font-bold text-slate-950">É o mesmo lançamento previsto?</h2>
-            <p className="mt-2 text-sm text-slate-700">Encontramos a recorrência “{pendingMatch.description}”, prevista para {pendingMatch.transactionDate}. Vincular evita uma entrada duplicada no extrato.</p>
+            <h2 id="recurrence-match-title" className="text-lg font-bold text-slate-950">É a mesma recorrência?</h2>
+            <p className="mt-2 text-sm text-slate-700">Encontramos a recorrência “{pendingMatch.description}”, prevista para {pendingMatch.transactionDate}. Confirmar o mesmo lançamento evita duplicidade no extrato.</p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button type="button" onClick={() => setPendingMatch(null)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600">Cancelar</button>
-              <button type="button" onClick={() => confirmPotentialDuplicate("separate")} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800">Criar separado</button>
+              <button type="button" onClick={() => confirmPotentialDuplicate("separate")} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800">Não, criar separado</button>
               <button type="button" onClick={() => confirmPotentialDuplicate("same")} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Sim, é o mesmo</button>
             </div>
           </div>

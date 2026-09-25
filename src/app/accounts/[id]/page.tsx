@@ -7,7 +7,7 @@ import { formatMoney } from "@/domain/money";
 import { getCurrentUserAccountHub } from "@/services/finance/accounts-service";
 import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
-import { getTransactionFormOptions } from "@/services/finance/transactions-service";
+import { getTransactionFormOptions, listCurrentUserRecurrenceMatches } from "@/services/finance/transactions-service";
 import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Detalhe da conta" };
@@ -20,12 +20,13 @@ export default async function AccountDetailPage({
   searchParams: Promise<{ page?: string; message?: string } & AccountRegisterFilters>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const [result, formOptions, creditCardOptions, investmentOptions] =
+  const [result, formOptions, creditCardOptions, investmentOptions, recurrenceMatches] =
     await Promise.all([
       getCurrentUserAccountHub(id),
       getTransactionFormOptions({ accountId: id }),
       listCurrentUserTransferCreditCardDestinations(),
       listCurrentUserInvestmentPositions(),
+      listCurrentUserRecurrenceMatches(id),
     ]);
   if (!result.account && !result.hasError) notFound();
 
@@ -151,9 +152,10 @@ export default async function AccountDetailPage({
                   groups: formOptions.groups,
                   creditCards: creditCardOptions.destinations,
                   investmentPositions: investmentOptions.positions,
-                  pendingRecurrences: result.pendingRecurrences,
+                  pendingRecurrences: recurrenceMatches.candidates,
                   hasError:
                     formOptions.hasError ||
+                    recurrenceMatches.hasError ||
                     creditCardOptions.hasError ||
                     investmentOptions.hasError,
                 }

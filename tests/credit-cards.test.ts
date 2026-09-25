@@ -10,6 +10,7 @@ import {
   getPurchaseReferenceMonth,
   remainingCreditCardInvoiceAmount,
   selectNextCreditCardInvoice,
+  summarizeNextCreditCardInvoices,
   splitInstallments,
 } from "../src/domain/credit-cards";
 import {
@@ -35,6 +36,23 @@ describe("credit card cycles", () => {
 
   it("labels a statement by the month before its due date", () => {
     expect(getInvoiceBillingMonth("2026-01-11")).toBe("2025-12-01");
+  });
+});
+
+describe("account card summary", () => {
+  it("uses exactly one next invoice per card in the total shown above the rows", () => {
+    const cards = [
+      { id: "bradesco", currency: "BRL" as const },
+      { id: "nubank", currency: "BRL" as const },
+    ];
+    const invoices = [
+      { credit_card_id: "bradesco", status: "open" as const, total_amount: 55309, paid_amount: 0, due_date: "2026-10-01" },
+      { credit_card_id: "bradesco", status: "open" as const, total_amount: 60000, paid_amount: 0, due_date: "2026-11-01" },
+      { credit_card_id: "nubank", status: "closed" as const, total_amount: 80274, paid_amount: 10000, due_date: "2026-10-02" },
+    ];
+    const rows = summarizeNextCreditCardInvoices(cards, invoices);
+    expect(rows.map((row) => row.amountMinor)).toEqual([55309, 70274]);
+    expect(rows.reduce((sum, row) => sum + row.amountMinor, 0)).toBe(125583);
   });
 });
 

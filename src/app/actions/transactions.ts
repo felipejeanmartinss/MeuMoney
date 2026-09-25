@@ -14,6 +14,7 @@ import {
 import {
   clearCurrentUserInactiveAutomaticTransactions,
   confirmCurrentUserRecurringForecast,
+  confirmCurrentUserRecurringRule,
   createCurrentUserTransaction,
   deleteCurrentUserTransaction,
   setCurrentUserAccountEntryReconciled,
@@ -36,6 +37,7 @@ const transactionInputFrom = (formData: FormData) => ({
 function revalidateFinancialPaths() {
   revalidatePath("/transactions");
   revalidatePath("/accounts");
+  revalidatePath("/recurring-transactions");
   revalidatePath("/dashboard");
 }
 
@@ -82,19 +84,23 @@ export async function createTransaction(
   }
 
   const matchedId = String(formData.get("matchedRecurringTransactionId") ?? "");
+  const matchedRuleId = String(formData.get("matchedRecurringRuleId") ?? "");
   const parsedMatch = matchedId ? transactionIdSchema.safeParse(matchedId) : null;
-  if (parsedMatch && !parsedMatch.success) {
+  const parsedRuleMatch = matchedRuleId ? transactionIdSchema.safeParse(matchedRuleId) : null;
+  if ((parsedMatch && !parsedMatch.success) || (parsedRuleMatch && !parsedRuleMatch.success) || (matchedId && matchedRuleId)) {
     return { status: "error", message: "Previsão inválida." };
   }
-  if (parsedMatch?.success && parsed.data.status !== "completed") {
+  if ((parsedMatch?.success || parsedRuleMatch?.success) && parsed.data.status !== "completed") {
     return { status: "error", message: "Confirme a previsão apenas com um lançamento realizado." };
   }
   const result = parsedMatch?.success
     ? await confirmCurrentUserRecurringForecast(parsedMatch.data, parsed.data)
+    : parsedRuleMatch?.success
+      ? await confirmCurrentUserRecurringRule(parsedRuleMatch.data, parsed.data)
     : await createCurrentUserTransaction(parsed.data);
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
-  if (!parsedMatch?.success && formData.get("createRecurring") === "true") {
+  if (!parsedMatch?.success && !parsedRuleMatch?.success && formData.get("createRecurring") === "true") {
     redirect(recurringTransactionHref(parsed.data));
   }
   if (formData.get("returnAccountId") === parsed.data.accountId) {

@@ -59,6 +59,7 @@ export type AccountRegisterFilters = {
 
 export type PendingRecurrenceMatch = {
   id: string;
+  kind: "forecast" | "rule";
   accountId: string;
   categoryId: string | null;
   transactionType: "income" | "expense";
@@ -68,12 +69,12 @@ export type PendingRecurrenceMatch = {
 };
 
 function normalizedWords(value: string) {
-  return normalizedSearch(value).split(/[^a-z0-9]+/).filter((word) => word.length > 2);
+  return normalizedSearch(value).split(/[^a-z0-9]+/).filter((word) => word.length > 1);
 }
 
 export function findSimilarPendingRecurrence(
   candidates: readonly PendingRecurrenceMatch[],
-  input: Omit<PendingRecurrenceMatch, "id">,
+  input: Omit<PendingRecurrenceMatch, "id" | "kind">,
 ) {
   const words = normalizedWords(input.description);
   const inputDate = Date.parse(`${input.transactionDate}T00:00:00Z`);
@@ -85,8 +86,10 @@ export function findSimilarPendingRecurrence(
     if (days > 14 || amountDifference > Math.max(500, Math.floor(candidate.amountMinor / 5))) return [];
     const candidateWords = new Set(normalizedWords(candidate.description));
     const overlap = words.filter((word) => candidateWords.has(word)).length;
-    if (!overlap && normalizedSearch(input.description) !== normalizedSearch(candidate.description)) return [];
-    return [{ candidate, score: overlap * 10 - days - amountDifference / 100 }];
+    const matchingDescription = overlap > 0 || normalizedSearch(input.description) === normalizedSearch(candidate.description);
+    const matchingScheduleAndAmount = days <= 7 && amountDifference <= Math.max(500, Math.floor(candidate.amountMinor / 10));
+    if (!matchingDescription && !matchingScheduleAndAmount) return [];
+    return [{ candidate, score: (candidate.kind === "forecast" ? 100 : 0) + overlap * 10 - days - amountDifference / 100 }];
   });
   ranked.sort((a, b) => b.score - a.score);
   return ranked[0]?.candidate ?? null;

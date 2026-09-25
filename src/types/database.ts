@@ -1463,6 +1463,19 @@ export type Database = {
         };
         Returns: string;
       };
+      confirm_recurring_rule_occurrence: {
+        Args: {
+          target_recurring_id: string;
+          target_account_id: string;
+          target_transaction_type: TransactionType;
+          target_category_id: string;
+          target_description: string;
+          target_amount_minor: number;
+          target_transaction_date: string;
+          target_notes: string | null;
+        };
+        Returns: string;
+      };
       link_investment_bank_income: {
         Args: {
           target_position_id: string;

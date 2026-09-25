@@ -4,7 +4,6 @@ import {
   accountRegisterMatchesBalance,
   summarizeAccountRegisterBalances,
   type AccountRegisterSourceEntry,
-  type PendingRecurrenceMatch,
 } from "@/domain/account-register";
 import { getCategoryQualifiedName } from "@/domain/categories";
 import { requireUser } from "@/services/auth/server-auth";
@@ -164,17 +163,6 @@ export async function getCurrentUserAccountHub(id: string) {
   ]);
 
   const categories = (categoriesResult.data ?? []) as Category[];
-  const pendingRecurrences: PendingRecurrenceMatch[] = transactionsResult.data
-    .filter((transaction) => transaction.origin_type === "system" && transaction.recurring_transaction_id && transaction.status === "pending")
-    .map((transaction) => ({
-      id: transaction.id,
-      accountId: transaction.account_id,
-      categoryId: transaction.category_id,
-      transactionType: transaction.transaction_type,
-      description: transaction.description,
-      amountMinor: transaction.amount_minor,
-      transactionDate: transaction.transaction_date,
-    }));
   const categoryGroups = (categoryGroupsResult.data ?? []) as CategoryGroup[];
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
@@ -327,7 +315,6 @@ export async function getCurrentUserAccountHub(id: string) {
   return {
     account: accountResult.data,
     registerEntries,
-    pendingRecurrences,
     balanceSummary,
     statementHasError,
     categories,

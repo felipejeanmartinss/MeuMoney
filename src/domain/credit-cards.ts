@@ -458,6 +458,32 @@ export function remainingCreditCardInvoiceAmount(invoice: {
   );
 }
 
+export function summarizeNextCreditCardInvoices<
+  C extends { id: string; currency: "BRL" | "USD" | "EUR" },
+  I extends {
+    credit_card_id: string;
+    status: CreditCardInvoiceStatus;
+    total_amount: number;
+    paid_amount: number;
+    due_date: string;
+  },
+>(cards: readonly C[], invoices: readonly I[]) {
+  const invoicesByCard = new Map<string, I[]>();
+  for (const invoice of invoices) {
+    const cardInvoices = invoicesByCard.get(invoice.credit_card_id) ?? [];
+    cardInvoices.push(invoice);
+    invoicesByCard.set(invoice.credit_card_id, cardInvoices);
+  }
+  return cards.map((card) => {
+    const invoice = selectNextCreditCardInvoice(invoicesByCard.get(card.id) ?? []);
+    return {
+      cardId: card.id,
+      currency: card.currency,
+      amountMinor: invoice ? remainingCreditCardInvoiceAmount(invoice) : 0,
+    };
+  });
+}
+
 export function buildCreditCardInvoiceForecast(input: {
   referenceMonth: string;
   months?: number;

@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { toggleAccountStatus } from "@/app/actions/accounts";
 import { ACCOUNT_TYPE_LABELS, CONTEXT_LABELS } from "@/domain/accounts";
-import { remainingCreditCardInvoiceAmount, selectNextCreditCardInvoice } from "@/domain/credit-cards";
+import { summarizeNextCreditCardInvoices } from "@/domain/credit-cards";
 import { formatMoney } from "@/domain/money";
 import { listCurrentUserAccounts } from "@/services/finance/accounts-service";
 import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
@@ -313,27 +313,10 @@ function CardsGroup({
         value: card.used_limit,
       })),
   );
-  const openInvoiceTotals = totalsByCurrency(
-    invoices
-      .filter((invoice) => invoice.status !== "paid")
-      .map((invoice) => {
-        const card = cards.find((item) => item.id === invoice.credit_card_id);
-        return card
-          ? { currency: card.currency, value: remainingCreditCardInvoiceAmount(invoice) }
-          : null;
-      })
-      .filter(
-        (item): item is { currency: SupportedCurrency; value: number } =>
-          item !== null,
-      ),
-  );
-  const nextOpenInvoiceByCard = new Map(
-    cards.flatMap((card) => {
-      const invoice = selectNextCreditCardInvoice(
-        invoices.filter((item) => item.credit_card_id === card.id),
-      );
-      return invoice ? [[card.id, invoice] as const] : [];
-    }),
+  const nextInvoiceAmounts = summarizeNextCreditCardInvoices(cards, invoices);
+  const nextInvoiceByCard = new Map(nextInvoiceAmounts.map((row) => [row.cardId, row.amountMinor]));
+  const nextInvoiceTotals = totalsByCurrency(
+    nextInvoiceAmounts.map((row) => ({ currency: row.currency, value: row.amountMinor })),
   );
 
   return (
@@ -347,10 +330,10 @@ function CardsGroup({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
           <div>
-            <p title="Soma do saldo restante de todas as faturas não pagas, inclusive de cartões inativos." className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
-              Faturas a pagar
+            <p title="Soma da próxima fatura exibida para cada cartão." className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
+              Próximas faturas
             </p>
-            <CurrencyTotals totals={openInvoiceTotals} emptyLabel="Sem faturas" />
+            <CurrencyTotals totals={nextInvoiceTotals} emptyLabel="Sem faturas" />
           </div>
           <div>
             <p title="Soma de todas as parcelas pendentes ou faturadas, inclusive em meses ainda sem fatura. Créditos e estornos são descontados." className="mb-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-400">
@@ -370,10 +353,10 @@ function CardsGroup({
           <div className="hidden overflow-x-auto md:block">
             <table className="min-w-[50rem] w-full border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Cartão</th><th className="px-3 py-2">Emissor</th><th className="px-3 py-2 text-right">Próxima fatura</th><th className="px-3 py-2 text-right">Comprometido</th><th className="px-3 py-2 text-right">Situação</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{cards.map((card) => <tr key={card.id} className="hover:bg-emerald-50/40"><td className="px-3 py-2"><Link href={`/credit-cards/${card.id}`} className="font-bold text-slate-950 hover:text-emerald-700">{card.name}</Link><p className="text-xs text-slate-500">final {card.last_four_digits}</p></td><td className="px-3 py-2 text-slate-600">{card.issuer}</td><td className="px-3 py-2 text-right font-semibold text-rose-700">{formatMoney(nextOpenInvoiceByCard.has(card.id) ? remainingCreditCardInvoiceAmount(nextOpenInvoiceByCard.get(card.id)!) : 0, card.currency)}</td><td className="px-3 py-2 text-right font-semibold">{formatMoney(card.used_limit, card.currency)}</td><td className="px-3 py-2 text-right"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${card.is_active ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{card.is_active ? "Ativo" : "Inativo"}</span></td></tr>)}</tbody>
+              <tbody className="divide-y divide-slate-100">{cards.map((card) => <tr key={card.id} className="hover:bg-emerald-50/40"><td className="px-3 py-2"><Link href={`/credit-cards/${card.id}`} className="font-bold text-slate-950 hover:text-emerald-700">{card.name}</Link><p className="text-xs text-slate-500">final {card.last_four_digits}</p></td><td className="px-3 py-2 text-slate-600">{card.issuer}</td><td className="px-3 py-2 text-right font-semibold text-rose-700">{formatMoney(nextInvoiceByCard.get(card.id) ?? 0, card.currency)}</td><td className="px-3 py-2 text-right font-semibold">{formatMoney(card.used_limit, card.currency)}</td><td className="px-3 py-2 text-right"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${card.is_active ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{card.is_active ? "Ativo" : "Inativo"}</span></td></tr>)}</tbody>
             </table>
           </div>
-          <div className="divide-y divide-slate-100 md:hidden">{cards.map((card) => <Link key={card.id} href={`/credit-cards/${card.id}`} className="block p-3 hover:bg-emerald-50/40"><div className="flex items-start justify-between gap-2"><div><p className="font-bold text-slate-950">{card.name}</p><p className="text-xs text-slate-500">{card.issuer} · final {card.last_four_digits}</p></div><span className="text-xs font-semibold text-slate-500">{card.is_active ? "Ativo" : "Inativo"}</span></div><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs"><span>Próxima <strong className="text-rose-700">{formatMoney(nextOpenInvoiceByCard.has(card.id) ? remainingCreditCardInvoiceAmount(nextOpenInvoiceByCard.get(card.id)!) : 0, card.currency)}</strong></span><span>Comprometido <strong>{formatMoney(card.used_limit, card.currency)}</strong></span></div></Link>)}</div>
+          <div className="divide-y divide-slate-100 md:hidden">{cards.map((card) => <Link key={card.id} href={`/credit-cards/${card.id}`} className="block p-3 hover:bg-emerald-50/40"><div className="flex items-start justify-between gap-2"><div><p className="font-bold text-slate-950">{card.name}</p><p className="text-xs text-slate-500">{card.issuer} · final {card.last_four_digits}</p></div><span className="text-xs font-semibold text-slate-500">{card.is_active ? "Ativo" : "Inativo"}</span></div><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs"><span>Próxima <strong className="text-rose-700">{formatMoney(nextInvoiceByCard.get(card.id) ?? 0, card.currency)}</strong></span><span>Comprometido <strong>{formatMoney(card.used_limit, card.currency)}</strong></span></div></Link>)}</div>
         </>
       )}
     </details>
