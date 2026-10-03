@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AccountEntryForm } from "@/components/forms/account-entry-form";
 import { listCurrentUserTransferCreditCardDestinations } from "@/services/finance/credit-cards-service";
-import { getTransactionFormOptions } from "@/services/finance/transactions-service";
+import { getTransactionFormOptions, listCurrentUserRecurrenceMatches } from "@/services/finance/transactions-service";
 import { listCurrentUserInvestmentPositions } from "@/services/finance/investments-service";
 import { toIsoDate } from "@/utils/dates";
 
@@ -13,10 +13,11 @@ export default async function NewTransactionPage({
   searchParams: Promise<{ accountId?: string; type?: string }>;
 }) {
   const { accountId, type } = await searchParams;
-  const [formOptions, creditCardOptions, investmentOptions] = await Promise.all([
+  const [formOptions, creditCardOptions, investmentOptions, recurrenceMatches] = await Promise.all([
     getTransactionFormOptions(accountId ? { accountId } : undefined),
     listCurrentUserTransferCreditCardDestinations(),
     listCurrentUserInvestmentPositions(),
+    listCurrentUserRecurrenceMatches(),
   ]);
   const { accounts, categories, groups, hasError } = formOptions;
   const selectedAccountId = accounts.some(
@@ -42,7 +43,7 @@ export default async function NewTransactionPage({
           saldo.
         </p>
       </div>
-      {hasError || accounts.length === 0 ? (
+      {hasError || recurrenceMatches.hasError || accounts.length === 0 ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
           Cadastre ao menos uma conta e aplique as migrations financeiras antes
           de criar lançamentos.
@@ -55,6 +56,7 @@ export default async function NewTransactionPage({
             groups={groups}
             creditCards={creditCardOptions.destinations}
             investmentPositions={investmentOptions.positions}
+            pendingRecurrences={recurrenceMatches.candidates}
             accountId={selectedAccountId}
             transactionDate={toIsoDate(new Date())}
             initialMode={

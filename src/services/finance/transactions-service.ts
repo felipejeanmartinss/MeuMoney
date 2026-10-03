@@ -1,5 +1,6 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
+import type { PendingRecurrenceMatch } from "@/domain/account-register";
 import {
   isMissingSubscriptionColumn,
   subscriptionMigrationMessage,
@@ -163,6 +164,105 @@ export async function getCurrentUserTransaction(id: string) {
   };
 }
 
+export async function listCurrentUserRecurrenceMatches(accountId?: string) {
+  const { supabase, user } = await requireUser();
+  let pendingQuery = supabase.from("transactions")
+    .select("id,account_id,category_id,transaction_type,description,amount_minor,transaction_date")
+    .eq("user_id", user.id).eq("origin_type", "system")
+    .eq("status", "pending").eq("is_active", true)
+    .not("recurring_transaction_id", "is", null).limit(1000);
+  let rulesQuery = supabase.from("recurring_transactions")
+    .select("id,account_id,category_id,transaction_type,description,amount_minor,next_occurrence")
+    .eq("user_id", user.id).eq("is_active", true).is("ended_at", null).limit(1000);
+  if (accountId) {
+    pendingQuery = pendingQuery.eq("account_id", accountId);
+    rulesQuery = rulesQuery.eq("account_id", accountId);
+  }
+  const [pending, rules] = await Promise.all([pendingQuery, rulesQuery]);
+  const candidates: PendingRecurrenceMatch[] = [
+    ...(pending.data ?? []).map((row) => ({
+      id: row.id, kind: "forecast" as const, accountId: row.account_id,
+      categoryId: row.category_id, transactionType: row.transaction_type,
+      description: row.description, amountMinor: row.amount_minor,
+      transactionDate: row.transaction_date,
+    })),
+    ...(rules.data ?? []).map((row) => ({
+      id: row.id, kind: "rule" as const, accountId: row.account_id,
+      categoryId: row.category_id, transactionType: row.transaction_type,
+      description: row.description, amountMinor: row.amount_minor,
+      transactionDate: row.next_occurrence,
+    })),
+  ];
+  return { candidates, hasError: Boolean(pending.error || rules.error) };
+}
+
+export async function getCurrentUserAutomaticTransaction(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id, account_id, description, transaction_date, origin_type, status")
+    .eq("user_id", user.id)
+    .eq("id", id)
+    .eq("is_active", true)
+    .in("origin_type", ["system", "credit_card_invoice_payment"])
+    .maybeSingle();
+  return { transaction: data, hasError: Boolean(error) };
+}
+
+export async function updateCurrentUserAutomaticTransactionDate(
+  id: string,
+  date: string,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("update_automatic_transaction_date", {
+    target_transaction_id: id,
+    target_transaction_date: date,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function confirmCurrentUserRecurringForecast(
+  forecastId: string,
+  input: TransactionMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("confirm_recurring_transaction", {
+    target_transaction_id: forecastId,
+    target_account_id: input.accountId,
+    target_transaction_type: input.transactionType,
+    target_category_id: input.categoryId,
+    target_description: input.description,
+    target_amount_minor: input.amountMinor,
+    target_transaction_date: input.transactionDate,
+    target_notes: input.notes,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
+export async function confirmCurrentUserRecurringRule(
+  ruleId: string,
+  input: TransactionMutationInput,
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("confirm_recurring_rule_occurrence", {
+    target_recurring_id: ruleId,
+    target_account_id: input.accountId,
+    target_transaction_type: input.transactionType,
+    target_category_id: input.categoryId,
+    target_description: input.description,
+    target_amount_minor: input.amountMinor,
+    target_transaction_date: input.transactionDate,
+    target_notes: input.notes,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
+}
+
 function mutationErrorMessage(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? "";
   if (message.includes("invalid_transaction_category")) {
@@ -170,6 +270,12 @@ function mutationErrorMessage(error: { message?: string } | null) {
   }
   if (message.includes("invalid_transaction_account")) {
     return "A conta selecionada não está disponível.";
+  }
+  if (message.includes("recurrence_match_not_similar")) {
+    return "A recorrência mudou desde a confirmação. Revise a data e o valor.";
+  }
+  if (message.includes("recurrence_occurrence_already_generated")) {
+    return "Esta ocorrência já foi lançada. Atualize o extrato antes de tentar novamente.";
   }
   return "Não foi possível salvar o lançamento.";
 }

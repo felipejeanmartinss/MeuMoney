@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { FinancialFormState } from "@/app/actions/accounts";
 import { accountRegisterReconciliationSchema } from "@/domain/account-register";
 import { accountIdSchema } from "@/domain/accounts";
+import { isValidIsoDate } from "@/domain/dates";
 import { nextRecurrenceDate } from "@/domain/recurring-transactions";
 import {
   transactionFormSchema,
@@ -12,9 +13,12 @@ import {
 } from "@/domain/transactions";
 import {
   clearCurrentUserInactiveAutomaticTransactions,
+  confirmCurrentUserRecurringForecast,
+  confirmCurrentUserRecurringRule,
   createCurrentUserTransaction,
   deleteCurrentUserTransaction,
   setCurrentUserAccountEntryReconciled,
+  updateCurrentUserAutomaticTransactionDate,
   updateCurrentUserTransaction,
 } from "@/services/finance/transactions-service";
 
@@ -33,6 +37,7 @@ const transactionInputFrom = (formData: FormData) => ({
 function revalidateFinancialPaths() {
   revalidatePath("/transactions");
   revalidatePath("/accounts");
+  revalidatePath("/recurring-transactions");
   revalidatePath("/dashboard");
 }
 
@@ -78,10 +83,24 @@ export async function createTransaction(
     };
   }
 
-  const result = await createCurrentUserTransaction(parsed.data);
+  const matchedId = String(formData.get("matchedRecurringTransactionId") ?? "");
+  const matchedRuleId = String(formData.get("matchedRecurringRuleId") ?? "");
+  const parsedMatch = matchedId ? transactionIdSchema.safeParse(matchedId) : null;
+  const parsedRuleMatch = matchedRuleId ? transactionIdSchema.safeParse(matchedRuleId) : null;
+  if ((parsedMatch && !parsedMatch.success) || (parsedRuleMatch && !parsedRuleMatch.success) || (matchedId && matchedRuleId)) {
+    return { status: "error", message: "Previsão inválida." };
+  }
+  if ((parsedMatch?.success || parsedRuleMatch?.success) && parsed.data.status !== "completed") {
+    return { status: "error", message: "Confirme a previsão apenas com um lançamento realizado." };
+  }
+  const result = parsedMatch?.success
+    ? await confirmCurrentUserRecurringForecast(parsedMatch.data, parsed.data)
+    : parsedRuleMatch?.success
+      ? await confirmCurrentUserRecurringRule(parsedRuleMatch.data, parsed.data)
+    : await createCurrentUserTransaction(parsed.data);
   if (!result.ok) return { status: "error", message: result.message };
   revalidateFinancialPaths();
-  if (formData.get("createRecurring") === "true") {
+  if (!parsedMatch?.success && !parsedRuleMatch?.success && formData.get("createRecurring") === "true") {
     redirect(recurringTransactionHref(parsed.data));
   }
   if (formData.get("returnAccountId") === parsed.data.accountId) {
@@ -121,6 +140,19 @@ export async function updateTransaction(
     redirect(recurringTransactionHref(parsed.data));
   }
   redirect("/transactions?message=updated");
+}
+
+export async function updateAutomaticTransactionDate(formData: FormData) {
+  const parsedId = transactionIdSchema.safeParse(formData.get("id"));
+  const parsedAccountId = accountIdSchema.safeParse(formData.get("accountId"));
+  const date = String(formData.get("transactionDate") ?? "");
+  if (!parsedId.success || !parsedAccountId.success || !isValidIsoDate(date)) {
+    redirect("/accounts?message=automatic-date-error");
+  }
+  const result = await updateCurrentUserAutomaticTransactionDate(parsedId.data, date);
+  revalidateFinancialPaths();
+  revalidatePath(`/accounts/${parsedAccountId.data}`);
+  redirect(`/accounts/${parsedAccountId.data}?message=${result.ok ? "automatic-date-updated" : "automatic-date-error"}#account-register`);
 }
 
 export async function deleteTransaction(formData: FormData) {

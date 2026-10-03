@@ -8,7 +8,9 @@ import {
   getInvoiceDueDate,
   getInvoiceBillingMonth,
   getPurchaseReferenceMonth,
+  remainingCreditCardInvoiceAmount,
   selectNextCreditCardInvoice,
+  summarizeNextCreditCardInvoices,
   splitInstallments,
 } from "../src/domain/credit-cards";
 import {
@@ -34,6 +36,23 @@ describe("credit card cycles", () => {
 
   it("labels a statement by the month before its due date", () => {
     expect(getInvoiceBillingMonth("2026-01-11")).toBe("2025-12-01");
+  });
+});
+
+describe("account card summary", () => {
+  it("uses exactly one next invoice per card in the total shown above the rows", () => {
+    const cards = [
+      { id: "bradesco", currency: "BRL" as const },
+      { id: "nubank", currency: "BRL" as const },
+    ];
+    const invoices = [
+      { credit_card_id: "bradesco", status: "open" as const, total_amount: 55309, paid_amount: 0, due_date: "2026-10-01" },
+      { credit_card_id: "bradesco", status: "open" as const, total_amount: 60000, paid_amount: 0, due_date: "2026-11-01" },
+      { credit_card_id: "nubank", status: "closed" as const, total_amount: 80274, paid_amount: 10000, due_date: "2026-10-02" },
+    ];
+    const rows = summarizeNextCreditCardInvoices(cards, invoices);
+    expect(rows.map((row) => row.amountMinor)).toEqual([55309, 70274]);
+    expect(rows.reduce((sum, row) => sum + row.amountMinor, 0)).toBe(125583);
   });
 });
 
@@ -199,7 +218,7 @@ describe("credit card commitment horizon", () => {
     },
   ];
 
-  it("limits installments and subscriptions to the last registered invoice", () => {
+  it("includes future installments even beyond the last registered invoice", () => {
     const result = calculateCreditCardCommitment({
       creditLimitMinor: 1_000_00,
       closingDay: 20,
@@ -218,8 +237,8 @@ describe("credit card commitment horizon", () => {
     });
 
     expect(result.lastInvoiceMonth).toBe("2026-11-01");
-    expect(result.committedMinor).toBe(350_00);
-    expect(result.availableMinor).toBe(650_00);
+    expect(result.committedMinor).toBe(450_00);
+    expect(result.availableMinor).toBe(550_00);
   });
 
   it("does not project a paid subscription month again", () => {
@@ -249,6 +268,17 @@ describe("credit card commitment horizon", () => {
 
     expect(result.committedMinor).toBe(0);
     expect(result.availableMinor).toBe(210_00);
+  });
+
+  it("counts registered installments without any invoice and nets partial invoice payments", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 500_00, closingDay: 20, invoices: [],
+      purchases: [{ id: "purchase", totalAmountMinor: 200_00, purchaseDate: "2026-09-01", isRecurring: false, entryKind: "purchase" }],
+      installments: [{ purchaseId: "purchase", amountMinor: 200_00, competenceDate: "2026-10-01", status: "pending" }],
+    });
+    expect(result.committedMinor).toBe(200_00);
+    expect(remainingCreditCardInvoiceAmount({ status: "open", total_amount: 200_00, paid_amount: 50_00 })).toBe(150_00);
+    expect(remainingCreditCardInvoiceAmount({ status: "paid", total_amount: 200_00, paid_amount: 200_00 })).toBe(0);
   });
 
   it("subtracts statement credits from the committed limit", () => {

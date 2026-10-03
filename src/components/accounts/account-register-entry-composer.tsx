@@ -8,6 +8,7 @@ import {
   type AccountEntryMode,
 } from "@/components/forms/account-entry-form";
 import type { CategoryGroupItem } from "@/domain/categories";
+import type { PendingRecurrenceMatch } from "@/domain/account-register";
 import type { CreditCardTransferDestination } from "@/domain/transfers";
 import type {
   AccountType,
@@ -23,6 +24,7 @@ export type AccountRegisterEntryComposerProps = {
   groups: CategoryGroupItem[];
   creditCards: CreditCardTransferDestination[];
   investmentPositions: InvestmentPositionSummary[];
+  pendingRecurrences: PendingRecurrenceMatch[];
   hasError: boolean;
 };
 
@@ -35,6 +37,7 @@ export function AccountRegisterEntryComposer({
   groups,
   creditCards,
   investmentPositions,
+  pendingRecurrences,
   hasError,
 }: AccountRegisterEntryComposerProps) {
   const panelId = useId();
@@ -101,6 +104,7 @@ export function AccountRegisterEntryComposer({
               groups={groups}
               creditCards={creditCards}
               investmentPositions={investmentPositions}
+              pendingRecurrences={pendingRecurrences}
               accountId={accountId}
               transactionDate={transactionDate}
               initialMode={mode}

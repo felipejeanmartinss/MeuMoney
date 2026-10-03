@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   changeRecurringTransactionState,
+  generateSingleRecurringTransaction,
   generateRecurringTransactions,
 } from "@/app/actions/recurring-transactions";
 import { inputClass } from "@/components/forms/form-control-styles";
@@ -39,6 +40,7 @@ const messages: Record<string, string> = {
   "state-ended": "Recorrência encerrada definitivamente.",
   "status-error": "Não foi possível alterar o estado da recorrência.",
   "generation-error": "Não foi possível gerar os lançamentos previstos.",
+  "single-generated": "Próxima ocorrência prevista criada.",
 };
 
 function recurrenceState(recurrence: {
@@ -96,9 +98,13 @@ function CurrencyAmounts({
 function RecurrenceMenu({
   id,
   state,
+  nextOccurrence,
+  amountMinor,
 }: {
   id: string;
   state: RecurringTransactionState;
+  nextOccurrence: string;
+  amountMinor: number;
 }) {
   return (
     <details className="relative">
@@ -106,6 +112,19 @@ function RecurrenceMenu({
         Ações
       </summary>
       <div className="z-10 mt-2 grid min-w-36 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl sm:absolute sm:right-0">
+        {state === "active" ? (
+          <form action={generateSingleRecurringTransaction} className="grid gap-2 border-b border-slate-100 p-2">
+            <input type="hidden" name="id" value={id} />
+            <span className="text-xs font-bold text-slate-700">Gerar próxima previsão</span>
+            <label className="grid gap-1 text-xs text-slate-600">Data
+              <input type="date" name="transactionDate" defaultValue={nextOccurrence} required className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="grid gap-1 text-xs text-slate-600">Valor
+              <input name="amount" inputMode="decimal" defaultValue={minorUnitsToInput(amountMinor)} required className="w-36 rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+            </label>
+            <button className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Gerar esta</button>
+          </form>
+        ) : null}
         {state !== "ended" ? (
           <Link
             href={`/recurring-transactions/${id}/edit`}
@@ -585,7 +604,7 @@ export default async function RecurringTransactionsPage({
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end">
-                          <RecurrenceMenu id={recurrence.id} state={state} />
+                          <RecurrenceMenu id={recurrence.id} state={state} nextOccurrence={recurrence.next_occurrence} amountMinor={recurrence.amount_minor} />
                         </div>
                       </td>
                     </tr>
@@ -640,7 +659,7 @@ export default async function RecurringTransactionsPage({
                         {formatFinancialDate(recurrence.next_occurrence)}
                       </p>
                     </div>
-                    <RecurrenceMenu id={recurrence.id} state={state} />
+                    <RecurrenceMenu id={recurrence.id} state={state} nextOccurrence={recurrence.next_occurrence} amountMinor={recurrence.amount_minor} />
                   </div>
                 </article>
               );

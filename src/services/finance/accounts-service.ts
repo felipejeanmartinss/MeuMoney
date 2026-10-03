@@ -58,6 +58,17 @@ export async function getCurrentUserAccount(id: string) {
 export async function getCurrentUserAccountHub(id: string) {
   const { supabase, user } = await requireUser();
 
+  async function getInvestmentLinks() {
+    const result = await supabase.from("investment_cash_flows")
+      .select("id, position_id, transaction_id, source_transfer_id, source_account_id, source_transaction_id")
+      .eq("user_id", user.id).limit(5000);
+    if (!result.error || !/source_transaction_id/i.test(result.error.message)) return result;
+    const fallback = await supabase.from("investment_cash_flows")
+      .select("id, position_id, transaction_id, source_transfer_id, source_account_id")
+      .eq("user_id", user.id).limit(5000);
+    return { ...fallback, data: fallback.data?.map((flow) => ({ ...flow, source_transaction_id: null })) ?? null };
+  }
+
   async function getAllAccountTransactions() {
     const rows: Omit<Transaction, "is_subscription">[] = [];
     const pageSize = 1000;
@@ -148,13 +159,7 @@ export async function getCurrentUserAccountHub(id: string) {
       .from("category_groups")
       .select("id, user_id, name, kind, context, is_system, archived_at, created_at, updated_at")
       .eq("user_id", user.id),
-    supabase
-      .from("investment_cash_flows")
-      .select(
-        "id, position_id, transaction_id, source_transfer_id, source_account_id",
-      )
-      .eq("user_id", user.id)
-      .limit(5000),
+    getInvestmentLinks(),
   ]);
 
   const categories = (categoriesResult.data ?? []) as Category[];
@@ -186,9 +191,9 @@ export async function getCurrentUserAccountHub(id: string) {
   );
   const investmentLinkByTransaction = new Map(
     (investmentLinksResult.data ?? []).flatMap((flow) =>
-      flow.transaction_id
+      flow.transaction_id || flow.source_transaction_id
         ? [[
-            flow.transaction_id,
+            (flow.transaction_id ?? flow.source_transaction_id)!,
             { positionId: flow.position_id, cashFlowId: flow.id },
           ] as const]
         : [],
@@ -223,7 +228,10 @@ export async function getCurrentUserAccountHub(id: string) {
         editHref:
           transaction.origin_type === "manual"
             ? `/transactions/${transaction.id}/edit`
+            : transaction.origin_type === "system" || transaction.origin_type === "credit_card_invoice_payment"
+              ? `/transactions/${transaction.id}/edit-date`
             : null,
+        automaticDateOnly: transaction.origin_type === "system" || transaction.origin_type === "credit_card_invoice_payment",
         canDelete:
           transaction.origin_type === "manual" ||
           transaction.origin_type === "system",

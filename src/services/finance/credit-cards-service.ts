@@ -158,6 +158,43 @@ export async function listCurrentUserTransferCreditCardDestinations() {
 
 export async function listCurrentUserCreditCards() {
   const { supabase, user } = await requireUser();
+
+  async function allInvoices() {
+    const rows: CreditCardInvoice[] = [];
+    for (let from = 0; ; from += 1000) {
+      const result = await supabase.from("credit_card_invoices")
+        .select(invoiceColumns).eq("user_id", user.id)
+        .order("id").range(from, from + 999);
+      if (result.error) return { data: [] as CreditCardInvoice[], error: result.error };
+      rows.push(...(result.data ?? []));
+      if (!result.data || result.data.length < 1000) return { data: rows, error: null };
+    }
+  }
+
+  async function allPurchases() {
+    const rows: CreditCardPurchase[] = [];
+    for (let from = 0; ; from += 1000) {
+      const result = await supabase.from("credit_card_purchases")
+        .select(purchaseColumns).eq("user_id", user.id).eq("status", "active")
+        .order("id").range(from, from + 999);
+      if (result.error) return { data: [] as CreditCardPurchase[], error: result.error };
+      rows.push(...(result.data ?? []));
+      if (!result.data || result.data.length < 1000) return { data: rows, error: null };
+    }
+  }
+
+  async function allInstallments() {
+    const rows: CreditCardInstallment[] = [];
+    for (let from = 0; ; from += 1000) {
+      const result = await supabase.from("credit_card_installments")
+        .select(installmentColumns).eq("user_id", user.id)
+        .order("id").range(from, from + 999);
+      if (result.error) return { data: [] as CreditCardInstallment[], error: result.error };
+      rows.push(...(result.data ?? []));
+      if (!result.data || result.data.length < 1000) return { data: rows, error: null };
+    }
+  }
+
   const [cardsResult, invoicesResult, purchasesResult, installmentsResult] =
     await Promise.all([
       supabase
@@ -166,21 +203,14 @@ export async function listCurrentUserCreditCards() {
         .eq("user_id", user.id)
         .order("is_active", { ascending: false })
         .order("name"),
-      supabase
-        .from("credit_card_invoices")
-        .select(invoiceColumns)
-        .eq("user_id", user.id)
-        .order("reference_month"),
-      supabase
-        .from("credit_card_purchases")
-        .select(purchaseColumns)
-        .eq("user_id", user.id)
-        .eq("status", "active"),
-      supabase
-        .from("credit_card_installments")
-        .select(installmentColumns)
-        .eq("user_id", user.id),
+      allInvoices(),
+      allPurchases(),
+      allInstallments(),
     ]);
+
+  if (cardsResult.error || invoicesResult.error || purchasesResult.error || installmentsResult.error) {
+    return { cards: [] as CreditCardSummary[], invoices: [] as CreditCardInvoice[], hasError: true };
+  }
 
   const invoices = invoicesResult.data ?? [];
   const purchases = purchasesResult.data ?? [];

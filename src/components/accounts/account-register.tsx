@@ -12,6 +12,8 @@ import {
 import { ConfirmSubmitButton } from "@/components/forms/confirm-submit-button";
 import {
   canReconcileAccountEntry,
+  filterAccountRegisterEntries,
+  type AccountRegisterFilters,
   type AccountRegisterEntry,
 } from "@/domain/account-register";
 import { formatMoney } from "@/domain/money";
@@ -38,6 +40,8 @@ const messages: Record<string, { text: string; error?: boolean }> = {
   "transaction-created": {
     text: "Lançamento criado com sucesso.",
   },
+  "automatic-date-updated": { text: "Data do lançamento automático atualizada." },
+  "automatic-date-error": { text: "Não foi possível atualizar a data do lançamento automático.", error: true },
   "transfer-created": {
     text: "Transferência criada com sucesso.",
   },
@@ -122,10 +126,12 @@ function Pagination({
   accountId,
   page,
   pageCount,
+  filterQuery,
 }: {
   accountId: string;
   page: number;
   pageCount: number;
+  filterQuery: string;
 }) {
   if (pageCount <= 1) return null;
 
@@ -136,7 +142,7 @@ function Pagination({
     >
       {page > 1 ? (
         <Link
-          href={`/accounts/${accountId}?tab=statement&page=${page - 1}#account-register`}
+          href={`/accounts/${accountId}?page=${page - 1}${filterQuery}#account-register`}
           className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           ← Anterior
@@ -147,7 +153,7 @@ function Pagination({
       </span>
       {page < pageCount ? (
         <Link
-          href={`/accounts/${accountId}?tab=statement&page=${page + 1}#account-register`}
+          href={`/accounts/${accountId}?page=${page + 1}${filterQuery}#account-register`}
           className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           Próxima →
@@ -165,6 +171,7 @@ export function AccountRegister({
   asOfDate,
   requestedPage,
   message,
+  filters = {},
   entryComposer,
 }: {
   accountId: string;
@@ -174,16 +181,24 @@ export function AccountRegister({
   asOfDate: string;
   requestedPage?: string;
   message?: string;
+  filters?: AccountRegisterFilters;
   entryComposer?: AccountRegisterEntryComposerProps;
 }) {
-  const pageCount = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const filteredEntries = filterAccountRegisterEntries(entries, filters);
+  const filterParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value?.trim()) filterParams.set(key, value);
+  }
+  const filterQuery = filterParams.size ? `&${filterParams.toString()}` : "";
+  const hasFilters = filterParams.size > 0;
+  const pageCount = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
   const parsedPage = Number.parseInt(requestedPage ?? "1", 10);
   const page = Number.isFinite(parsedPage)
     ? Math.min(Math.max(parsedPage, 1), pageCount)
     : 1;
   const pageStart = (page - 1) * PAGE_SIZE;
-  const pageEntries = entries.slice(pageStart, page * PAGE_SIZE);
-  const firstCurrentEntryIndex = entries.findIndex(
+  const pageEntries = filteredEntries.slice(pageStart, page * PAGE_SIZE);
+  const firstCurrentEntryIndex = filteredEntries.findIndex(
     (entry) => !entry.isProjected,
   );
   const feedback = message ? messages[message] : undefined;
@@ -199,6 +214,22 @@ export function AccountRegister({
         ) : null}
       </div>
 
+      <details className="border-b border-slate-200 bg-slate-50/60" open={hasFilters || undefined}>
+        <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold text-slate-600">Filtros{hasFilters ? " · ativos" : ""}</summary>
+        <form method="get" action={`/accounts/${accountId}#account-register`} className="grid gap-2 px-3 pb-2 sm:grid-cols-2 lg:grid-cols-6">
+          <input type="date" name="dateFrom" aria-label="Data inicial" title="Data inicial" defaultValue={filters.dateFrom} className="min-h-8 rounded-md border border-slate-300 px-2 text-xs" />
+          <input type="date" name="dateTo" aria-label="Data final" title="Data final" defaultValue={filters.dateTo} className="min-h-8 rounded-md border border-slate-300 px-2 text-xs" />
+          <input name="description" aria-label="Descrição" placeholder="Descrição" defaultValue={filters.description} className="min-h-8 rounded-md border border-slate-300 px-2 text-xs" />
+          <input name="category" aria-label="Categoria ou subcategoria" placeholder="Categoria / subcategoria" defaultValue={filters.category} className="min-h-8 rounded-md border border-slate-300 px-2 text-xs" />
+          <input name="income" aria-label="Valor de entrada" placeholder="Entrada R$" inputMode="decimal" defaultValue={filters.income} className="min-h-8 rounded-md border border-slate-300 px-2 text-xs" />
+          <input name="expense" aria-label="Valor de saída" placeholder="Saída R$" inputMode="decimal" defaultValue={filters.expense} className="min-h-8 rounded-md border border-slate-300 px-2 text-xs" />
+          <div className="flex gap-2 lg:col-span-6 lg:justify-end">
+            <Link href={`/accounts/${accountId}#account-register`} className="inline-flex min-h-8 items-center px-2 text-xs font-semibold text-slate-600">Limpar</Link>
+            <button className="min-h-8 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white">Aplicar</button>
+          </div>
+        </form>
+      </details>
+
       {feedback ? (
         <p
           role={feedback.error ? "alert" : "status"}
@@ -212,10 +243,10 @@ export function AccountRegister({
         </p>
       ) : null}
 
-      {entries.length === 0 ? (
+      {filteredEntries.length === 0 ? (
         <div className="px-5 py-12 text-center">
           <p className="font-bold text-slate-700">
-            Nenhuma movimentação nesta conta.
+            {hasFilters ? "Nenhuma movimentação corresponde aos filtros." : "Nenhuma movimentação nesta conta."}
           </p>
           <p className="mt-2 text-sm text-slate-500">
             O saldo inicial continua sendo o ponto de partida.
@@ -361,7 +392,7 @@ export function AccountRegister({
                               href={entry.editHref}
                               className="text-sm font-bold text-blue-700 hover:underline"
                             >
-                              Editar
+                              {entry.automaticDateOnly ? "Editar data" : "Editar"}
                             </Link>
                             {entry.entryType === "transaction" ? (
                               <form action={deleteTransaction}>
@@ -517,7 +548,7 @@ export function AccountRegister({
                             href={entry.editHref}
                             className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700"
                           >
-                            Editar
+                            {entry.automaticDateOnly ? "Editar data" : "Editar"}
                           </Link>
                           {entry.entryType === "transaction" ? (
                             <form action={deleteTransaction}>
@@ -555,7 +586,7 @@ export function AccountRegister({
         </>
       )}
 
-      <Pagination accountId={accountId} page={page} pageCount={pageCount} />
+      <Pagination accountId={accountId} page={page} pageCount={pageCount} filterQuery={filterQuery} />
     </section>
   );
 }

@@ -6,6 +6,18 @@ const readSource = (...segments: string[]) =>
   readFileSync(resolve(...segments), "utf8");
 
 describe("transaction to recurring-account handoff", () => {
+  it("checks registered rules and pending forecasts in both entry points", () => {
+    const accountPage = readSource("src", "app", "accounts", "[id]", "page.tsx");
+    const newTransactionPage = readSource("src", "app", "transactions", "new", "page.tsx");
+    const form = readSource("src", "components", "forms", "transaction-form.tsx");
+    const action = readSource("src", "app", "actions", "transactions.ts");
+    expect(accountPage).toContain("listCurrentUserRecurrenceMatches(id)");
+    expect(newTransactionPage).toContain("listCurrentUserRecurrenceMatches()");
+    expect(newTransactionPage).toContain("pendingRecurrences={recurrenceMatches.candidates}");
+    expect(form).toContain('name="matchedRecurringRuleId"');
+    expect(action).toContain("confirmCurrentUserRecurringRule");
+  });
+
   it("offers recurrence for new and edited manual transactions", () => {
     const form = readSource("src", "components", "forms", "transaction-form.tsx");
     expect(form).toContain('name="createRecurring"');
