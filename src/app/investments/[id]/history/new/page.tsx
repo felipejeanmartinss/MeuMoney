@@ -8,7 +8,7 @@ import {
   INVESTMENT_INCOME_TYPE_LABELS,
   investmentPositionIdSchema,
 } from "@/domain/investments";
-import { getCurrentUserInvestmentPosition, listCurrentUserBankIncomeCandidates } from "@/services/finance/investments-service";
+import { getCurrentUserInvestmentPosition, listCurrentUserBankIncomeCandidates, listCurrentUserCompatibleInvestmentAccounts } from "@/services/finance/investments-service";
 import { toIsoDate } from "@/utils/dates";
 
 export const metadata = { title: "Registrar histórico de investimento" };
@@ -26,8 +26,9 @@ export default async function NewInvestmentCashFlowPage({
   const { position, hasError } =
     await getCurrentUserInvestmentPosition(parsedId.data);
   if (hasError || !position) notFound();
-  const [{ candidates, hasError: candidateError }, query] = await Promise.all([
-    listCurrentUserBankIncomeCandidates(position.id), searchParams,
+  const [{ candidates, hasError: candidateError }, { accounts, hasError: accountError }, query] = await Promise.all([
+    listCurrentUserBankIncomeCandidates(position.id),
+    listCurrentUserCompatibleInvestmentAccounts(position.id), searchParams,
   ]);
 
   return (
@@ -73,10 +74,13 @@ export default async function NewInvestmentCashFlowPage({
         ) : <p className="mt-3 text-sm text-slate-500">Nenhuma receita bancária disponível para esta moeda e contexto.</p>}
       </section>
       <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-        <h2 className="mb-3 font-bold text-slate-950">Registrar movimento sem lançamento bancário</h2>
+        <h2 className="mb-3 font-bold text-slate-950">Registrar movimento</h2>
+        {accountError ? <p role="alert" className="mb-3 text-sm text-amber-700">Não foi possível carregar as contas de investimento.</p> : null}
         <InvestmentCashFlowForm
           positionId={position.id}
           maxDate={toIsoDate(new Date())}
+          accounts={accounts}
+          assetName={position.asset_name}
         />
       </section>
     </main>

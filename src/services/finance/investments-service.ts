@@ -525,6 +525,20 @@ export async function createCurrentUserInvestmentCashFlow(
     : { ok: true as const, id: data };
 }
 
+export async function listCurrentUserCompatibleInvestmentAccounts(positionId: string) {
+  const { supabase, user } = await requireUser();
+  const position = await supabase.from("investment_positions")
+    .select("currency,context").eq("user_id", user.id).eq("id", positionId)
+    .eq("is_active", true).maybeSingle();
+  if (position.error || !position.data) return { accounts: [], hasError: true };
+  const result = await supabase.from("accounts")
+    .select("id,name,currency").eq("user_id", user.id)
+    .eq("type", "investment").eq("currency", position.data.currency)
+    .eq("context", position.data.context).is("archived_at", null)
+    .order("name");
+  return { accounts: result.data ?? [], hasError: Boolean(result.error) };
+}
+
 export async function listCurrentUserBankIncomeCandidates(positionId: string) {
   const { supabase, user } = await requireUser();
   const positionResult = await supabase.from("investment_positions")

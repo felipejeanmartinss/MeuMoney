@@ -8,7 +8,7 @@ export type RecurrenceCalendarEvent = {
   description: string;
   accountName: string;
   amountLabel: string;
-  transactionType: "income" | "expense";
+  transactionType: "income" | "expense" | "transfer";
   colorIndex: number;
 };
 
@@ -135,9 +135,8 @@ export function RecurrenceCalendar({
                     </span>
                     <span
                       className={`mt-1 block text-sm font-extrabold ${
-                        event.transactionType === "income"
-                          ? "text-emerald-700"
-                          : "text-rose-700"
+                        event.transactionType === "income" ? "text-emerald-700"
+                          : event.transactionType === "transfer" ? "text-blue-700" : "text-rose-700"
                       }`}
                     >
                       {event.amountLabel}

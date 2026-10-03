@@ -198,6 +198,19 @@ describe("credit card invoice forecast", () => {
       100_00,
     ]);
   });
+
+  it("does not add a subscription twice when a future charge is materialized or cancelled", () => {
+    const rows = buildCreditCardInvoiceForecast({
+      referenceMonth: "2026-09-01", months: 3,
+      invoices: [
+        { id: "sept", referenceMonth: "2026-09-01", totalAmountMinor: 50_00 },
+        { id: "oct", referenceMonth: "2026-10-01", totalAmountMinor: 50_00 },
+      ],
+      subscriptions: [{ amountMinor: 50_00, firstReferenceMonth: "2026-09-01",
+        registeredReferenceMonths: ["2026-10-01", "2026-11-01"] }],
+    });
+    expect(rows.map((row) => row.amountMinor)).toEqual([50_00, 50_00, 0]);
+  });
 });
 
 describe("credit card commitment horizon", () => {
@@ -255,6 +268,28 @@ describe("credit card commitment horizon", () => {
 
     expect(result.committedMinor).toBe(0);
     expect(result.availableMinor).toBe(500_00);
+  });
+
+  it("does not double count generated charges and respects cancelled months", () => {
+    const result = calculateCreditCardCommitment({
+      creditLimitMinor: 500_00, closingDay: 20,
+      invoices: [{ referenceMonth: "2026-11-01" }],
+      purchases: [purchases[1], {
+        id: "oct", totalAmountMinor: 50_00, purchaseDate: "2026-10-07",
+        isRecurring: false, entryKind: "purchase",
+        recurringSourcePurchaseId: "subscription", recurringReferenceMonth: "2026-10-01",
+      }, {
+        id: "nov-cancelled", totalAmountMinor: 50_00, purchaseDate: "2026-11-07",
+        isRecurring: false, entryKind: "purchase",
+        recurringSourcePurchaseId: "subscription", recurringReferenceMonth: "2026-11-01",
+      }],
+      installments: [
+        { purchaseId: "subscription", amountMinor: 50_00, competenceDate: "2026-09-01", status: "paid" },
+        { purchaseId: "oct", amountMinor: 50_00, competenceDate: "2026-10-01", status: "pending" },
+        { purchaseId: "nov-cancelled", amountMinor: 50_00, competenceDate: "2026-11-01", status: "cancelled" },
+      ],
+    });
+    expect(result.committedMinor).toBe(50_00);
   });
 
   it("returns the full limit when no invoice horizon exists", () => {

@@ -87,6 +87,9 @@
 
 ## Cartões de crédito — Sprint 4
 
+- Uma assinatura ativa gera cobranças mensais reais nas faturas abertas dos seis meses correntes/futuros quando os cartões são consultados. Cada cobrança futura é uma compra independente, editável e cancelável pelas ações normais da fatura. O vínculo com a assinatura e a competência original são únicos e preservados após o cancelamento; excluí-la não faz a cobrança reaparecer. Faturas fechadas ou pagas não são alteradas pela geração.
+- O comprometimento e a projeção não somam novamente a assinatura quando já existe uma cobrança materializada ou cancelada para aquela competência. Alterar a regra da assinatura não reescreve automaticamente cobranças futuras já materializadas; estas são revisadas individualmente.
+
 - Compra de cartão é despesa de consumo e exige categoria de Despesa ativa do mesmo usuário.
 - Compra não altera saldo de conta. Uma transferência realizada para o cartão reduz o saldo da conta de origem e o saldo devedor atual do cartão, sem exigir vínculo com uma fatura.
 - Valores são positivos e exatos em unidades menores; parcelas nunca possuem valor zero. Eventual resto da divisão fica na última parcela.
@@ -103,6 +106,9 @@
 - Limpar o histórico de importações remove todos os jobs e dados temporários do usuário. Lançamentos, compras e assinaturas de deduplicação já confirmados são preservados; apenas a referência ao job removido é descartada.
 
 ## Recorrências — feature/recurring-transactions
+
+- Transferências recorrentes são regras próprias, sem categoria e sem efeito de receita/despesa. Cada ocorrência gera uma transferência prevista com saída e entrada vinculadas nas duas contas. A chave `(regra, data programada)` impede duplicidade mesmo após alterar a data visível da transferência. A próxima ocorrência avança apenas depois da criação atômica das duas pontas; transferência editada ou excluída não reaparece automaticamente.
+- Transferências entre contas da mesma moeda exigem valores de saída e entrada iguais. Em moedas diferentes, o usuário informa os dois valores exatos; nenhuma cotação é presumida. A geração por período inclui essas regras na mesma operação das demais recorrências, e cada regra também pode gerar uma ocorrência individual.
 
 - Recorrências representam exclusivamente receitas ou despesas e mantêm valor positivo em unidades menores inteiras.
 - As frequências disponíveis são semanal, mensal e anual. O dia da data inicial é a âncora do calendário; em meses curtos, usa-se o último dia real e a âncora volta a ser aplicada nos meses seguintes.
@@ -264,6 +270,8 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - A taxa anual nominal é convertida para pontos-base. Impostos, inflação, custos e variações reais não são inferidos.
 
 ## Operação de investimentos, relatórios e orçamento anual
+
+- Ao registrar aporte, resgate ou renda diretamente no histórico da posição, o usuário pode optar por criar um lançamento na conta de investimento compatível (mesma moeda e contexto). Nesse caso, a operação existente `create_investment_account_entry` cria o lançamento e o vínculo à posição atomicamente. Sem conta selecionada, o registro permanece apenas no histórico da posição; receitas bancárias já existentes seguem vinculáveis sem segunda entrada.
 
 - Uma aplicação ou aporte cria uma saída realizada somente em uma conta ativa do tipo Investimento e um aporte vinculado à posição escolhida, na mesma moeda, contexto e proprietário. No primeiro aporte, a posição pode ser criada na mesma operação, usando o valor aplicado como custo e valor inicial sem ganho presumido.
 - Uma liquidação ou resgate cria uma entrada na conta e um resgate vinculado. É movimento de capital, não renda econômica, e por isso não compõe receitas dos relatórios.

@@ -295,7 +295,7 @@ export async function generateCurrentUserRecurringTransactions(
 ) {
   const { supabase } = await requireUser();
   const { data, error } = await supabase.rpc(
-    "generate_recurring_transactions_reviewed",
+    "generate_all_recurring_forecasts",
     {
       target_until: targetUntil,
       review_overrides: reviews as unknown as Json,
