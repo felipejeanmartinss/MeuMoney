@@ -48,4 +48,13 @@ describe("investment transfer links", () => {
       "grant select on table public.investment_transfer_candidates to authenticated",
     );
   });
+
+  it("lets a position cash flow create its linked investment-account entry atomically", () => {
+    const action = readFileSync(resolve("src", "app", "actions", "investments.ts"), "utf8");
+    const service = readFileSync(resolve("src", "services", "finance", "investments-service.ts"), "utf8");
+    expect(action).toContain("createCurrentUserInvestmentAccountEntry({");
+    expect(action).toContain("accountId: parsedAccount.data");
+    expect(service).toContain('"create_investment_account_entry"');
+    expect(service).toContain('.eq("type", "investment")');
+  });
 });

@@ -166,16 +166,46 @@ export async function createInvestmentCashFlow(
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
-
-  const result = await createCurrentUserInvestmentCashFlow(
-    parsed.data.positionId,
-    parsed.data,
-  );
+  const accountId = String(formData.get("accountId") ?? "");
+  const parsedAccount = accountId ? accountIdSchema.safeParse(accountId) : null;
+  if (parsedAccount && !parsedAccount.success) {
+    return { status: "error", fieldErrors: { accountId: ["Selecione uma conta válida."] } };
+  }
+  const description = String(formData.get("description") ?? "").trim();
+  const incomeType = String(formData.get("incomeType") ?? "dividend");
+  if (parsedAccount?.success && (description.length < 1 || description.length > 180)) {
+    return { status: "error", fieldErrors: { description: ["Informe uma descrição de até 180 caracteres."] } };
+  }
+  if (parsedAccount?.success && parsed.data.cashFlowType === "income" && !(incomeType in INVESTMENT_INCOME_TYPE_LABELS)) {
+    return { status: "error", fieldErrors: { incomeType: ["Selecione o tipo de renda."] } };
+  }
+  const result = parsedAccount?.success
+    ? await createCurrentUserInvestmentAccountEntry({
+        accountId: parsedAccount.data,
+        positionId: parsed.data.positionId,
+        eventType: parsed.data.cashFlowType === "income"
+          ? incomeType as InvestmentIncomeType : parsed.data.cashFlowType,
+        description,
+        amountMinor: parsed.data.amountMinor,
+        quantity: parsed.data.quantity,
+        transactionDate: parsed.data.cashFlowDate,
+        notes: parsed.data.notes,
+        newPosition: null,
+      })
+    : await createCurrentUserInvestmentCashFlow(
+        parsed.data.positionId, parsed.data,
+      );
   if (!result.ok) return { status: "error", message: result.message };
 
   revalidatePath("/investments");
   revalidatePath(`/investments/${parsed.data.positionId}/history`);
-  redirect(`/investments/${parsed.data.positionId}/history?message=flow-created`);
+  if (parsedAccount?.success) {
+    revalidatePath("/accounts");
+    revalidatePath(`/accounts/${parsedAccount.data}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/reports");
+  }
+  redirect(`/investments/${parsed.data.positionId}/history?message=${parsedAccount?.success ? "flow-linked" : "flow-created"}`);
 }
 
 export async function linkInvestmentBankIncome(formData: FormData) {

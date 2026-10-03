@@ -121,6 +121,27 @@ export const recurringTransactionFormSchema = z
     }
   });
 
+export const recurringTransferFormSchema = z.object({
+  sourceAccountId: z.uuid("Selecione a conta de origem."),
+  destinationAccountId: z.uuid("Selecione a conta de destino."),
+  description: z.string().trim().min(1, "Informe a descrição.").max(180),
+  amountMinor: positiveMoneyInput,
+  destinationAmountMinor: positiveMoneyInput,
+  frequency: z.enum(RECURRENCE_FREQUENCIES),
+  startDate: z.string().refine(isValidIsoDate, "Informe uma data inicial válida."),
+  nextOccurrence: z.string().refine(isValidIsoDate, "Informe a próxima ocorrência."),
+  endDate: optionalDate,
+  notes: optionalText,
+}).superRefine((value, context) => {
+  if (value.sourceAccountId === value.destinationAccountId) {
+    context.addIssue({ code: "custom", path: ["destinationAccountId"], message: "Escolha outra conta." });
+  }
+  if (value.nextOccurrence < value.startDate ||
+    (value.endDate && (value.endDate < value.startDate || value.nextOccurrence > value.endDate))) {
+    context.addIssue({ code: "custom", path: ["nextOccurrence"], message: "Revise as datas da recorrência." });
+  }
+});
+
 export const recurringTransactionIdSchema = z.uuid(
   "Recorrência inválida.",
 );

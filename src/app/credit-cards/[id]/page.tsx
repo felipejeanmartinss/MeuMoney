@@ -45,6 +45,13 @@ export default async function CreditCardPage({
     ]),
   );
   const purchaseById = new Map(purchases.map((purchase) => [purchase.id, purchase]));
+  const subscriptionMonths = new Map<string, string[]>();
+  for (const purchase of purchases) {
+    if (!purchase.recurring_source_purchase_id || !purchase.recurring_reference_month) continue;
+    const months = subscriptionMonths.get(purchase.recurring_source_purchase_id) ?? [];
+    months.push(purchase.recurring_reference_month);
+    subscriptionMonths.set(purchase.recurring_source_purchase_id, months);
+  }
   const pendingInstallments = installments.filter(
     (item) => item.status === "pending",
   );
@@ -63,7 +70,7 @@ export default async function CreditCardPage({
     subscriptions: purchases
       .filter(
         (purchase) =>
-          purchase.is_recurring && purchase.entry_kind === "purchase",
+          purchase.is_recurring && purchase.entry_kind === "purchase" && purchase.status === "active",
       )
       .map((purchase) => ({
         amountMinor: purchase.total_amount,
@@ -71,6 +78,7 @@ export default async function CreditCardPage({
           purchase.purchase_date,
           card.closing_day,
         ),
+        registeredReferenceMonths: subscriptionMonths.get(purchase.id) ?? [],
       })),
   });
 
@@ -208,9 +216,9 @@ export default async function CreditCardPage({
                     </td>
                     <td className="px-4 py-2 font-semibold text-slate-950">
                       <span>{purchase.description}</span>
-                      {purchase.is_recurring ? (
+                      {purchase.is_recurring || purchase.recurring_source_purchase_id ? (
                         <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
-                          Assinatura
+                          {purchase.recurring_source_purchase_id ? "Cobrança recorrente" : "Assinatura"}
                         </span>
                       ) : null}
                     </td>

@@ -7,7 +7,7 @@ const automaticMigration = readFileSync(resolve(
 ), "utf8");
 const incomeMigration = readFileSync(resolve(
   "supabase/migrations/20260924121000_link_investment_bank_income.sql",
-), "utf8");
+), "utf8").replace(/\r\n/g, "\n");
 
 describe("automatic entry and bank income migrations", () => {
   it("keys recurrence idempotency to its original occurrence, not the editable posting date", () => {

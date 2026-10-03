@@ -40,6 +40,7 @@ type Values = {
   installmentCount?: number;
   installmentAmounts?: string[];
   isRecurring?: boolean;
+  isGeneratedRecurrence?: boolean;
   notes?: string | null;
 };
 
@@ -282,7 +283,7 @@ export function CreditCardPurchaseForm({
       {state.message ? <FormMessage>{state.message}</FormMessage> : null}
 
       <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
-        {entryKinds.map((kind) => (
+        {(values.isGeneratedRecurrence ? entryKinds.filter((kind) => kind === "purchase") : entryKinds).map((kind) => (
           <button
             key={kind}
             type="button"
@@ -356,12 +357,14 @@ export function CreditCardPurchaseForm({
             required
           />
         </Field>
-        {isCredit || isRecurring || isDirectInvoiceEntry ? (
+        {isCredit || isRecurring || isDirectInvoiceEntry || values.isGeneratedRecurrence ? (
           <div className="grid content-end gap-1.5">
             <span className="text-sm font-semibold text-slate-700">Forma</span>
             <div className="flex min-h-12 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700">
-              {isDirectInvoiceEntry
-                ? "Lançamento único nesta fatura"
+              {values.isGeneratedRecurrence
+                ? "Cobrança única desta assinatura"
+                : isDirectInvoiceEntry
+                  ? "Lançamento único nesta fatura"
                 : isCredit
                   ? "Crédito único"
                   : "Mensal, sem quantidade fixa"}
@@ -387,7 +390,7 @@ export function CreditCardPurchaseForm({
         )}
       </div>
 
-      {!isCredit && !isDirectInvoiceEntry ? (
+      {!isCredit && !isDirectInvoiceEntry && !values.isGeneratedRecurrence ? (
         <label className="flex min-h-10 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-800">
           <input
             className="h-4 w-4 accent-blue-700"

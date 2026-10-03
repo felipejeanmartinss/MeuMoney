@@ -5,6 +5,7 @@ import {
   collectDueRecurrenceDates,
   nextRecurrenceDate,
   recurringTransactionFormSchema,
+  recurringTransferFormSchema,
 } from "../src/domain/recurring-transactions";
 
 const recurringService = readFileSync(
@@ -155,5 +156,41 @@ describe("recurring transaction generation", () => {
 describe("recurring transaction operational lists", () => {
   it("keeps ended schedules out of the dedicated recurrence agenda", () => {
     expect(recurringService).toContain('.is("ended_at", null)');
+  });
+});
+
+describe("recurring account transfers", () => {
+  const input = {
+    sourceAccountId: "11111111-1111-4111-8111-111111111111",
+    destinationAccountId: "22222222-2222-4222-8222-222222222222",
+    description: "Previdência privada Tegra",
+    amountMinor: "650,00",
+    destinationAmountMinor: "650,00",
+    frequency: "monthly",
+    startDate: "2026-09-30",
+    nextOccurrence: "2026-09-30",
+    endDate: "",
+    notes: "",
+  };
+
+  it("keeps the two amounts in exact minor units and rejects a same-account rule", () => {
+    const parsed = recurringTransferFormSchema.safeParse(input);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.amountMinor).toBe(65000);
+      expect(parsed.data.destinationAmountMinor).toBe(65000);
+    }
+    expect(recurringTransferFormSchema.safeParse({ ...input,
+      destinationAccountId: input.sourceAccountId }).success).toBe(false);
+    expect(recurringTransferFormSchema.safeParse({ ...input,
+      nextOccurrence: "2026-09-29" }).success).toBe(false);
+  });
+
+  it("generates two linked transfer legs with a unique scheduled occurrence", () => {
+    const migration = readFileSync(resolve("supabase", "migrations",
+      "20261003121000_recurring_account_transfers.sql"), "utf8");
+    expect(migration).toContain("private.create_account_transfer(");
+    expect(migration).toContain("transfers_recurring_occurrence_idx");
+    expect(migration).toContain("for update skip locked");
   });
 });

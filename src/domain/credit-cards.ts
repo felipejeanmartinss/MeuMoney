@@ -378,6 +378,9 @@ export function calculateCreditCardCommitment(input: {
     purchaseDate: string;
     isRecurring: boolean;
     entryKind: CreditCardEntryKind;
+    recurringSourcePurchaseId?: string | null;
+    recurringReferenceMonth?: string | null;
+    status?: "active" | "cancelled";
   }[];
   installments: readonly {
     purchaseId: string;
@@ -398,6 +401,12 @@ export function calculateCreditCardCommitment(input: {
     input.purchases.map((purchase) => [purchase.id, purchase]),
   );
   const registeredMonthsByPurchase = new Map<string, Set<string>>();
+  for (const purchase of input.purchases) {
+    if (!purchase.recurringSourcePurchaseId || !purchase.recurringReferenceMonth) continue;
+    const months = registeredMonthsByPurchase.get(purchase.recurringSourcePurchaseId) ?? new Set<string>();
+    months.add(purchase.recurringReferenceMonth);
+    registeredMonthsByPurchase.set(purchase.recurringSourcePurchaseId, months);
+  }
   let committedMinor = 0;
 
   for (const installment of input.installments) {
@@ -406,12 +415,11 @@ export function calculateCreditCardCommitment(input: {
     // Parcelas ja registradas comprometem o limite mesmo que a fatura futura
     // ainda nao tenha sido materializada. O horizonte so limita assinaturas.
 
-    const months =
-      registeredMonthsByPurchase.get(installment.purchaseId) ??
-      new Set<string>();
+    const months = registeredMonthsByPurchase.get(installment.purchaseId) ?? new Set<string>();
     months.add(installment.competenceDate);
     registeredMonthsByPurchase.set(installment.purchaseId, months);
-    if (installment.status === "pending" || installment.status === "invoiced") {
+    if (purchase.status !== "cancelled" &&
+      (installment.status === "pending" || installment.status === "invoiced")) {
       const direction = purchase.entryKind === "purchase" ? 1 : -1;
       committedMinor = assertMinorUnits(
         committedMinor +
@@ -421,7 +429,7 @@ export function calculateCreditCardCommitment(input: {
   }
 
   for (const purchase of input.purchases) {
-    if (!purchase.isRecurring || purchase.entryKind !== "purchase") continue;
+    if (purchase.status === "cancelled" || !purchase.isRecurring || purchase.entryKind !== "purchase") continue;
     if (!lastInvoiceMonth) continue;
     const amountMinor = Math.max(0, assertMinorUnits(purchase.totalAmountMinor));
     const firstReference = parseIsoDate(
@@ -495,6 +503,7 @@ export function buildCreditCardInvoiceForecast(input: {
   subscriptions: readonly {
     amountMinor: number;
     firstReferenceMonth: string;
+    registeredReferenceMonths?: readonly string[];
   }[];
 }): CreditCardInvoiceForecastRow[] {
   const months = input.months ?? 6;
@@ -512,7 +521,8 @@ export function buildCreditCardInvoiceForecast(input: {
     const invoice = invoiceByMonth.get(referenceMonth);
     const recurringProjection = input.subscriptions.reduce(
       (total, subscription) =>
-        referenceMonth > subscription.firstReferenceMonth
+        referenceMonth > subscription.firstReferenceMonth &&
+          !subscription.registeredReferenceMonths?.includes(referenceMonth)
           ? total + subscription.amountMinor
           : total,
       0,

@@ -54,6 +54,7 @@ export default async function EditCreditCardPurchasePage({
               minorUnitsToInput(installment.amount),
             ),
             isRecurring: purchase.is_recurring,
+            isGeneratedRecurrence: Boolean(purchase.recurring_source_purchase_id),
             notes: purchase.notes,
           }}
           targetInvoiceId={

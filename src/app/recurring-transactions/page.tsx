@@ -2,7 +2,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import {
   changeRecurringTransactionState,
+  changeRecurringTransferState,
   generateSingleRecurringTransaction,
+  generateSingleRecurringTransfer,
   generateRecurringTransactions,
 } from "@/app/actions/recurring-transactions";
 import { inputClass } from "@/components/forms/form-control-styles";
@@ -22,6 +24,7 @@ import {
 import { getCategoryQualifiedName } from "@/domain/categories";
 import { TRANSACTION_TYPE_LABELS } from "@/domain/transactions";
 import { getSubscriptionOverview, listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
+import { listCurrentUserRecurringTransfers } from "@/services/finance/recurring-transfers-service";
 import type {
   RecurringTransactionState,
   SupportedCurrency,
@@ -41,6 +44,8 @@ const messages: Record<string, string> = {
   "status-error": "Não foi possível alterar o estado da recorrência.",
   "generation-error": "Não foi possível gerar os lançamentos previstos.",
   "single-generated": "Próxima ocorrência prevista criada.",
+  "transfer-saved": "Transferência recorrente salva.",
+  "transfer-generated": "Transferência prevista criada nas duas contas.",
 };
 
 function recurrenceState(recurrence: {
@@ -178,9 +183,11 @@ export default async function RecurringTransactionsPage({
   const [
     { recurrences, accounts, categories, groups, hasError },
     subscriptionOverview,
+    transferOverview,
   ] = await Promise.all([
     listCurrentUserRecurringTransactions(),
     getSubscriptionOverview(),
+    listCurrentUserRecurringTransfers(),
   ]);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
@@ -190,7 +197,7 @@ export default async function RecurringTransactionsPage({
     typeof value === "string" ? value : undefined;
   const period = asString(rawParams.period);
   const accountFilter = asString(rawParams.accountId);
-  const typeFilter = asString(rawParams.type) as TransactionType | undefined;
+  const typeFilter = asString(rawParams.type) as TransactionType | "transfer" | undefined;
   const stateFilter = asString(rawParams.state) as
     | "active"
     | "suspended"
@@ -217,6 +224,12 @@ export default async function RecurringTransactionsPage({
       (!stateFilter || state === stateFilter)
     );
   });
+  const filteredTransfers = transferOverview.transfers.filter((transfer) => {
+    const state = recurrenceState(transfer);
+    return (!period || transfer.next_occurrence.startsWith(period)) &&
+      (!accountFilter || transfer.source_account_id === accountFilter || transfer.destination_account_id === accountFilter) &&
+      (!typeFilter || typeFilter === "transfer") && (!stateFilter || state === stateFilter);
+  });
   const upcomingIncome = new Map<SupportedCurrency, number>();
   const upcomingExpense = new Map<SupportedCurrency, number>();
   let attentionCount = 0;
@@ -237,10 +250,12 @@ export default async function RecurringTransactionsPage({
         : upcomingExpense;
     target.set(currency, (target.get(currency) ?? 0) + recurrence.amount_minor);
   }
+  attentionCount += filteredTransfers.filter((transfer) =>
+    transfer.is_active && transfer.next_occurrence < today).length;
 
   const timelineStart = `${timelineMonth}-01`;
   const timelineEnd = referenceMonthEnd(timelineMonth);
-  const timelineEvents = recurrences
+  const transactionTimelineEvents = recurrences
     .filter((recurrence) => {
       const state = recurrenceState(recurrence);
       return (
@@ -282,6 +297,24 @@ export default async function RecurringTransactionsPage({
       left.date.localeCompare(right.date) ||
       left.description.localeCompare(right.description, "pt-BR"),
     );
+  const transferTimelineEvents: RecurrenceCalendarEvent[] = transferOverview.transfers
+    .filter((transfer) => transfer.is_active &&
+      (!accountFilter || [transfer.source_account_id, transfer.destination_account_id].includes(accountFilter)) &&
+      (!typeFilter || typeFilter === "transfer") && (!stateFilter || stateFilter === "active") &&
+      transfer.next_occurrence <= timelineEnd)
+    .flatMap((transfer) => collectDueRecurrenceDates({
+      startDate: transfer.start_date, nextOccurrence: transfer.next_occurrence,
+      endDate: transfer.end_date, frequency: transfer.frequency, targetDate: timelineEnd,
+    }).dueDates.filter((date) => date >= timelineStart).map((date) => ({
+      id: `transfer:${transfer.id}:${date}`, date, description: transfer.description,
+      accountName: `${accountById.get(transfer.source_account_id)?.name ?? "Conta"} → ${accountById.get(transfer.destination_account_id)?.name ?? "Conta"}`,
+      amountLabel: formatMoney(transfer.amount_minor,
+        (accountById.get(transfer.source_account_id)?.currency ?? "BRL") as SupportedCurrency),
+      transactionType: "transfer" as const, colorIndex: stableColorIndex(transfer.id),
+    })));
+  const timelineEvents = [...transactionTimelineEvents, ...transferTimelineEvents]
+    .sort((left, right) => left.date.localeCompare(right.date) ||
+      left.description.localeCompare(right.description, "pt-BR"));
   const reviewableRecurrences = recurrences.filter(
     (recurrence) =>
       recurrenceState(recurrence) === "active" &&
@@ -302,13 +335,17 @@ export default async function RecurringTransactionsPage({
 
   return (
     <main className="app-page">
-      <PageHeader title="Recorrências" actions={
+      <PageHeader title="Recorrências" actions={<div className="flex flex-wrap gap-2">
+        <Link href="/recurring-transactions/transfers/new"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-700 px-4 font-bold text-emerald-800 hover:bg-emerald-50">
+          Nova transferência recorrente
+        </Link>
         <Link
           href="/recurring-transactions/new"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
         >
           Nova recorrência
-        </Link>
+        </Link></div>
       } />
 
       {feedback ? (
@@ -398,6 +435,7 @@ export default async function RecurringTransactionsPage({
               <option value="">Todos</option>
               <option value="income">Receita</option>
               <option value="expense">Despesa</option>
+              <option value="transfer">Transferência</option>
             </select>
           </label>
           <label className="grid gap-0.5 text-[0.68rem] font-bold text-slate-600">
@@ -509,7 +547,7 @@ export default async function RecurringTransactionsPage({
         </form>
       </section>
 
-      {hasError ? (
+      {hasError || transferOverview.hasError ? (
         <p
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
@@ -518,7 +556,7 @@ export default async function RecurringTransactionsPage({
         </p>
       ) : null}
 
-      {!hasError && filtered.length === 0 ? (
+      {!hasError && !transferOverview.hasError && filtered.length === 0 && filteredTransfers.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <h2 className="text-xl font-extrabold text-slate-950">
             Nenhuma recorrência encontrada
@@ -667,6 +705,47 @@ export default async function RecurringTransactionsPage({
           </div>
         </section>
       ) : null}
+
+      {filteredTransfers.length ? <section className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-labelledby="recurring-transfers-title">
+        <div className="border-b px-4 py-3"><h2 id="recurring-transfers-title" className="font-bold text-slate-950">Transferências recorrentes</h2></div>
+        <div className="divide-y divide-slate-100">
+          {filteredTransfers.map((transfer) => {
+            const source = accountById.get(transfer.source_account_id);
+            const destination = accountById.get(transfer.destination_account_id);
+            const state = recurrenceState(transfer);
+            return <article key={transfer.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-950">{transfer.description}</p>
+                <p className="text-xs text-slate-500">{source?.name ?? "Origem"} → {destination?.name ?? "Destino"} · {RECURRENCE_FREQUENCY_LABELS[transfer.frequency]} · {formatFinancialDate(transfer.next_occurrence)}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <strong className="text-sm tabular-nums">{formatMoney(transfer.amount_minor, (source?.currency ?? "BRL") as SupportedCurrency)}</strong>
+                <span className="text-xs text-slate-500">{RECURRENCE_STATE_LABELS[state]}</span>
+                <details className="relative"><summary className="cursor-pointer rounded-lg border px-3 py-2 text-sm font-semibold">Ações</summary>
+                  <div className="z-10 mt-1 grid min-w-44 gap-2 rounded-lg border bg-white p-2 shadow-lg sm:absolute sm:right-0">
+                    {state === "active" ? <form action={generateSingleRecurringTransfer} className="grid gap-2">
+                      <input type="hidden" name="id" value={transfer.id} />
+                      <label className="grid gap-1 text-xs">Data<input type="date" name="transactionDate" defaultValue={transfer.next_occurrence} required className="rounded border px-2 py-1" /></label>
+                      <label className="grid gap-1 text-xs">Sai<input name="amount" defaultValue={minorUnitsToInput(transfer.amount_minor)} inputMode="decimal" required className="w-36 rounded border px-2 py-1" /></label>
+                      <label className="grid gap-1 text-xs">Entra<input name="destinationAmount" defaultValue={minorUnitsToInput(transfer.destination_amount_minor)} inputMode="decimal" required className="w-36 rounded border px-2 py-1" /></label>
+                      <button className="rounded bg-emerald-700 px-2 py-1.5 text-sm font-bold text-white">Gerar esta</button>
+                    </form> : null}
+                    {state !== "ended" ? <Link href={`/recurring-transactions/transfers/${transfer.id}/edit`} className="text-sm font-semibold text-emerald-700">Editar</Link> : null}
+                    {state !== "ended" ? <form action={changeRecurringTransferState}>
+                      <input type="hidden" name="id" value={transfer.id} />
+                      <input type="hidden" name="state" value={state === "active" ? "suspended" : "active"} />
+                      <button className="text-sm font-semibold">{state === "active" ? "Suspender" : "Reativar"}</button>
+                    </form> : null}
+                    {state !== "ended" ? <form action={changeRecurringTransferState}>
+                      <input type="hidden" name="id" value={transfer.id} /><input type="hidden" name="state" value="ended" />
+                      <button className="text-sm font-semibold text-rose-700">Encerrar</button>
+                    </form> : null}
+                  </div></details>
+              </div>
+            </article>;
+          })}
+        </div>
+      </section> : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>

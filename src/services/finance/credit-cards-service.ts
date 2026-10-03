@@ -42,7 +42,7 @@ const cardColumns =
   "id, user_id, name, issuer, brand, last_four_digits, credit_limit, closing_day, due_day, currency, linked_account_id, is_active, created_at, updated_at";
 const cardSummaryColumns = `${cardColumns}, used_limit, available_limit, current_balance_minor`;
 const purchaseColumns =
-  "id, user_id, credit_card_id, category_id, entry_kind, description, total_amount, purchase_date, installment_count, is_recurring, status, notes, created_at, updated_at";
+  "id, user_id, credit_card_id, category_id, entry_kind, description, total_amount, purchase_date, installment_count, is_recurring, recurring_source_purchase_id, recurring_reference_month, status, notes, created_at, updated_at";
 const invoiceColumns =
   "id, user_id, credit_card_id, reference_month, closing_date, due_date, status, total_amount, paid_amount, closed_at, paid_at, payment_account_id, payment_transaction_id, created_at, updated_at";
 const installmentColumns =
@@ -61,16 +61,16 @@ function withCalculatedCommitment(
       .filter((invoice) => invoice.credit_card_id === card.id)
       .map((invoice) => ({ referenceMonth: invoice.reference_month })),
     purchases: purchases
-      .filter(
-        (purchase) =>
-          purchase.credit_card_id === card.id && purchase.status === "active",
-      )
+      .filter((purchase) => purchase.credit_card_id === card.id)
       .map((purchase) => ({
         id: purchase.id,
         totalAmountMinor: coerceMinorUnits(purchase.total_amount),
         purchaseDate: purchase.purchase_date,
         isRecurring: purchase.is_recurring,
         entryKind: purchase.entry_kind,
+        recurringSourcePurchaseId: purchase.recurring_source_purchase_id,
+        recurringReferenceMonth: purchase.recurring_reference_month,
+        status: purchase.status,
       })),
     installments: installments
       .filter((installment) => installment.credit_card_id === card.id)
@@ -133,6 +133,16 @@ function mutationErrorMessage(error: { message?: string } | null) {
   return "Não foi possível concluir a operação.";
 }
 
+async function ensureSubscriptionInvoices(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  cardId: string | null = null,
+) {
+  const result = await supabase.rpc("ensure_card_subscription_horizon", {
+    target_card_id: cardId,
+  });
+  return Boolean(result.error);
+}
+
 export async function listCurrentUserTransferCreditCardDestinations() {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
@@ -158,6 +168,7 @@ export async function listCurrentUserTransferCreditCardDestinations() {
 
 export async function listCurrentUserCreditCards() {
   const { supabase, user } = await requireUser();
+  const subscriptionError = await ensureSubscriptionInvoices(supabase);
 
   async function allInvoices() {
     const rows: CreditCardInvoice[] = [];
@@ -175,7 +186,7 @@ export async function listCurrentUserCreditCards() {
     const rows: CreditCardPurchase[] = [];
     for (let from = 0; ; from += 1000) {
       const result = await supabase.from("credit_card_purchases")
-        .select(purchaseColumns).eq("user_id", user.id).eq("status", "active")
+        .select(purchaseColumns).eq("user_id", user.id)
         .order("id").range(from, from + 999);
       if (result.error) return { data: [] as CreditCardPurchase[], error: result.error };
       rows.push(...(result.data ?? []));
@@ -223,7 +234,7 @@ export async function listCurrentUserCreditCards() {
     cards,
     invoices: invoices.filter((invoice) => invoice.status !== "paid"),
     hasError: Boolean(
-      cardsResult.error ||
+      subscriptionError || cardsResult.error ||
         invoicesResult.error ||
         purchasesResult.error ||
         installmentsResult.error,
@@ -346,6 +357,7 @@ export async function getCreditCardPurchaseFormOptions(cardId: string) {
 
 export async function getCurrentUserCreditCardDetails(cardId: string) {
   const { supabase, user } = await requireUser();
+  const subscriptionError = await ensureSubscriptionInvoices(supabase, cardId);
   const [
     cardResult,
     purchasesResult,
@@ -364,7 +376,6 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
         .select(purchaseColumns)
         .eq("user_id", user.id)
         .eq("credit_card_id", cardId)
-        .eq("status", "active")
         .order("purchase_date", { ascending: false }),
       supabase
         .from("credit_card_installments")
@@ -400,7 +411,7 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
     invoices,
     categories: categoriesResult.data ?? [],
     hasError: Boolean(
-      cardResult.error ||
+      subscriptionError || cardResult.error ||
         purchasesResult.error ||
         installmentsResult.error ||
         invoicesResult.error ||
@@ -526,6 +537,7 @@ export async function updateCurrentUserCreditCardInstallmentAmount(
 
 export async function listCurrentUserCreditCardInvoices(cardId: string) {
   const { supabase, user } = await requireUser();
+  const subscriptionError = await ensureSubscriptionInvoices(supabase, cardId);
   const [cardResult, invoicesResult] = await Promise.all([
     supabase
       .from("credit_card_summaries")
@@ -543,7 +555,7 @@ export async function listCurrentUserCreditCardInvoices(cardId: string) {
   return {
     card: cardResult.data,
     invoices: invoicesResult.data ?? [],
-    hasError: Boolean(cardResult.error || invoicesResult.error),
+    hasError: Boolean(subscriptionError || cardResult.error || invoicesResult.error),
   };
 }
 
@@ -552,6 +564,7 @@ export async function getCurrentUserCreditCardInvoice(
   invoiceId: string,
 ) {
   const { supabase, user } = await requireUser();
+  const subscriptionError = await ensureSubscriptionInvoices(supabase, cardId);
   const [
     cardResult,
     invoiceResult,
@@ -609,7 +622,7 @@ export async function getCurrentUserCreditCardInvoice(
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
     hasError: Boolean(
-      cardResult.error ||
+      subscriptionError || cardResult.error ||
         invoiceResult.error ||
         installmentsResult.error ||
         purchasesResult.error ||

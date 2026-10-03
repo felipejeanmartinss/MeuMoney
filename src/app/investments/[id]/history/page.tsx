@@ -23,6 +23,7 @@ export const metadata = { title: "Histórico do investimento" };
 
 const messages: Record<string, { text: string; error?: boolean }> = {
   "flow-created": { text: "Movimento registrado e posição atualizada." },
+  "flow-linked": { text: "Movimento e lançamento na conta de investimento registrados juntos." },
   "flow-deleted": { text: "Movimento excluído e efeito na posição revertido." },
   "flow-delete-error": {
     text: "Não foi possível excluir este movimento.",

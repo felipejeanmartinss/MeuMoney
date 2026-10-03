@@ -227,6 +227,25 @@ export type RecurringTransaction = {
   updated_at: string;
 };
 
+export type RecurringTransfer = {
+  id: string;
+  user_id: string;
+  source_account_id: string;
+  destination_account_id: string;
+  description: string;
+  amount_minor: number;
+  destination_amount_minor: number;
+  frequency: RecurrenceFrequency;
+  start_date: string;
+  end_date: string | null;
+  next_occurrence: string;
+  notes: string | null;
+  is_active: boolean;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CreditCard = {
   id: string;
   user_id: string;
@@ -255,6 +274,8 @@ export type CreditCardPurchase = {
   purchase_date: string;
   installment_count: number;
   is_recurring: boolean;
+  recurring_source_purchase_id?: string | null;
+  recurring_reference_month?: string | null;
   status: CreditCardPurchaseStatus;
   notes: string | null;
   created_at: string;
@@ -1064,6 +1085,29 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      recurring_transfers: {
+        Row: RecurringTransfer;
+        Insert: {
+          id?: string;
+          user_id: string;
+          source_account_id: string;
+          destination_account_id: string;
+          description: string;
+          amount_minor: number;
+          destination_amount_minor: number;
+          frequency: RecurrenceFrequency;
+          start_date: string;
+          end_date?: string | null;
+          next_occurrence: string;
+          notes?: string | null;
+          is_active?: boolean;
+          ended_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<RecurringTransfer, "id" | "user_id" | "created_at">>;
+        Relationships: [];
+      };
       transfer_entries: {
         Row: TransferEntry;
         Insert: never;
@@ -1442,6 +1486,23 @@ export type Database = {
       };
     };
     Functions: {
+      generate_all_recurring_forecasts: {
+        Args: { target_until: string; review_overrides?: Json };
+        Returns: number;
+      };
+      generate_one_recurring_transfer: {
+        Args: {
+          target_recurring_id: string;
+          target_transaction_date: string;
+          target_amount_minor: number;
+          target_destination_amount_minor: number;
+        };
+        Returns: string;
+      };
+      ensure_card_subscription_horizon: {
+        Args: { target_card_id?: string | null };
+        Returns: number;
+      };
       generate_one_recurring_transaction: {
         Args: { target_recurring_id: string; target_transaction_date: string; target_amount_minor: number };
         Returns: string;
