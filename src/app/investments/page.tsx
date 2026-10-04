@@ -620,7 +620,7 @@ function PositionsView({
 
                           <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                             <p>
-                              {position.institution} · {CONTEXT_LABELS[position.context]} · {formatInvestmentQuantity(position.quantity)} un.
+                              {position.institution} · {CONTEXT_LABELS[position.context]} · {formatInvestmentQuantity(position.quantity)} un. · Início {formatDate(position.initial_position_date ?? position.position_date)} · Atualizado {formatDate(position.position_date)}
                             </p>
                             <div className="flex flex-wrap items-center gap-1">
                               <Link href={`/investments/${position.id}/edit`} className="rounded-lg px-3 py-2 font-bold text-slate-800 hover:bg-white">
@@ -688,7 +688,7 @@ function FinancingsView({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-4">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[...totals.entries()].map(([currency, total]) => (
           <article
@@ -704,15 +704,6 @@ function FinancingsView({
           </article>
         ))}
       </section>
-      <section className="flex flex-wrap gap-2">
-        <Link
-          href="/investments/financings/new"
-          className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 font-bold text-slate-800"
-        >
-          Novo financiamento
-        </Link>
-      </section>
-
       {contracts.length ? (
         <section className="grid gap-3">
           <div>

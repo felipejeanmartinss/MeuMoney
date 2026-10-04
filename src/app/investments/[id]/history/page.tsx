@@ -85,7 +85,7 @@ export default async function InvestmentHistoryPage({
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">
               Histórico de {position.asset_name}
             </h1>
-            <p className="mt-2 text-slate-600">{position.institution}</p>
+            <p className="mt-2 text-slate-600">{position.institution} · Início {formatDate(position.initial_position_date ?? position.position_date)} · Última atualização {formatDate(position.position_date)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -103,6 +103,8 @@ export default async function InvestmentHistoryPage({
           </div>
         </div>
       </div>
+
+      <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">Para acompanhar a performance mês a mês, registre uma posição no fechamento de cada mês. A data inicial não cria valores históricos por estimativa.</p>
 
       {feedback ? (
         <p

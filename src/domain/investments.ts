@@ -350,17 +350,25 @@ export const investmentPositionFormSchema = z.object({
   quantity: quantityInput,
   accumulatedCostMinor: nonNegativeMoneyInput,
   currentValueMinor: nonNegativeMoneyInput,
+  initialPositionDate: pastOrTodayDate,
   positionDate: pastOrTodayDate,
   context: z.enum(FINANCIAL_CONTEXTS, {
     error: "Selecione o contexto.",
   }),
   historyIsComplete: z.boolean(),
+  taxDeductiblePension: z.boolean().default(false),
   notes: z
     .string()
     .trim()
     .max(1000, "Use até 1.000 caracteres.")
     .transform((value) => value || null),
 }).superRefine((value, context) => {
+  if (value.initialPositionDate > value.positionDate) {
+    context.addIssue({ code: "custom", path: ["initialPositionDate"], message: "A data inicial não pode ser posterior à última atualização." });
+  }
+  if (value.taxDeductiblePension && value.investmentClass !== "pension") {
+    context.addIssue({ code: "custom", path: ["taxDeductiblePension"], message: "A dedução só se aplica a planos de previdência elegíveis." });
+  }
   if (!INVESTMENT_TYPES_BY_CLASS[value.investmentClass].includes(
     value.investmentType,
   )) {

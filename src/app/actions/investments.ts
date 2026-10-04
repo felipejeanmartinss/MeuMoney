@@ -46,9 +46,11 @@ const positionInputFrom = (formData: FormData) => ({
   quantity: formData.get("quantity"),
   accumulatedCostMinor: formData.get("accumulatedCostMinor"),
   currentValueMinor: formData.get("currentValueMinor"),
+  initialPositionDate: formData.get("initialPositionDate"),
   positionDate: formData.get("positionDate"),
   context: formData.get("context"),
   historyIsComplete: formData.get("historyIsComplete") === "true",
+  taxDeductiblePension: formData.get("taxDeductiblePension") === "true",
   notes: formData.get("notes") ?? "",
 });
 

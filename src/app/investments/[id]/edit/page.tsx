@@ -63,10 +63,12 @@ export default async function EditInvestmentPositionPage({
             ),
             currentValueMinor: minorUnitsToInput(position.current_value_minor),
             positionDate: position.position_date,
+            initialPositionDate: position.initial_position_date ?? position.position_date,
             minPositionDate: position.position_date,
             maxPositionDate: toIsoDate(new Date()),
             context: position.context,
             historyIsComplete: position.history_is_complete,
+            taxDeductiblePension: position.tax_deductible_pension ?? false,
             notes: position.notes ?? "",
           }}
         />

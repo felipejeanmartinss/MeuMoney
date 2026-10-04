@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { createManualFinancingContract, type FinancingImportFormState } from "@/app/actions/financing-imports";
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
-import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule } from "@/domain/financing-schedule";
+import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule, reprojectRemainingFinancingSchedule } from "@/domain/financing-schedule";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
 import type { FinancingContractSummary, FinancingScheduleEntry } from "@/types/database";
 import type { FinancingTransactionOption } from "@/types/financing";
@@ -84,6 +84,23 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
       setMessage("Confira a prévia e aplique à tabela. As alterações só serão gravadas ao salvar.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível projetar."); }
   }
+  function reprojectRemaining() {
+    try {
+      if (!contract) throw new Error("Salve o contrato antes de reprojetar.");
+      const toNumeric = (row: Row) => ({ ...row,
+        ...Object.fromEntries(monetaryFields.map((field) => [field, parseMoneyInputToMinor(row[field])])) as Record<typeof monetaryFields[number], number>,
+        installmentNumber: Number(row.installmentNumber), installmentsReduced: Number(row.installmentsReduced), linkedTransactionId: row.linkedTransactionId || null });
+      const next = reprojectRemainingFinancingSchedule(rows.map(toNumeric), {
+        balanceDate, balanceMinor: parseMoneyInputToMinor(balance), termMonths: Number(term), annualRate: rate, method,
+        createRow: (number, dueDate) => toNumeric({ ...emptyRow(number, rowKey()), dueDate }),
+      });
+      setPreview(next.map((row) => ({ ...row,
+        ...Object.fromEntries(monetaryFields.map((field) => [field, financingMoneyInput(row[field])])) as Record<typeof monetaryFields[number], string>,
+        installmentNumber: String(row.installmentNumber), installmentsReduced: String(row.installmentsReduced), linkedTransactionId: row.linkedTransactionId ?? "",
+      })));
+      setMessage("Prévia das parcelas após a data-base criada a partir do saldo informado. O histórico anterior foi preservado; confira vencimentos, seguros e reajustes antes de aplicar.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível reprojetar o fluxo."); }
+  }
   function amortize() {
     try {
       const numeric = rows.map((row) => ({ ...row,
@@ -132,7 +149,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
         </div>
       </section>
       <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Ajustar fluxo</h2>{!contract ? <button type="button" onClick={project} className="min-h-11 rounded-lg border px-3 text-sm font-semibold">Projetar parcelas</button> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Ajustar fluxo</h2><button type="button" onClick={contract ? reprojectRemaining : project} className="min-h-11 rounded-lg border px-3 text-sm font-semibold">{contract ? "Reprojetar após data-base" : "Projetar parcelas"}</button></div>
         <p className="text-xs text-slate-600">Só valor: reduz as prestações seguintes. Só quantidade: antecipa o principal das últimas parcelas. Ambos: aplica o valor e reduz o prazo informado.</p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Amortizar após a parcela" compact><select className={cell} value={extraRow} onChange={(event) => { setPreview(null); setExtraRow(event.target.value); }}><option value="">Selecione</option>{rows.map((row) => <option key={row.key} value={row.key}>{row.installmentNumber} · {row.dueDate.split("-").reverse().join("/")}</option>)}</select></Field>

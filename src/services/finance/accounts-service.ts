@@ -29,6 +29,7 @@ export type AccountMutationInput = {
   currency: SupportedCurrency;
   openingBalanceMinor: number;
   openingBalanceDate: string;
+  taxDeductiblePension: boolean;
 };
 
 export async function listCurrentUserAccounts() {
@@ -47,7 +48,7 @@ export async function getCurrentUserAccount(id: string) {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("accounts")
-    .select("id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, archived_at, created_at, updated_at")
+    .select("id, user_id, name, type, context, currency, opening_balance_minor, opening_balance_date, tax_deductible_pension, archived_at, created_at, updated_at")
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle();
@@ -342,6 +343,7 @@ export async function createCurrentUserAccount(input: AccountMutationInput) {
     currency: input.currency,
     opening_balance_minor: input.openingBalanceMinor,
     opening_balance_date: input.openingBalanceDate,
+    tax_deductible_pension: input.taxDeductiblePension,
   });
 
   return error
@@ -360,6 +362,7 @@ export async function updateCurrentUserAccount(id: string, input: AccountMutatio
       currency: input.currency,
       opening_balance_minor: input.openingBalanceMinor,
       opening_balance_date: input.openingBalanceDate,
+      tax_deductible_pension: input.taxDeductiblePension,
     })
     .eq("user_id", user.id)
     .eq("id", id)

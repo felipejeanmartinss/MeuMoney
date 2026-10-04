@@ -175,6 +175,7 @@ export const SECONDARY_NAVIGATION: Record<
     { href: "/reports?report=asset-performance-general", label: "Performance (geral)", icon: "reports", match: [] },
     { href: "/reports?report=net-worth-evolution", label: "Evolução patrimonial", icon: "reports", match: [], group: "Patrimônio" },
     { href: "/reports?report=cash-flow-forecast", label: "Projeção de fluxo de caixa", icon: "reports", match: [] },
+    { href: "/reports/irpf", label: "Simulador IRPF", icon: "reports", match: ["/reports/irpf"], group: "Impostos" },
   ],
   profile: [
     {

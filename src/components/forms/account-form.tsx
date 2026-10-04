@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   createAccount,
   updateAccount,
@@ -31,6 +31,7 @@ type AccountFormValues = {
   currency?: SupportedCurrency;
   openingBalanceMinor?: string;
   openingBalanceDate?: string;
+  taxDeductiblePension?: boolean;
 };
 
 const initialState: FinancialFormState = { status: "idle" };
@@ -42,6 +43,7 @@ export function AccountForm({
 }) {
   const action = values.id ? updateAccount : createAccount;
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [accountType, setAccountType] = useState<AccountType>(values.type ?? "checking");
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -66,7 +68,8 @@ export function AccountForm({
           <select
             className={inputClass(Boolean(state.fieldErrors?.type))}
             name="type"
-            defaultValue={values.type ?? "checking"}
+            value={accountType}
+            onChange={(event) => setAccountType(event.target.value as AccountType)}
             required
             aria-invalid={Boolean(state.fieldErrors?.type)}
           >
@@ -152,6 +155,13 @@ export function AccountForm({
           aria-invalid={Boolean(state.fieldErrors?.openingBalanceDate)}
         />
       </Field>
+
+      {accountType === "investment" ? (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="taxDeductiblePension" value="true" defaultChecked={values.taxDeductiblePension} />
+          Esta conta recebe aportes em previdência dedutível no IRPF (PGBL ou equivalente)
+        </label>
+      ) : null}
 
       <SubmitButton pending={pending}>
         {values.id ? "Salvar alterações" : "Cadastrar conta"}

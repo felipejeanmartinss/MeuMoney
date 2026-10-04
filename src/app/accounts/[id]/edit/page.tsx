@@ -47,6 +47,7 @@ export default async function EditAccountPage({
               account.opening_balance_minor,
             ),
             openingBalanceDate: account.opening_balance_date,
+            taxDeductiblePension: account.tax_deductible_pension ?? false,
           }}
         />
       </section>
