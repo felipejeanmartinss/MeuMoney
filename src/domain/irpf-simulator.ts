@@ -3,6 +3,42 @@ import { assertMinorUnits } from "./money";
 export type IrpfEventKind = "salary" | "vacation" | "inss" | "health" | "health_reimbursement" | "pension" | "withheld_tax";
 export type IrpfEvent = { id: string; date: string; kind: IrpfEventKind; amountMinor: number };
 export type IrpfMonth = { month: string; salaryMinor: number; vacationMinor: number; inssMinor: number; healthMinor: number; healthReimbursementMinor: number; pensionMinor: number; withheldTaxMinor: number };
+export type IrpfMonthField = Exclude<keyof IrpfMonth, "month">;
+export type IrpfMonthProjection = { month: string } & Partial<Record<IrpfMonthField, number | null>>;
+
+export const IRPF_MONTH_FIELDS: readonly IrpfMonthField[] = [
+  "salaryMinor", "vacationMinor", "inssMinor", "healthMinor",
+  "healthReimbursementMinor", "pensionMinor", "withheldTaxMinor",
+];
+
+export function currentIrpfMonth(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit",
+  }).formatToParts(date);
+  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
+}
+
+/** Forecasts are monthly totals, never transactions or additive ledger entries. */
+export function applyIrpfMonthlyProjections(
+  actual: readonly IrpfMonth[],
+  projections: readonly IrpfMonthProjection[],
+  currentMonth: string,
+): IrpfMonth[] {
+  const byMonth = new Map(projections.map((projection) => [projection.month, projection]));
+  return actual.map((month) => {
+    if (month.month < currentMonth) return { ...month };
+    const projection = byMonth.get(month.month);
+    if (!projection) return { ...month };
+    const result = { ...month };
+    for (const field of IRPF_MONTH_FIELDS) {
+      const value = projection[field];
+      if (value === null || value === undefined) continue;
+      result[field] = assertMinorUnits(value);
+      if (result[field] < 0) throw new Error("A projeção não pode ser negativa.");
+    }
+    return result;
+  });
+}
 
 function percent(value: number, numerator: number, denominator = 10_000) {
   return Number((BigInt(assertMinorUnits(value)) * BigInt(numerator) + BigInt(denominator / 2)) / BigInt(denominator));

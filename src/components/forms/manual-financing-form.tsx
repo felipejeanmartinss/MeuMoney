@@ -3,10 +3,12 @@
 import { useActionState, useRef, useState } from "react";
 import { createManualFinancingContract, type FinancingImportFormState } from "@/app/actions/financing-imports";
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
+import { mergeFinancingWorkbookRows, type FinancingWorkbookRow } from "@/domain/financing-workbook";
 import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule, reprojectRemainingFinancingSchedule } from "@/domain/financing-schedule";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
 import type { FinancingContractSummary, FinancingScheduleEntry } from "@/types/database";
 import type { FinancingTransactionOption } from "@/types/financing";
+import { exportFinancingWorkbook, importFinancingWorkbook } from "@/utils/financing-xlsx";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 
 type Row = {
@@ -38,6 +40,25 @@ function monthlyDate(start: string, offset: number) {
   const last = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
 }
+function toWorkbookRow(row: Row): FinancingWorkbookRow {
+  return {
+    id: row.id, installmentNumber: Number(row.installmentNumber), dueDate: row.dueDate,
+    principalMinor: parseMoneyInputToMinor(row.principalMinor), interestMinor: parseMoneyInputToMinor(row.interestMinor),
+    totalAmountMinor: parseMoneyInputToMinor(row.totalAmountMinor), chargesMinor: parseMoneyInputToMinor(row.chargesMinor),
+    extraAmortizationMinor: parseMoneyInputToMinor(row.extraAmortizationMinor), outstandingBalanceMinor: parseMoneyInputToMinor(row.outstandingBalanceMinor),
+    correctionFactor: row.correctionFactor, installmentsReduced: Number(row.installmentsReduced),
+    paymentStatus: row.paymentStatus, paymentDate: row.paymentDate, paidAmountMinor: parseMoneyInputToMinor(row.paidAmountMinor),
+    linkedTransactionId: row.linkedTransactionId || null,
+  };
+}
+function fromWorkbookRow(row: FinancingWorkbookRow, key: string): Row {
+  return { key, id: row.id, installmentNumber: String(row.installmentNumber), dueDate: row.dueDate,
+    principalMinor: financingMoneyInput(row.principalMinor), interestMinor: financingMoneyInput(row.interestMinor),
+    totalAmountMinor: financingMoneyInput(row.totalAmountMinor), chargesMinor: financingMoneyInput(row.chargesMinor),
+    extraAmortizationMinor: financingMoneyInput(row.extraAmortizationMinor), outstandingBalanceMinor: financingMoneyInput(row.outstandingBalanceMinor),
+    correctionFactor: row.correctionFactor, installmentsReduced: String(row.installmentsReduced), paymentStatus: row.paymentStatus,
+    paymentDate: row.paymentDate, paidAmountMinor: financingMoneyInput(row.paidAmountMinor), linkedTransactionId: row.linkedTransactionId ?? "" };
+}
 
 export function ManualFinancingForm({ contract, schedule = [], transactions = [] }: {
   contract?: FinancingContractSummary; schedule?: FinancingScheduleEntry[]; transactions?: FinancingTransactionOption[];
@@ -52,16 +73,45 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
   const [balance, setBalance] = useState(contract ? financingMoneyInput(contract.current_balance_minor) : "");
   const [balanceDate, setBalanceDate] = useState(contract?.balance_date ?? "");
   const [message, setMessage] = useState<string | null>(null);
-  const [extraRow, setExtraRow] = useState("");
+  const [extraRow, setExtraRow] = useState(() => schedule.filter((row) => row.due_date <= (contract?.balance_date ?? "") && row.outstanding_balance_minor > 0).at(-1)?.id ?? "");
   const [extraValue, setExtraValue] = useState("");
   const [extraCount, setExtraCount] = useState("0");
   const [preview, setPreview] = useState<Row[] | null>(null);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [workbookBusy, setWorkbookBusy] = useState(false);
   const [linkRow, setLinkRow] = useState("");
   const transactionById = new Map(transactions.map((transaction) => [transaction.id, transaction]));
   const sequence = useRef(1);
   const rowKey = () => `new-${sequence.current++}`;
+  async function downloadWorkbook() {
+    setWorkbookBusy(true);
+    try {
+      const data = await exportFinancingWorkbook(rows.map(toWorkbookRow), contract?.name ?? "Novo contrato");
+      const url = URL.createObjectURL(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `financiamento-${(contract?.name ?? "modelo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase()}.xlsx`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      setMessage("Base Excel exportada. A importação mostrará uma prévia antes de alterar a tabela.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível exportar a planilha."); }
+    finally { setWorkbookBusy(false); }
+  }
+  async function loadWorkbook(file: File) {
+    setWorkbookBusy(true);
+    try {
+      const imported = await importFinancingWorkbook(file);
+      const result = mergeFinancingWorkbookRows(rows.map(toWorkbookRow), imported);
+      const keys = new Map(rows.map((row) => [Number(row.installmentNumber), row.key]));
+      setPreview(result.rows.map((row) => fromWorkbookRow(row, keys.get(row.installmentNumber) ?? rowKey())));
+      setImportSummary(`${result.updated} atualizadas · ${result.added} novas · ${result.preserved} pagas ou vinculadas preservadas. Parcelas ausentes na planilha também permanecem.`);
+      setMessage("Confira a prévia abaixo. Aplicar à tabela ainda não salva o contrato.");
+    } catch (error) { setPreview(null); setImportSummary(null); setMessage(error instanceof Error ? error.message : "Não foi possível importar a planilha."); }
+    finally { setWorkbookBusy(false); }
+  }
   function update(key: string, field: keyof Row, value: string) {
     setPreview(null);
+    setImportSummary(null);
     setRows((current) => current.map((row) => row.key === key ? { ...row, [field]: value } : row));
   }
   function paid(key: string, status: "paid" | "scheduled") {
@@ -150,6 +200,12 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
       </section>
       <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Ajustar fluxo</h2><button type="button" onClick={contract ? reprojectRemaining : project} className="min-h-11 rounded-lg border px-3 text-sm font-semibold">{contract ? "Reprojetar após data-base" : "Projetar parcelas"}</button></div>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+          <span className="font-medium">Editar em Excel</span>
+          <button type="button" disabled={workbookBusy} onClick={downloadWorkbook} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 font-semibold disabled:opacity-50">Exportar base .xlsx</button>
+          <label className="min-h-10 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold">Importar base .xlsx<input className="sr-only" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={workbookBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void loadWorkbook(file); event.target.value = ""; }} /></label>
+          <span className="text-xs text-slate-600">Pagamentos e vínculos existentes são preservados. Veja a prévia antes de aplicar e salvar.</span>
+        </div>
         <p className="text-xs text-slate-600">Só valor: reduz as prestações seguintes. Só quantidade: antecipa o principal das últimas parcelas. Ambos: aplica o valor e reduz o prazo informado.</p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Amortizar após a parcela" compact><select className={cell} value={extraRow} onChange={(event) => { setPreview(null); setExtraRow(event.target.value); }}><option value="">Selecione</option>{rows.map((row) => <option key={row.key} value={row.key}>{row.installmentNumber} · {row.dueDate.split("-").reverse().join("/")}</option>)}</select></Field>
@@ -158,7 +214,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
           <button type="button" onClick={amortize} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white">Prévia da amortização</button>
         </div>
         {message ? <p role="status" className="text-sm text-slate-700">{message}</p> : null}
-        {preview ? <div className="flex flex-wrap items-center gap-3 rounded-lg bg-emerald-50 p-3"><span className="text-sm">Prévia: {preview.length} parcelas no fluxo.</span><button type="button" className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white" onClick={() => { setRows(preview); setPreview(null); setMessage("Prévia aplicada. Confira o saldo atual e salve o contrato."); }}>Aplicar à tabela</button><button type="button" className="min-h-11 px-3 text-sm" onClick={() => setPreview(null)}>Descartar prévia</button></div> : null}
+        {preview ? <div className="flex flex-wrap items-center gap-3 rounded-lg bg-emerald-50 p-3"><span className="text-sm">Prévia: {preview.length} parcelas no fluxo.{importSummary ? ` ${importSummary}` : ""}</span><button type="button" className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white" onClick={() => { setRows(preview); setPreview(null); setImportSummary(null); setMessage("Prévia aplicada. Confira o saldo atual e salve o contrato."); }}>Aplicar à tabela</button><button type="button" className="min-h-11 px-3 text-sm" onClick={() => { setPreview(null); setImportSummary(null); }}>Descartar prévia</button></div> : null}
       </section>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3"><div><h2 className="font-semibold">Parcelas</h2><p className="text-xs text-slate-500">Edite qualquer célula. O vínculo com lançamento é apenas histórico; nenhuma movimentação bancária será alterada.</p></div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIrpfMonths, calculateIrpf2026, classifyIrpfCategory } from "../src/domain/irpf-simulator";
+import { applyIrpfMonthlyProjections, buildIrpfMonths, calculateIrpf2026, classifyIrpfCategory } from "../src/domain/irpf-simulator";
 
 describe("IRPF simulator", () => {
   it("classifies only explicit taxable and deductible categories", () => {
@@ -39,5 +39,19 @@ describe("IRPF simulator", () => {
     const result = calculateIrpf2026(months);
     expect(result.simplified.annualReductionMinor).toBeGreaterThan(0);
     expect(result.simplified.dueMinor).toBeGreaterThanOrEqual(0);
+  });
+  it("overrides only the current and future monthly totals without changing past actuals", () => {
+    const actual = buildIrpfMonths(2026, [
+      { id: "sep", date: "2026-09-20", kind: "salary", amountMinor: 500_000 },
+      { id: "oct", date: "2026-10-01", kind: "pension", amountMinor: 20_000 },
+    ]);
+    const result = applyIrpfMonthlyProjections(actual, [
+      { month: "2026-09", salaryMinor: 1 },
+      { month: "2026-10", pensionMinor: 100_000, salaryMinor: 0 },
+    ], "2026-10");
+    expect(result[8].salaryMinor).toBe(500_000);
+    expect(result[9].pensionMinor).toBe(100_000);
+    expect(result[9].salaryMinor).toBe(0);
+    expect(actual[9].pensionMinor).toBe(20_000);
   });
 });

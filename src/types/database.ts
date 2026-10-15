@@ -913,6 +913,20 @@ export type SavedFinancialReport = {
   updated_at: string;
 };
 
+export type IrpfMonthlyProjectionRecord = {
+  user_id: string;
+  month_date: string;
+  salary_minor: number | null;
+  vacation_minor: number | null;
+  inss_minor: number | null;
+  health_minor: number | null;
+  health_reimbursement_minor: number | null;
+  pension_minor: number | null;
+  withheld_tax_minor: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -949,6 +963,24 @@ export type Database = {
           filters?: Json;
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      irpf_monthly_projections: {
+        Row: IrpfMonthlyProjectionRecord;
+        Insert: {
+          user_id: string;
+          month_date: string;
+          salary_minor?: number | null;
+          vacation_minor?: number | null;
+          inss_minor?: number | null;
+          health_minor?: number | null;
+          health_reimbursement_minor?: number | null;
+          pension_minor?: number | null;
+          withheld_tax_minor?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<IrpfMonthlyProjectionRecord, "user_id" | "month_date" | "created_at">>;
         Relationships: [];
       };
       accounts: {
