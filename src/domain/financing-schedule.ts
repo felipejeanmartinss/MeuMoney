@@ -79,3 +79,34 @@ export function amortizeFinancingSchedule<T extends AmortizableRow>(rows: T[], i
       totalAmountMinor: assertMinorUnits(item.paymentMinor + future[i].chargesMinor), outstandingBalanceMinor: item.balanceMinor })),
   ];
 }
+
+function nextMonthlyDate(start: string, offset: number) {
+  const [year, month, day] = start.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + offset, 1));
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
+}
+
+/** Rebuilds only installments after the balance reference date; prior history is untouched. */
+export function reprojectRemainingFinancingSchedule<T extends AmortizableRow & { dueDate: string; installmentNumber: number }>(
+  rows: T[],
+  input: { balanceDate: string; balanceMinor: number; termMonths: number; annualRate: string; method: "SAC" | "PRICE"; createRow: (number: number, dueDate: string) => T },
+): T[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.balanceDate)) throw new Error("Informe a data-base do saldo.");
+  const firstFuture = rows.findIndex((row) => row.paymentStatus === "scheduled" && row.dueDate > input.balanceDate);
+  if (firstFuture < 0) throw new Error("Não há parcelas após a data-base do saldo para reprojetar.");
+  if (rows.slice(firstFuture).some((row) => row.paymentStatus === "paid" || row.linkedTransactionId)) {
+    throw new Error("Revise primeiro parcelas pagas ou vinculadas entre as futuras; elas não serão substituídas.");
+  }
+  const remaining = input.termMonths - firstFuture;
+  if (!Number.isInteger(remaining) || remaining < 1 || remaining > 1200) throw new Error("Confira o prazo original e as parcelas já pagas.");
+  const projected = projectFinancingSchedule({ principalMinor: input.balanceMinor, months: remaining, annualRate: input.annualRate, method: input.method });
+  return [...rows.slice(0, firstFuture), ...projected.map((entry, index) => {
+    const installmentNumber = firstFuture + index + 1;
+    const existing = rows[firstFuture + index];
+    const row = existing ?? input.createRow(installmentNumber, nextMonthlyDate(input.balanceDate, index + 1));
+    return { ...row, installmentNumber, principalMinor: entry.principalMinor, interestMinor: entry.interestMinor,
+      totalAmountMinor: assertMinorUnits(entry.paymentMinor + row.chargesMinor), outstandingBalanceMinor: entry.balanceMinor,
+      extraAmortizationMinor: 0, installmentsReduced: 0 };
+  })];
+}

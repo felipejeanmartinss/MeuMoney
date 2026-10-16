@@ -30,6 +30,7 @@ export default async function NewInvestmentPositionPage() {
           values={{
             currency: profile?.preferred_currency ?? "BRL",
             positionDate: today,
+            initialPositionDate: today,
             maxPositionDate: today,
           }}
         />

@@ -28,6 +28,7 @@ const accountInputFrom = (formData: FormData) => ({
   currency: formData.get("currency"),
   openingBalanceMinor: formData.get("openingBalanceMinor"),
   openingBalanceDate: formData.get("openingBalanceDate"),
+  taxDeductiblePension: formData.get("taxDeductiblePension") === "true",
 });
 
 export async function createAccount(

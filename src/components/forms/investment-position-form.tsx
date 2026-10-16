@@ -39,11 +39,13 @@ type InvestmentPositionFormValues = {
   quantity?: string;
   accumulatedCostMinor?: string;
   currentValueMinor?: string;
+  initialPositionDate?: string;
   positionDate?: string;
   minPositionDate?: string;
   maxPositionDate?: string;
   context?: FinancialContext;
   historyIsComplete?: boolean;
+  taxDeductiblePension?: boolean;
   notes?: string;
 };
 
@@ -335,21 +337,27 @@ export function InvestmentPositionForm({
         </Field>
       </div>
 
-      <Field
-        label="Data da posição"
-        error={state.fieldErrors?.positionDate?.[0]}
-      >
-        <input
-          className={inputClass(Boolean(state.fieldErrors?.positionDate))}
-          name="positionDate"
-          type="date"
-          defaultValue={values.positionDate}
-          min={values.minPositionDate}
-          max={values.maxPositionDate}
-          required
-          aria-invalid={Boolean(state.fieldErrors?.positionDate)}
-        />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Data inicial da posição" error={state.fieldErrors?.initialPositionDate?.[0]}>
+          <input className={inputClass(Boolean(state.fieldErrors?.initialPositionDate))}
+            name="initialPositionDate" type="date" defaultValue={values.initialPositionDate ?? values.positionDate}
+            max={values.positionDate} required aria-invalid={Boolean(state.fieldErrors?.initialPositionDate)} />
+        </Field>
+        <Field label="Data da última atualização" error={state.fieldErrors?.positionDate?.[0]}>
+          <input className={inputClass(Boolean(state.fieldErrors?.positionDate))}
+            name="positionDate" type="date" defaultValue={values.positionDate}
+            min={values.minPositionDate} max={values.maxPositionDate} required
+            aria-invalid={Boolean(state.fieldErrors?.positionDate)} />
+        </Field>
+      </div>
+      <p className="text-xs text-slate-600">A data inicial identifica desde quando você acompanha o ativo. Cada atualização gera uma posição datada; não preenche meses anteriores automaticamente.</p>
+
+      {investmentClass === "pension" ? (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="taxDeductiblePension" value="true" defaultChecked={values.taxDeductiblePension} />
+          Considerar aportes na simulação de IRPF (PGBL ou plano elegível; não VGBL)
+        </label>
+      ) : null}
 
       <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
         <input

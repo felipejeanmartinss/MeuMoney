@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule } from "../src/domain/financing-schedule";
+import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule, reprojectRemainingFinancingSchedule } from "../src/domain/financing-schedule";
 
 function schedule() {
   return projectFinancingSchedule({ principalMinor: 120_000, months: 12, annualRate: "12", method: "SAC" }).map((row, i) => ({
@@ -9,6 +9,18 @@ function schedule() {
   }));
 }
 describe("editable financing schedule", () => {
+  it("reprojects only after the balance date and keeps earlier installments unchanged", () => {
+    const before = schedule().map((row, index) => ({ ...row, installmentNumber: index + 1, dueDate: `2026-${String(index + 1).padStart(2, "0")}-01` }));
+    const after = reprojectRemainingFinancingSchedule(before, {
+      balanceDate: "2026-02-01", balanceMinor: 100_000, termMonths: 12, annualRate: "12", method: "SAC",
+      createRow: (number, dueDate) => ({ ...before[0], id: `new-${number}`, installmentNumber: number, dueDate, paymentStatus: "scheduled", paidAmountMinor: 0 }),
+    });
+    expect(after.slice(0, 2)).toEqual(before.slice(0, 2));
+    expect(after).toHaveLength(12);
+    expect(after[2].id).toBe(before[2].id);
+    expect(after.at(-1)?.outstandingBalanceMinor).toBe(0);
+    expect(after.slice(2).reduce((sum, row) => sum + row.principalMinor, 0)).toBe(100_000);
+  });
   it("formats thousands without changing cents", () => {
     expect(financingMoneyInput(202865)).toBe("2.028,65");
     expect(normalizeFinancingMoney("234000,01")).toBe("234.000,01");

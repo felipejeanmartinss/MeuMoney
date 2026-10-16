@@ -136,9 +136,11 @@ describe("investment rules", () => {
       quantity: "0,00000001",
       accumulatedCostMinor: "350,00",
       currentValueMinor: "420,50",
+      initialPositionDate: "2026-07-01",
       positionDate: "2026-07-25",
       context: "personal",
       historyIsComplete: false,
+      taxDeductiblePension: false,
       notes: "",
     });
 
@@ -148,6 +150,12 @@ describe("investment rules", () => {
       expect(result.data.accumulatedCostMinor).toBe(35_000);
       expect(result.data.currentValueMinor).toBe(42_050);
     }
+  });
+
+  it("keeps inception before the latest valuation and limits IR deductibility to pensions", () => {
+    const base = { institution: "Corretora", investmentClass: "stock", investmentType: "stock", assetName: "Ação", currency: "BRL", quantity: "1", accumulatedCostMinor: "10,00", currentValueMinor: "10,00", initialPositionDate: "2026-09-01", positionDate: "2026-08-31", context: "personal", historyIsComplete: false, taxDeductiblePension: false, notes: "" };
+    expect(investmentPositionFormSchema.safeParse(base).success).toBe(false);
+    expect(investmentPositionFormSchema.safeParse({ ...base, positionDate: "2026-09-30", taxDeductiblePension: true }).success).toBe(false);
   });
 
   it("requires positive cash-flow money and accepts optional quantity", () => {

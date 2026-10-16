@@ -151,6 +151,7 @@ export type Account = {
   currency: SupportedCurrency;
   opening_balance_minor: number;
   opening_balance_date: string;
+  tax_deductible_pension?: boolean;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -548,6 +549,8 @@ export type InvestmentPosition = {
   accumulated_cost_minor: number;
   current_value_minor: number;
   position_date: string;
+  initial_position_date?: string;
+  tax_deductible_pension?: boolean;
   context: FinancialContext;
   history_is_complete: boolean;
   notes: string | null;
@@ -910,6 +913,20 @@ export type SavedFinancialReport = {
   updated_at: string;
 };
 
+export type IrpfMonthlyProjectionRecord = {
+  user_id: string;
+  month_date: string;
+  salary_minor: number | null;
+  vacation_minor: number | null;
+  inss_minor: number | null;
+  health_minor: number | null;
+  health_reimbursement_minor: number | null;
+  pension_minor: number | null;
+  withheld_tax_minor: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -948,6 +965,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      irpf_monthly_projections: {
+        Row: IrpfMonthlyProjectionRecord;
+        Insert: {
+          user_id: string;
+          month_date: string;
+          salary_minor?: number | null;
+          vacation_minor?: number | null;
+          inss_minor?: number | null;
+          health_minor?: number | null;
+          health_reimbursement_minor?: number | null;
+          pension_minor?: number | null;
+          withheld_tax_minor?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<IrpfMonthlyProjectionRecord, "user_id" | "month_date" | "created_at">>;
+        Relationships: [];
+      };
       accounts: {
         Row: Account;
         Insert: {
@@ -959,6 +994,7 @@ export type Database = {
           currency?: SupportedCurrency;
           opening_balance_minor?: number;
           opening_balance_date?: string;
+          tax_deductible_pension?: boolean;
           archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1232,6 +1268,8 @@ export type Database = {
           accumulated_cost_minor: number;
           current_value_minor: number;
           position_date: string;
+          initial_position_date?: string;
+          tax_deductible_pension?: boolean;
           context: FinancialContext;
           history_is_complete?: boolean;
           notes?: string | null;
@@ -1251,6 +1289,8 @@ export type Database = {
             | "accumulated_cost_minor"
             | "current_value_minor"
             | "position_date"
+            | "initial_position_date"
+            | "tax_deductible_pension"
             | "context"
             | "history_is_complete"
             | "notes"

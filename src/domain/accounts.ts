@@ -49,6 +49,11 @@ export const accountFormSchema = z.object({
   openingBalanceDate: z
     .string()
     .refine(isValidIsoDate, "Informe uma data de referência válida."),
+  taxDeductiblePension: z.boolean().default(false),
+}).superRefine((value, context) => {
+  if (value.taxDeductiblePension && value.type !== "investment") {
+    context.addIssue({ code: "custom", path: ["taxDeductiblePension"], message: "Marque apenas contas de previdência elegível." });
+  }
 });
 
 export const accountIdSchema = z.uuid("Conta inválida.");

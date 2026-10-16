@@ -33,9 +33,11 @@ export type InvestmentPositionMutationInput = {
   quantity: string;
   accumulatedCostMinor: number;
   currentValueMinor: number;
+  initialPositionDate: string;
   positionDate: string;
   context: FinancialContext;
   historyIsComplete: boolean;
+  taxDeductiblePension: boolean;
   notes: string | null;
 };
 
@@ -135,7 +137,7 @@ export async function listCurrentUserInvestmentPositions() {
       }
     }
   })();
-  const [positionsResult, cashFlowsResult, snapshotsResult] = await Promise.all([
+  const [positionsResult, cashFlowsResult, snapshotsResult, inceptionResult] = await Promise.all([
     supabase
       .from("investment_position_summary")
       .select(
@@ -147,7 +149,9 @@ export async function listCurrentUserInvestmentPositions() {
       .order("asset_name", { ascending: true }),
     cashFlowsPromise,
     snapshotsPromise,
+    supabase.from("investment_positions").select("id, initial_position_date").eq("user_id", user.id),
   ]);
+  const inceptionByPosition = new Map((inceptionResult.data ?? []).map((row) => [row.id, row.initial_position_date]));
 
   const cashFlows: InvestmentPerformanceCashFlow[] = (
     cashFlowsResult.data ?? []
@@ -166,6 +170,11 @@ export async function listCurrentUserInvestmentPositions() {
     currentValueMinor: coerceMinorUnits(snapshot.current_value_minor),
     positionDate: snapshot.position_date,
   }));
+  const firstSnapshotByPosition = new Map<string, string>();
+  for (const snapshot of snapshots) {
+    const previous = firstSnapshotByPosition.get(snapshot.positionId);
+    if (!previous || snapshot.positionDate < previous) firstSnapshotByPosition.set(snapshot.positionId, snapshot.positionDate);
+  }
   const performanceInputs = new Map<string, InvestmentPerformancePosition>();
   const cashFlowsByPosition = new Map<
     string,
@@ -220,6 +229,7 @@ export async function listCurrentUserInvestmentPositions() {
       );
     return {
       ...normalized,
+      initial_position_date: inceptionByPosition.get(normalized.id) ?? firstSnapshotByPosition.get(normalized.id) ?? normalized.position_date,
       performance_result_minor: performance.resultMinor,
       performance_result_is_estimated: performance.resultIsEstimated,
       realized_gain_loss_minor: performance.realizedGainLossMinor,
@@ -272,7 +282,7 @@ export async function listCurrentUserInvestmentPositions() {
     performanceInputs,
     portfolioPerformance,
     hasError: Boolean(
-      positionsResult.error || cashFlowsResult.error || snapshotsResult.error,
+      positionsResult.error || cashFlowsResult.error || snapshotsResult.error || inceptionResult.error,
     ),
   };
 }
@@ -298,7 +308,7 @@ export async function getCurrentUserInvestmentPosition(id: string) {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("investment_positions")
-    .select(positionColumns)
+    .select(`${positionColumns}, initial_position_date, tax_deductible_pension`)
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle();
@@ -352,9 +362,11 @@ export async function createCurrentUserInvestmentPosition(
       quantity: input.quantity,
       accumulated_cost_minor: input.accumulatedCostMinor,
       current_value_minor: input.currentValueMinor,
+      initial_position_date: input.initialPositionDate,
       position_date: input.positionDate,
       context: input.context,
       history_is_complete: input.historyIsComplete,
+      tax_deductible_pension: input.taxDeductiblePension,
       notes: input.notes,
     })
     .select("id")
@@ -383,9 +395,11 @@ export async function updateCurrentUserInvestmentPosition(
       quantity: input.quantity,
       accumulated_cost_minor: input.accumulatedCostMinor,
       current_value_minor: input.currentValueMinor,
+      initial_position_date: input.initialPositionDate,
       position_date: input.positionDate,
       context: input.context,
       history_is_complete: input.historyIsComplete,
+      tax_deductible_pension: input.taxDeductiblePension,
       notes: input.notes,
     })
     .eq("user_id", user.id)
