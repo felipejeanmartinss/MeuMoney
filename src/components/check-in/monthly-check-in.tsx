@@ -2,6 +2,7 @@ import Link from "next/link";
 import { closeMonthlyCheckin } from "@/app/actions/monthly-checkins";
 import { PageHeader, PageHelp } from "@/components/layout/page-header";
 import type { MonthlyCheckinData } from "@/services/finance/monthly-checkins-service";
+import { formatIsoDatePtBr } from "@/utils/dates";
 
 const messages = {
   closed: "Fechamento mensal confirmado.",
@@ -24,6 +25,7 @@ export function MonthlyCheckIn({
       help: "Revise as categorias dos lançamentos deste mês.",
       count: checklist.unclassifiedCount,
       href: "/transactions",
+      items: checklist.unclassifiedItems.map((item) => ({ label: item.description, detail: `${item.accountName} · ${formatIsoDatePtBr(item.date)}`, href: `/transactions/${item.id}/edit` })),
     },
     {
       title: "Conferir extratos",
@@ -31,13 +33,18 @@ export function MonthlyCheckIn({
       help: "Confirme as movimentações que já conferiu no extrato.",
       count: checklist.unreconciledCount,
       href: "/accounts",
+      items: checklist.unreconciledItems.map((item) => ({ label: item.description, detail: `${item.accountName} · ${formatIsoDatePtBr(item.date)}`, href: `/accounts/${item.accountId}` })),
     },
     {
       title: "Revisar vencimentos",
       detail: `${checklist.upcomingInvoices.length} fatura${checklist.upcomingInvoices.length === 1 ? "" : "s"} · ${checklist.upcomingRecurrencesCount} recorrência${checklist.upcomingRecurrencesCount === 1 ? "" : "s"}`,
       help: "Confira faturas dos próximos 45 dias e recorrências dos próximos 30 dias.",
       count: checklist.upcomingInvoices.length + checklist.upcomingRecurrencesCount,
-      href: "/accounts",
+      href: "/recurring-transactions",
+      items: [
+        ...checklist.upcomingInvoices.map((item) => ({ label: `Fatura ${item.credit_card_name}`, detail: formatIsoDatePtBr(item.due_date), href: `/credit-cards/${item.credit_card_id}/invoices/${item.id}` })),
+        ...checklist.upcomingRecurrences.map((item) => ({ label: item.description, detail: `${item.accountName} · ${formatIsoDatePtBr(item.date)}`, href: "/recurring-transactions" })),
+      ],
     },
     {
       title: "Revisar orçamento",
@@ -45,6 +52,7 @@ export function MonthlyCheckIn({
       help: "Revise as categorias que atingiram 80% ou ultrapassaram o orçamento.",
       count: checklist.overBudget.length,
       href: "/budgets",
+      items: checklist.overBudget.map((item) => ({ label: item.category_name, detail: `${Math.round(item.percentage_consumed)}% do planejado`, href: `/budgets?month=${month}` })),
     },
     {
       title: "Atualizar posições",
@@ -52,6 +60,7 @@ export function MonthlyCheckIn({
       help: "Confira as posições que estão sem atualização há mais de 30 dias.",
       count: checklist.staleQuotes.length,
       href: "/investments/prices",
+      items: checklist.staleQuotes.map((item) => ({ label: item.asset_name, detail: `Última posição: ${formatIsoDatePtBr(item.position_date)}`, href: `/investments/${item.id}/history` })),
     },
   ];
   const attentionCount = steps.filter((step) => step.count > 0).length;
@@ -96,16 +105,27 @@ export function MonthlyCheckIn({
         <ol className="divide-y divide-slate-100">
           {steps.map((step, index) => (
             <li key={step.title}>
-              <Link href={step.href} aria-label={`${step.title}: ${step.count}. ${step.help}`}
-                className="flex min-h-16 items-center gap-3 px-4 py-3 transition hover:bg-slate-50">
+              <details className="group">
+              <summary aria-label={`${step.title}: ${step.count}. ${step.help}`} className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3 transition hover:bg-slate-50">
                 <span aria-hidden="true" className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold ${step.count > 0 ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-500"}`}>{index + 1}</span>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-slate-950">{step.title}</h3>
                   <p className="mt-0.5 text-xs text-slate-500">{step.detail}</p>
                 </div>
                 <span className="text-base font-semibold tabular-nums text-slate-800">{step.count}</span>
-                <span aria-hidden="true" className="text-slate-400">→</span>
-              </Link>
+                <span aria-hidden="true" className="text-slate-400 group-open:rotate-90">▸</span>
+              </summary>
+              <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-sm">
+                {step.items.length ? <ul className="divide-y divide-slate-100">
+                  {step.items.map((item, itemIndex) => <li key={`${item.href}-${itemIndex}`}>
+                    <Link href={item.href} className="flex min-h-10 items-center justify-between gap-3 py-2 text-emerald-800 hover:underline">
+                      <span className="font-medium text-slate-900">{item.label}<span className="block text-xs font-normal text-slate-500">{item.detail}</span></span><span aria-hidden="true">→</span>
+                    </Link>
+                  </li>)}
+                </ul> : <p className="py-2 text-slate-600">Nenhuma pendência nesta etapa.</p>}
+                <Link href={step.href} className="inline-flex min-h-9 items-center font-semibold text-emerald-800 hover:underline">Abrir área completa →</Link>
+              </div>
+              </details>
             </li>
           ))}
         </ol>

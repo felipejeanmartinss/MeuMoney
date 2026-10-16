@@ -1,5 +1,6 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
+import { categoryAndDescendantIds } from "@/domain/categories";
 import type { PendingRecurrenceMatch } from "@/domain/account-register";
 import {
   isMissingSubscriptionColumn,
@@ -52,9 +53,6 @@ export async function listCurrentUserTransactions(
   }
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
-  if (filters.categoryId) {
-    query = query.eq("category_id", filters.categoryId);
-  }
   if (filters.uncategorized) {
     query = query.eq("origin_type", "manual").is("category_id", null);
   }
@@ -66,9 +64,8 @@ export async function listCurrentUserTransactions(
     query = query.eq("is_active", filters.activity === "active");
   }
 
-  const [transactionsResult, accountsResult, categoriesResult, groupsResult] =
+  const [accountsResult, categoriesResult, groupsResult] =
     await Promise.all([
-      query,
       supabase
         .from("accounts")
         .select("id, name, currency, archived_at")
@@ -87,6 +84,11 @@ export async function listCurrentUserTransactions(
         .eq("user_id", user.id)
         .order("name"),
     ]);
+
+  if (filters.categoryId) {
+    query = query.in("category_id", categoryAndDescendantIds(filters.categoryId, categoriesResult.data ?? []));
+  }
+  const transactionsResult = await query;
 
   return {
     transactions: withSubscriptionDefaults(transactionsResult.data ?? []),

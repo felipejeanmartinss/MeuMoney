@@ -796,6 +796,16 @@ async function IncomeExpenseReport({
     allDates: period.period === "all",
   });
   const totals = summarizeIncomeExpenseReport(result.rows);
+  const detailHref = (section?: "income" | "expense") => {
+    const query = new URLSearchParams({ from: result.months[0] ?? period.startMonth, to: result.months.at(-1) ?? period.endMonth, basis: filters.basis });
+    if (section) query.set("section", section);
+    const detailRows = result.matrix.filter((row) => !section || row.section === section).map((row) => row.rowId.slice(row.section.length + 1));
+    if (detailRows.length) query.set("rows", [...new Set(detailRows)].join(","));
+    if (context !== "all") query.set("context", context);
+    if (filters.sourceKeys.length) query.set("sources", filters.sourceKeys.join(","));
+    if (sourceCurrencies.length) query.set("currencies", sourceCurrencies.join(","));
+    return `/reports/entries?${query.toString()}`;
+  };
   const view = raw.view === "chart" ? "chart" : "table";
   const viewHref = (target: "chart" | "table") => {
     const query = new URLSearchParams();
@@ -848,16 +858,19 @@ async function IncomeExpenseReport({
       <div className="grid grid-cols-3 border-t border-slate-200 bg-white">
         <SummaryCell
           label="Receitas"
+          href={detailHref("income")}
           value={formatMoney(totals.incomeAmountMinor, filters.currency)}
           color="text-emerald-700"
         />
         <SummaryCell
           label={filters.basis === "cash" ? "Saídas de caixa" : "Despesas"}
+          href={detailHref("expense")}
           value={formatMoney(totals.expenseAmountMinor, filters.currency)}
           color="text-rose-700"
         />
         <SummaryCell
           label="Resultado"
+          href={detailHref()}
           value={formatMoney(totals.resultAmountMinor, filters.currency)}
           color={
             totals.resultAmountMinor < 0
@@ -875,6 +888,10 @@ async function IncomeExpenseReport({
         months={result.months}
         timeGrouping={filters.timeGrouping}
         categoryGrouping={filters.categoryGrouping}
+        basis={filters.basis}
+        sourceKeys={filters.sourceKeys}
+        reportContext={context}
+        sourceCurrencies={sourceCurrencies}
       />}
     </>
   );
@@ -932,6 +949,10 @@ async function FixedExpensesReport({
         showSections={false}
         timeGrouping={filters.timeGrouping}
         categoryGrouping={filters.categoryGrouping}
+        basis={filters.basis}
+        sourceKeys={filters.sourceKeys}
+        reportContext={context}
+        sourceCurrencies={sourceCurrencies}
       />
     </>
   );
@@ -1151,17 +1172,19 @@ function SummaryCell({
   label,
   value,
   color,
+  href,
 }: {
   label: string;
   value: string;
   color: string;
+  href?: string;
 }) {
-  return (
-    <div className="border-r border-slate-200 px-4 py-3 last:border-r-0">
+  const content = <>
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className={"mt-1 text-lg font-black tabular-nums " + color}>{value}</p>
-    </div>
-  );
+    </>;
+  return href ? <Link href={href} className="border-r border-slate-200 px-4 py-3 last:border-r-0 hover:bg-slate-50" title={`Abrir lançamentos de ${label.toLowerCase()}`}>{content}</Link>
+    : <div className="border-r border-slate-200 px-4 py-3 last:border-r-0">{content}</div>;
 }
 
 function MonthField({

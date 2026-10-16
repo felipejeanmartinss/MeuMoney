@@ -13,6 +13,24 @@ export const CATEGORY_KIND_LABELS: Record<CategoryKind, string> = {
   expense: "Despesa",
 };
 
+export function categoryAndDescendantIds(
+  categoryId: string,
+  categories: readonly { id: string; parent_id: string | null }[],
+) {
+  const selected = new Set([categoryId]);
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    for (const category of categories) {
+      if (category.parent_id && selected.has(category.parent_id) && !selected.has(category.id)) {
+        selected.add(category.id);
+        expanded = true;
+      }
+    }
+  }
+  return [...selected];
+}
+
 const optionalParentId = z.preprocess(
   (value) => (value === "" || value == null ? null : value),
   z.uuid("Selecione uma categoria principal válida.").nullable(),

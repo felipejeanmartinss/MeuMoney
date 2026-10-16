@@ -903,6 +903,23 @@ export type FinancialReportEntryBySource = FinancialReportCategoryMonthly & {
   source_key: string;
 };
 
+export type FinancialReportEntryDetail = {
+  basis: FinancialReportBasis;
+  user_id: string;
+  reference_month: string;
+  entry_date: string;
+  currency: SupportedCurrency;
+  section: "income" | "expense";
+  row_id: string;
+  category_id: string | null;
+  context: FinancialContext;
+  source_key: string;
+  entry_kind: "transaction" | "investment_income" | "card_installment" | "card_payment";
+  entry_id: string;
+  description: string;
+  amount_minor: number;
+};
+
 export type SavedFinancialReport = {
   id: string;
   user_id: string;
@@ -1498,6 +1515,10 @@ export type Database = {
       };
       financial_report_entries_by_source: {
         Row: FinancialReportEntryBySource;
+        Relationships: [];
+      };
+      financial_report_entry_details: {
+        Row: FinancialReportEntryDetail;
         Relationships: [];
       };
       financial_dashboard_upcoming_recurrences: {

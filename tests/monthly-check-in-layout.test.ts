@@ -16,6 +16,9 @@ const fixture: MonthlyCheckinData = {
     unclassifiedCount: 0,
     unreconciledCount: 0,
     upcomingRecurrencesCount: 1,
+    unclassifiedItems: [],
+    unreconciledItems: [],
+    upcomingRecurrences: [{ id: "recurrence", description: "TV", date: "2026-09-30", accountName: "Bradesco" }],
     upcomingInvoices: [],
     overBudget: [],
     staleQuotes: [],
@@ -30,9 +33,11 @@ describe("monthly check-in presentation", () => {
   it("counts recurrence-only attention and links to each review module", () => {
     const html = render();
     expect(html).toContain("1 etapa para revisar");
-    for (const route of ["/transactions", "/accounts", "/budgets", "/investments/prices"]) {
+    for (const route of ["/transactions", "/accounts", "/recurring-transactions", "/budgets", "/investments/prices"]) {
       expect(html).toContain(`href="${route}"`);
     }
+    expect(html).toContain("TV");
+    expect(html).toContain("Bradesco");
   });
 
   it("keeps guidance and the optional observation collapsed", () => {
@@ -56,8 +61,8 @@ describe("monthly check-in presentation", () => {
       checklist: {
         ...fixture.checklist,
         upcomingInvoices: [
-          { id: "brl", credit_card_name: "BRL", due_date: "2026-09-30", outstanding_amount_minor: 10000, currency: "BRL" },
-          { id: "usd", credit_card_name: "USD", due_date: "2026-09-30", outstanding_amount_minor: 10000, currency: "USD" },
+          { id: "brl", credit_card_id: "card-brl", credit_card_name: "BRL", due_date: "2026-09-30", outstanding_amount_minor: 10000, currency: "BRL" },
+          { id: "usd", credit_card_id: "card-usd", credit_card_name: "USD", due_date: "2026-09-30", outstanding_amount_minor: 10000, currency: "USD" },
         ],
       },
     });

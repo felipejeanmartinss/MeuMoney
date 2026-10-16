@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { saveMonthlyBudgets, type BudgetFormState } from "@/app/actions/budgets";
-import { assertMinorUnits, minorUnitsToInput } from "@/domain/money";
+import { allocateBudgetGroupByPercent } from "@/domain/budget-allocations";
+import { assertMinorUnits, minorUnitsToInput, parseMoneyInputToMinor } from "@/domain/money";
 import type { CategoryKind, FinancialContext, SupportedCurrency } from "@/types/database";
 import { FormMessage, SubmitButton, inputClass } from "./form-controls";
 
@@ -73,15 +74,37 @@ function buildHierarchy(categories: BudgetCategory[]) {
     });
 }
 
-export function MonthlyBudgetForm({ referenceMonth, context, currency, categories }: {
+export function MonthlyBudgetForm({ referenceMonth, context, currency, categories, incomeBaseMinor }: {
   referenceMonth: string;
   context: FinancialContext;
   currency: SupportedCurrency;
   categories: BudgetCategory[];
+  incomeBaseMinor: number;
 }) {
   const [state, formAction, pending] = useActionState(saveMonthlyBudgets, initialState);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
+  const [amounts, setAmounts] = useState<Record<string, string>>(() => Object.fromEntries(categories.map((category) => [category.id, minorUnitsToInput(category.plannedAmountMinor)])));
   const hierarchy = buildHierarchy(categories);
+  const expenseGroups = hierarchy.filter((node) => node.category.kind === "expense");
+  const amountFor = (id: string, source = amounts) => {
+    try { return Math.max(0, parseMoneyInputToMinor(source[id] ?? "0")); }
+    catch { return 0; }
+  };
+  const plannedIncomeMinor = categories.filter((category) => category.kind === "income").reduce((sum, category) => sum + amountFor(category.id), 0);
+  const incomeReferenceMinor = plannedIncomeMinor || incomeBaseMinor;
+  const groupAmount = (node: BudgetCategoryNode) => [node.category, ...node.children].reduce((sum, category) => sum + amountFor(category.id), 0);
+  const allocatedMinor = expenseGroups.reduce((sum, node) => sum + groupAmount(node), 0);
+  const allocatedPercent = incomeReferenceMinor > 0 ? Math.round(allocatedMinor / incomeReferenceMinor * 100) : 0;
+
+  function setGroupPercent(node: BudgetCategoryNode, percent: number) {
+    const rows = [node.category, ...node.children];
+    setAmounts((current) => {
+      const next = { ...current };
+      const allocation = allocateBudgetGroupByPercent(incomeReferenceMinor, percent, rows.map((row) => ({ id: row.id, plannedAmountMinor: amountFor(row.id, current) })));
+      for (const row of rows) next[row.id] = minorUnitsToInput(allocation[row.id]);
+      return next;
+    });
+  }
 
   function toggleCategory(key: string) {
     setExpandedCategories((current) => {
@@ -98,6 +121,26 @@ export function MonthlyBudgetForm({ referenceMonth, context, currency, categorie
       <input type="hidden" name="context" value={context} />
       <input type="hidden" name="currency" value={currency} />
       {state.status === "error" && state.message ? <FormMessage>{state.message}</FormMessage> : null}
+      <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3" aria-label="Planejamento por percentual da receita">
+        <h3 className="text-sm font-bold text-slate-900">Distribuir despesas pela receita</h3>
+        <p className="mt-1 text-xs text-slate-600">Base: {minorUnitsToInput(incomeReferenceMinor)} {currency} ({plannedIncomeMinor > 0 ? "receita planejada" : "receita realizada"}). Ajuste as faixas ou edite os valores abaixo; tudo é salvo no mesmo orçamento mensal.</p>
+        {incomeReferenceMinor > 0 ? <div className="mt-3 grid gap-3 sm:grid-cols-[7rem_1fr] sm:items-center">
+          <div className="grid size-24 place-items-center rounded-full" style={{ background: `conic-gradient(#047857 ${Math.min(100, allocatedPercent)}%, #e2e8f0 0)` }}>
+            <span className="grid size-16 place-items-center rounded-full bg-white text-sm font-black tabular-nums">{allocatedPercent}%</span>
+          </div>
+          <div className="grid gap-2">
+            {expenseGroups.map((node) => {
+              const percent = Math.min(100, Math.round(groupAmount(node) / incomeReferenceMinor * 100));
+              return <label key={node.key} className="grid gap-1 text-xs font-semibold text-slate-700 sm:grid-cols-[minmax(7rem,1fr)_minmax(7rem,2fr)_3rem] sm:items-center">
+                <span>{node.category.name}</span>
+                <input type="range" min={0} max={100} value={percent} onChange={(event) => setGroupPercent(node, Number(event.target.value))} aria-label={`Percentual da receita para ${node.category.name}`} className="w-full accent-emerald-700" />
+                <span className="text-right tabular-nums">{percent}%</span>
+              </label>;
+            })}
+          </div>
+        </div> : <p className="mt-2 text-xs text-amber-800">Planeje uma receita ou registre uma receita realizada para ativar a distribuição percentual.</p>}
+        {incomeReferenceMinor > 0 ? <p className={`mt-2 text-xs font-semibold ${allocatedPercent > 100 ? "text-rose-700" : "text-emerald-800"}`}>{allocatedPercent > 100 ? "A distribuição supera a receita." : `${100 - allocatedPercent}% da receita ainda não distribuída.`}</p> : null}
+      </section>
       <div className="overflow-hidden rounded-xl border border-slate-200">
         {hierarchy.map((node, index) => {
           const previous = hierarchy[index - 1];
@@ -112,11 +155,11 @@ export function MonthlyBudgetForm({ referenceMonth, context, currency, categorie
               ) : null}
               <button type="button" aria-expanded={expanded} onClick={() => toggleCategory(node.key)} className="flex min-h-10 w-full items-center justify-between gap-3 border-b border-slate-100 bg-emerald-50/50 px-3 text-left font-semibold text-slate-900 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-600">
                 <span><span aria-hidden="true" className="mr-2">{expanded ? "▾" : "▸"}</span>{node.category.name}</span>
-                <span className="tabular-nums text-slate-600">{formatBudgetAmount(node.totalAmountMinor)}</span>
+                <span className="tabular-nums text-slate-600">{formatBudgetAmount(groupAmount(node))}</span>
               </button>
               <div className={expanded ? "block" : "hidden"}>
-                <BudgetInput category={node.category} label="Sem subcategoria" nested />
-                {node.children.map((category) => <BudgetInput key={category.id} category={category} nested />)}
+                <BudgetInput category={node.category} label="Sem subcategoria" nested value={amounts[node.category.id] ?? "0,00"} onChange={(value) => setAmounts((current) => ({ ...current, [node.category.id]: value }))} />
+                {node.children.map((category) => <BudgetInput key={category.id} category={category} nested value={amounts[category.id] ?? "0,00"} onChange={(value) => setAmounts((current) => ({ ...current, [category.id]: value }))} />)}
               </div>
             </div>
           );
@@ -127,17 +170,19 @@ export function MonthlyBudgetForm({ referenceMonth, context, currency, categorie
   );
 }
 
-function BudgetInput({ category, label, nested = false }: {
+function BudgetInput({ category, label, nested = false, value, onChange }: {
   category: BudgetCategory;
   label?: string;
   nested?: boolean;
+  value: string;
+  onChange: (value: string) => void;
 }) {
   return (
     <label className={`grid gap-2 border-b border-slate-100 py-2 pr-3 last:border-0 hover:bg-slate-50 sm:grid-cols-[1fr_11rem] sm:items-center ${nested ? "pl-10" : "pl-3"}`}>
       <span className="min-w-0 truncate font-semibold text-slate-900">{label ?? category.name}</span>
       <span className="grid gap-1 text-sm text-slate-600">
         <input type="hidden" name="categoryId" value={category.id} />
-        <input name="plannedAmountMinor" inputMode="decimal" defaultValue={minorUnitsToInput(category.plannedAmountMinor)} className={inputClass()} aria-label={`Valor planejado para ${category.name}`} />
+        <input name="plannedAmountMinor" inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} className={inputClass()} aria-label={`Valor planejado para ${category.name}`} />
       </span>
     </label>
   );

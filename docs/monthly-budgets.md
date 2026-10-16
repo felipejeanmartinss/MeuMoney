@@ -6,6 +6,13 @@ A tela `/budgets` planeja receitas e despesas por mês, categoria, contexto e
 moeda. A visão mensal apresenta planejado, realizado, diferença e percentual;
 a visão anual abre os doze meses em uma grade compacta sobre os mesmos registros.
 
+Na visão mensal, receitas e despesas são comparadas em seções separadas. A
+distribuição percentual usa a receita planejada digitada na própria tela; se
+não houver, usa a receita já realizada. Cada faixa ajusta o total da categoria
+principal e reparte esse total entre suas subcategorias na proporção do
+planejamento anterior. A soma em centavos é preservada e o botão de salvar
+grava os mesmos orçamentos mensais, não uma regra automática para outros meses.
+
 ## Competência do realizado
 
 - despesas em conta entram quando estão ativas, concluídas e categorizadas;

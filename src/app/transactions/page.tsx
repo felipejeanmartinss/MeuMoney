@@ -133,14 +133,16 @@ export default async function TransactionsPage({
         </div>
       ) : null}
 
-      <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+      <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <summary className="flex min-h-10 cursor-pointer items-center justify-between px-3 text-sm font-semibold text-slate-800">Filtros do extrato <span className="text-xs text-slate-500">{filters.dateFrom || filters.dateTo || filters.categoryId || filters.accountId || filters.transactionType || filters.status ? "Recorte aplicado · abrir para editar" : "Mostrar / ocultar"}</span></summary>
+      <form className="grid gap-2 border-t border-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-4">
         {filters.uncategorized ? <input type="hidden" name="uncategorized" value="true" /> : null}
         <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
           Tipo
           <select
             name="transactionType"
             defaultValue={filters.transactionType ?? ""}
-            className={inputClass()}
+            className={inputClass(false, true)}
           >
             <option value="">Todos</option>
             {TRANSACTION_TYPES.map((type) => (
@@ -155,7 +157,7 @@ export default async function TransactionsPage({
           <select
             name="status"
             defaultValue={filters.status ?? ""}
-            className={inputClass()}
+            className={inputClass(false, true)}
           >
             <option value="">Todos</option>
             {TRANSACTION_STATUSES.map((status) => (
@@ -170,7 +172,7 @@ export default async function TransactionsPage({
           <select
             name="accountId"
             defaultValue={filters.accountId ?? ""}
-            className={inputClass()}
+            className={inputClass(false, true)}
           >
             <option value="">Todas</option>
             {accounts.map((account) => (
@@ -185,7 +187,7 @@ export default async function TransactionsPage({
           <select
             name="categoryId"
             defaultValue={filters.categoryId ?? ""}
-            className={inputClass()}
+            className={inputClass(false, true)}
           >
             <option value="">Todas</option>
             {categories.map((category) => (
@@ -201,7 +203,7 @@ export default async function TransactionsPage({
             name="dateFrom"
             type="date"
             defaultValue={filters.dateFrom}
-            className={inputClass()}
+            className={inputClass(false, true)}
           />
         </label>
         <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
@@ -210,7 +212,7 @@ export default async function TransactionsPage({
             name="dateTo"
             type="date"
             defaultValue={filters.dateTo}
-            className={inputClass()}
+            className={inputClass(false, true)}
           />
         </label>
         <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
@@ -218,7 +220,7 @@ export default async function TransactionsPage({
           <select
             name="activity"
             defaultValue={filters.activity}
-            className={inputClass()}
+            className={inputClass(false, true)}
           >
             <option value="active">Ativos</option>
             <option value="inactive">Inativos</option>
@@ -226,17 +228,18 @@ export default async function TransactionsPage({
           </select>
         </label>
         <div className="flex items-end gap-2">
-          <button className="min-h-12 flex-1 rounded-xl bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800">
+          <button className="min-h-9 flex-1 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800">
             Filtrar
           </button>
           <Link
             href="/transactions"
-            className="inline-flex min-h-12 items-center rounded-xl px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+            className="inline-flex min-h-9 items-center rounded-lg px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50"
           >
             Limpar
           </Link>
         </div>
       </form>
+      </details>
 
       {hasError ? (
         <p
@@ -259,7 +262,7 @@ export default async function TransactionsPage({
         </section>
       ) : null}
 
-      <section className="grid gap-1.5">
+      <section className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {transactions.map((transaction) => {
           const account = accountById.get(transaction.account_id);
           const category = transaction.category_id
@@ -272,7 +275,7 @@ export default async function TransactionsPage({
           return (
             <article
               key={transaction.id}
-              className={`rounded-xl border border-slate-200 bg-white px-3 py-2 ${
+              className={`px-3 py-1.5 ${
                 transaction.is_active ? "" : "opacity-65"
               }`}
             >
