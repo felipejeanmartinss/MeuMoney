@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { parseImportAmountToMinor, parseImportDate } from "./file-imports";
 import { isValidIsoDate } from "./dates";
-import { parseMoneyInputToMinor } from "./money";
+import { assertMinorUnits, parseMoneyInputToMinor } from "./money";
+import { financingMonthlyInterestMinor, projectFinancingSchedule } from "./financing-schedule";
 import { SUPPORTED_CURRENCIES } from "./currencies";
 import type { PdfTextDocument, PdfTextPage } from "./pdf-imports";
 
@@ -574,28 +575,9 @@ export type FinancingSimulation = {
   finalPaymentMinor: number;
 };
 
-function roundSimulationMinor(value: number) {
-  if (!Number.isFinite(value)) {
-    throw new Error("A simulação excede o limite seguro.");
-  }
-  const rounded = Math.round(value);
-  if (!Number.isSafeInteger(rounded)) {
-    throw new Error("A simulação excede o limite seguro.");
-  }
-  return rounded;
-}
-
-function pricePaymentMinor(balanceMinor: number, monthlyRate: number, months: number) {
-  if (months <= 0 || balanceMinor <= 0) return 0;
-  if (monthlyRate === 0) return Math.round(balanceMinor / months);
-  return roundSimulationMinor(
-    balanceMinor * (monthlyRate / (1 - (1 + monthlyRate) ** -months)),
-  );
-}
-
 /**
- * Simula um fluxo educativo de SAC ou PRICE sem gravar parcelas no banco.
- * A amortização extra é aplicada mensalmente e pode reduzir prazo ou prestação.
+ * Projeta o efeito de uma amortização única depois da próxima prestação, sem alterar o contrato.
+ * A opção prazo mantém a amortização/prestação projetada; a opção prestação mantém o prazo.
  */
 export function simulateFinancing(input: {
   principalMinor: number;
@@ -604,6 +586,8 @@ export function simulateFinancing(input: {
   method: FinancingAmortizationMethod;
   extraAmortizationMinor?: number;
   extraAmortizationMode?: FinancingExtraAmortizationMode;
+  nextPrincipalMinor?: number;
+  nextInterestMinor?: number;
 }): FinancingSimulation {
   if (
     !Number.isSafeInteger(input.principalMinor) ||
@@ -641,83 +625,67 @@ export function simulateFinancing(input: {
     throw new Error("Escolha como a amortização extra será aplicada.");
   }
 
-  const monthlyRate = input.annualRatePercent / 100 / 12;
-  const originalPrincipal = input.principalMinor;
-  let balance = originalPrincipal;
-  let sacPrincipal = originalPrincipal / input.termMonths;
-  let pricePayment = pricePaymentMinor(
-    originalPrincipal,
-    monthlyRate,
-    input.termMonths,
-  );
-  const rows: FinancingSimulationRow[] = [];
-
-  for (
-    let installment = 1;
-    installment <= input.termMonths && balance > 0;
-    installment += 1
-  ) {
-    const remainingMonths = input.termMonths - installment + 1;
-    const interest = Math.min(
-      balance,
-      roundSimulationMinor(balance * monthlyRate),
-    );
-    const scheduledPrincipal =
-      input.method === "sac"
-        ? Math.min(
-            balance,
-            installment === input.termMonths
-              ? balance
-              : Math.max(1, roundSimulationMinor(sacPrincipal)),
-          )
-        : Math.min(
-            balance,
-            Math.max(0, roundSimulationMinor(pricePayment - interest)),
-          );
-    const extra = Math.min(
-      extraAmortizationMinor,
-      Math.max(0, balance - scheduledPrincipal),
-    );
-    const payment = roundSimulationMinor(interest + scheduledPrincipal);
-    balance = Math.max(0, balance - scheduledPrincipal - extra);
-
-    rows.push({
-      installment,
-      principalMinor: scheduledPrincipal,
-      interestMinor: interest,
-      extraAmortizationMinor: extra,
-      paymentMinor: payment,
-      balanceMinor: balance,
-    });
-
-    const nextMonths = remainingMonths - 1;
-    if (nextMonths > 0 && balance > 0 && extra > 0 && extraAmortizationMode === "payment") {
-      if (input.method === "sac") {
-        sacPrincipal = balance / nextMonths;
-      } else {
-        pricePayment = pricePaymentMinor(balance, monthlyRate, nextMonths);
-      }
-    }
+  const annualRate = String(input.annualRatePercent);
+  const method = input.method === "sac" ? "SAC" : "PRICE";
+  const hasScheduledFirst = input.nextPrincipalMinor !== undefined || input.nextInterestMinor !== undefined;
+  if (hasScheduledFirst && (
+    !Number.isSafeInteger(input.nextPrincipalMinor) || !Number.isSafeInteger(input.nextInterestMinor) ||
+    (input.nextPrincipalMinor ?? -1) < 0 || (input.nextInterestMinor ?? -1) < 0 ||
+    (input.nextPrincipalMinor ?? 0) > input.principalMinor
+  )) throw new Error("Confira o principal e os juros da próxima parcela cadastrada.");
+  const projected = hasScheduledFirst ? null : projectFinancingSchedule({ principalMinor: input.principalMinor, annualRate, months: input.termMonths, method });
+  const first = hasScheduledFirst ? {
+    principalMinor: input.nextPrincipalMinor!,
+    interestMinor: input.nextInterestMinor!,
+    paymentMinor: assertMinorUnits(input.nextPrincipalMinor! + input.nextInterestMinor!),
+    balanceMinor: input.principalMinor - input.nextPrincipalMinor!,
+  } : projected![0];
+  if (first.balanceMinor > 0 && input.termMonths < 2) throw new Error("O prazo restante não quita o saldo após a próxima parcela.");
+  const baselineFuture = first.balanceMinor === 0 ? [] : hasScheduledFirst
+    ? projectFinancingSchedule({ principalMinor: first.balanceMinor, annualRate, months: input.termMonths - 1, method })
+    : projected!.slice(1);
+  if (extraAmortizationMinor > first.balanceMinor) {
+    throw new Error("A amortização não pode exceder o saldo após a próxima parcela.");
   }
+
+  const rows: FinancingSimulationRow[] = [{
+    installment: 1,
+    principalMinor: first.principalMinor,
+    interestMinor: first.interestMinor,
+    extraAmortizationMinor,
+    paymentMinor: first.paymentMinor,
+    balanceMinor: first.balanceMinor - extraAmortizationMinor,
+  }];
+
+  if (rows[0].balanceMinor > 0 && extraAmortizationMinor === 0) {
+    rows.push(...baselineFuture.map((row, index) => ({ ...row, installment: index + 2, extraAmortizationMinor: 0 })));
+  } else if (rows[0].balanceMinor > 0 && extraAmortizationMode === "payment") {
+    const future = projectFinancingSchedule({ principalMinor: rows[0].balanceMinor, annualRate, months: input.termMonths - 1, method });
+    rows.push(...future.map((row, index) => ({ ...row, installment: index + 2, extraAmortizationMinor: 0 })));
+  } else if (rows[0].balanceMinor > 0) {
+    const targetPrincipal = baselineFuture[0].principalMinor;
+    const targetPayment = baselineFuture[0].paymentMinor;
+    let balance = rows[0].balanceMinor;
+    for (let installment = 2; installment <= input.termMonths && balance > 0; installment += 1) {
+      const interestMinor = financingMonthlyInterestMinor(balance, annualRate);
+      const principalMinor = Math.min(balance, method === "SAC" ? targetPrincipal : Math.max(0, targetPayment - interestMinor));
+      if (principalMinor <= 0) throw new Error("A prestação projetada não cobre os juros.");
+      balance -= principalMinor;
+      rows.push({ installment, principalMinor, interestMinor, extraAmortizationMinor: 0,
+        paymentMinor: assertMinorUnits(principalMinor + interestMinor), balanceMinor: balance });
+    }
+    if (balance > 0) throw new Error("Não foi possível quitar o saldo no prazo restante.");
+  }
+
+  const sum = (field: "paymentMinor" | "principalMinor" | "interestMinor" | "extraAmortizationMinor") =>
+    rows.reduce((total, row) => assertMinorUnits(total + row[field]), 0);
 
   return {
     rows,
-    totalPaymentMinor: rows.reduce(
-      (total, row) => total + row.paymentMinor + row.extraAmortizationMinor,
-      0,
-    ),
-    totalPrincipalMinor: rows.reduce(
-      (total, row) => total + row.principalMinor + row.extraAmortizationMinor,
-      0,
-    ),
-    totalInterestMinor: rows.reduce(
-      (total, row) => total + row.interestMinor,
-      0,
-    ),
-    totalExtraAmortizationMinor: rows.reduce(
-      (total, row) => total + row.extraAmortizationMinor,
-      0,
-    ),
+    totalPaymentMinor: assertMinorUnits(sum("paymentMinor") + sum("extraAmortizationMinor")),
+    totalPrincipalMinor: assertMinorUnits(sum("principalMinor") + sum("extraAmortizationMinor")),
+    totalInterestMinor: sum("interestMinor"),
+    totalExtraAmortizationMinor: sum("extraAmortizationMinor"),
     initialPaymentMinor: rows[0]?.paymentMinor ?? 0,
     finalPaymentMinor: rows.at(-1)?.paymentMinor ?? 0,
   };
