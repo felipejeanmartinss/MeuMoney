@@ -104,7 +104,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
       const result = mergeFinancingWorkbookRows(rows.map(toWorkbookRow), imported);
       const keys = new Map(rows.map((row) => [Number(row.installmentNumber), row.key]));
       setPreview(result.rows.map((row) => fromWorkbookRow(row, keys.get(row.installmentNumber) ?? rowKey())));
-      setImportSummary(`${result.updated} atualizadas · ${result.added} novas · ${result.preserved} pagas ou vinculadas preservadas. Parcelas ausentes na planilha também permanecem.`);
+      setImportSummary(`${result.updated} alteradas · ${result.added} novas · ${result.removed} sem pagamento/vínculo retiradas · ${result.preserved} pagas ou vinculadas preservadas. ${result.rows.filter((row) => row.paymentStatus === "paid").length} parcelas pagas na prévia.`);
       setMessage("Confira a prévia abaixo. Aplicar à tabela ainda não salva o contrato.");
     } catch (error) { setPreview(null); setImportSummary(null); setMessage(error instanceof Error ? error.message : "Não foi possível importar a planilha."); }
     finally { setWorkbookBusy(false); }
@@ -204,7 +204,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
           <span className="font-medium">Editar em Excel</span>
           <button type="button" disabled={workbookBusy} onClick={downloadWorkbook} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 font-semibold disabled:opacity-50">Exportar base .xlsx</button>
           <label className="min-h-10 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold">Importar base .xlsx<input className="sr-only" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={workbookBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void loadWorkbook(file); event.target.value = ""; }} /></label>
-          <span className="text-xs text-slate-600">Pagamentos e vínculos existentes são preservados. Veja a prévia antes de aplicar e salvar.</span>
+          <span className="text-xs text-slate-600">Pagamentos e vínculos existentes são preservados. Parcelas sem pagamento/vínculo removidas do Excel saem do fluxo após aplicar a prévia e salvar.</span>
         </div>
         <p className="text-xs text-slate-600">Só valor: reduz as prestações seguintes. Só quantidade: antecipa o principal das últimas parcelas. Ambos: aplica o valor e reduz o prazo informado.</p>
         <div className="flex flex-wrap items-end gap-3">

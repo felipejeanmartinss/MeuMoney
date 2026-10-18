@@ -24,6 +24,7 @@ import {
   linkCurrentUserBankIncome,
   setCurrentUserInvestmentPositionArchived,
   updateCurrentUserInvestmentPosition,
+  updateCurrentUserInvestmentCashFlow,
   updateCurrentUserInvestmentUnitPrices,
 } from "@/services/finance/investments-service";
 import { accountIdSchema } from "@/domain/accounts";
@@ -208,6 +209,42 @@ export async function createInvestmentCashFlow(
     revalidatePath("/reports");
   }
   redirect(`/investments/${parsed.data.positionId}/history?message=${parsedAccount?.success ? "flow-linked" : "flow-created"}`);
+}
+
+export async function updateInvestmentCashFlow(
+  _previousState: InvestmentFormState,
+  formData: FormData,
+): Promise<InvestmentFormState> {
+  const parsedId = investmentCashFlowIdSchema.safeParse(formData.get("cashFlowId"));
+  const parsed = investmentCashFlowFormSchema.safeParse({
+    positionId: formData.get("positionId"),
+    cashFlowType: formData.get("cashFlowType"),
+    amountMinor: formData.get("amountMinor"),
+    quantity: formData.get("quantity") ?? "",
+    cashFlowDate: formData.get("cashFlowDate"),
+    notes: formData.get("notes") ?? "",
+  });
+  if (!parsedId.success || !parsed.success) {
+    return {
+      status: "error",
+      message: parsedId.success ? undefined : "Movimento inválido.",
+      fieldErrors: parsed.success ? undefined : parsed.error.flatten().fieldErrors,
+    };
+  }
+  const description = String(formData.get("description") ?? "").trim();
+  if (description.length > 180) return { status: "error", fieldErrors: { description: ["Use até 180 caracteres."] } };
+  const result = await updateCurrentUserInvestmentCashFlow(parsedId.data, {
+    ...parsed.data, description: description || null,
+  });
+  if (!result.ok) return { status: "error", message: result.message };
+  revalidatePath("/investments");
+  revalidatePath(`/investments/${result.positionId}/history`);
+  revalidatePath("/accounts");
+  revalidatePath("/accounts/[id]", "page");
+  revalidatePath("/transactions");
+  revalidatePath("/reports");
+  revalidatePath("/dashboard");
+  redirect(`/investments/${result.positionId}/history?message=flow-updated`);
 }
 
 export async function linkInvestmentBankIncome(formData: FormData) {

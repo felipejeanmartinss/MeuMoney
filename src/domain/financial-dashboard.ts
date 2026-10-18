@@ -177,7 +177,7 @@ export function calculateFinancialDashboardMonth(input: {
         );
       } else if (basis === "cash") {
         const summary = getSummary(entry.currency);
-        if (entry.categoryId !== null) {
+        if (entry.categoryId !== null && entry.originType !== "credit_card_invoice_payment") {
           addExpense(entry, summary);
         } else {
           summary.expenseAmountMinor = addMinorUnits(

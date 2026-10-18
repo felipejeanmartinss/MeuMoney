@@ -1572,6 +1572,16 @@ export type Database = {
         Args: { target_transaction_id: string; target_transaction_date: string };
         Returns: string;
       };
+        update_recurring_occurrence: {
+          Args: {
+            target_transaction_id: string;
+            target_description: string;
+            target_amount_minor: number;
+            target_transaction_date: string;
+            target_notes: string | null;
+          };
+          Returns: string;
+        };
       confirm_recurring_transaction: {
         Args: {
           target_transaction_id: string;
@@ -1649,6 +1659,17 @@ export type Database = {
           target_quantity: string | null;
           target_cash_flow_date: string;
           target_notes?: string | null;
+        };
+        Returns: string;
+      };
+      update_investment_cash_flow: {
+        Args: {
+          target_cash_flow_id: string;
+          target_amount_minor: number;
+          target_quantity: string | null;
+          target_cash_flow_date: string;
+          target_description: string | null;
+          target_notes: string | null;
         };
         Returns: string;
       };
@@ -1938,6 +1959,20 @@ export type Database = {
           transfer_status: TransactionStatus;
           transfer_description?: string | null;
           transfer_notes?: string | null;
+        };
+        Returns: boolean;
+      };
+      update_linked_investment_transfer: {
+        Args: {
+          target_transfer_id: string;
+          source_account_id: string;
+          destination_account_id: string;
+          source_amount_minor: number;
+          destination_amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description: string | null;
+          transfer_notes: string | null;
         };
         Returns: boolean;
       };

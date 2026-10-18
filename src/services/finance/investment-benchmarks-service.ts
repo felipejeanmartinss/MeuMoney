@@ -6,9 +6,6 @@ import { benchmarkMonths, compareInvestmentBenchmarks } from "@/domain/investmen
 export async function getInvestmentBenchmarks(input: { selection: string; from: string; to: string }) {
   const { supabase, user } = await requireUser();
   const months = benchmarkMonths(input.from, input.to);
-  const previous = new Date(`${months[0]}T12:00:00Z`); previous.setUTCDate(0);
-  const end = new Date(`${months.at(-1)}T12:00:00Z`); end.setUTCMonth(end.getUTCMonth() + 1); end.setUTCDate(0);
-  const endDate = end.toISOString().slice(0, 10);
   const positionResult = await supabase.from("investment_positions").select("id,asset_name,investment_class,currency,history_is_complete,current_value_minor,position_date")
     .eq("user_id", user.id).order("asset_name");
   const positions = positionResult.data ?? [];
@@ -19,7 +16,7 @@ export async function getInvestmentBenchmarks(input: { selection: string; from: 
     if (!ids.length) return { rows, error: null };
     for (let offset = 0; ; offset += 1000) {
       const page = await supabase.from("investment_position_snapshots").select("position_id,position_date,current_value_minor")
-        .eq("user_id", user.id).in("position_id", ids).gte("position_date", previous.toISOString().slice(0, 10)).lte("position_date", endDate)
+        .eq("user_id", user.id).in("position_id", ids)
         .order("position_date").order("id").range(offset, offset + 999);
       if (page.error) return { rows, error: page.error };
       rows.push(...page.data);
@@ -31,7 +28,7 @@ export async function getInvestmentBenchmarks(input: { selection: string; from: 
     if (!ids.length) return { rows, error: null };
     for (let offset = 0; ; offset += 1000) {
       const page = await supabase.from("investment_cash_flows").select("position_id,cash_flow_date,amount_minor,cash_flow_type")
-        .eq("user_id", user.id).in("position_id", ids).gte("cash_flow_date", months[0]).lte("cash_flow_date", endDate)
+        .eq("user_id", user.id).in("position_id", ids)
         .order("cash_flow_date").order("id").range(offset, offset + 999);
       if (page.error) return { rows, error: page.error };
       rows.push(...page.data);

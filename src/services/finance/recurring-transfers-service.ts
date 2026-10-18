@@ -20,7 +20,8 @@ export async function listCurrentUserRecurringTransfers() {
   const result = await supabase.from("recurring_transfers").select("*")
     .eq("user_id", user.id).is("ended_at", null)
     .order("is_active", { ascending: false }).order("next_occurrence");
-  return { transfers: result.data ?? [], hasError: Boolean(result.error) };
+  const unavailable = result.error?.code === "42P01" || result.error?.code === "PGRST205";
+  return { transfers: result.data ?? [], hasError: Boolean(result.error && !unavailable), unavailable };
 }
 
 export async function getCurrentUserRecurringTransfer(id: string) {

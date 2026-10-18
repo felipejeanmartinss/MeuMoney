@@ -8,6 +8,7 @@ import { accountIdSchema } from "@/domain/accounts";
 import { isValidIsoDate } from "@/domain/dates";
 import { nextRecurrenceDate } from "@/domain/recurring-transactions";
 import {
+  recurringOccurrenceEditSchema,
   transactionFormSchema,
   transactionIdSchema,
 } from "@/domain/transactions";
@@ -19,6 +20,7 @@ import {
   deleteCurrentUserTransaction,
   setCurrentUserAccountEntryReconciled,
   updateCurrentUserAutomaticTransactionDate,
+  updateCurrentUserRecurringOccurrence,
   updateCurrentUserTransaction,
 } from "@/services/finance/transactions-service";
 
@@ -153,6 +155,26 @@ export async function updateAutomaticTransactionDate(formData: FormData) {
   revalidateFinancialPaths();
   revalidatePath(`/accounts/${parsedAccountId.data}`);
   redirect(`/accounts/${parsedAccountId.data}?message=${result.ok ? "automatic-date-updated" : "automatic-date-error"}#account-register`);
+}
+
+export async function updateRecurringOccurrence(formData: FormData) {
+  const parsed = recurringOccurrenceEditSchema.safeParse({
+    id: formData.get("id"),
+    accountId: formData.get("accountId"),
+    description: formData.get("description"),
+    amountMinor: formData.get("amountMinor"),
+    transactionDate: formData.get("transactionDate"),
+    notes: formData.get("notes") ?? "",
+  });
+  if (!parsed.success) {
+    const id = transactionIdSchema.safeParse(formData.get("id"));
+    redirect(id.success ? `/transactions/${id.data}/edit-occurrence?message=invalid` : "/transactions");
+  }
+  const result = await updateCurrentUserRecurringOccurrence(parsed.data.id, parsed.data);
+  if (!result.ok) redirect(`/transactions/${parsed.data.id}/edit-occurrence?message=save-error`);
+  revalidateFinancialPaths();
+  revalidatePath(`/accounts/${parsed.data.accountId}`);
+  redirect(`/accounts/${parsed.data.accountId}?message=recurring-occurrence-updated#account-register`);
 }
 
 export async function deleteTransaction(formData: FormData) {

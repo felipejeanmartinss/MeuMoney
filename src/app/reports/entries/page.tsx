@@ -34,7 +34,7 @@ export default async function ReportEntriesPage({ searchParams }: {
   return <main className="app-page grid gap-3">
     <Link href="/reports" className="w-fit text-sm font-semibold text-emerald-800 hover:underline">← Voltar aos relatórios</Link>
     <PageHeader title="Lançamentos do relatório" description={validPeriod ? `${fromMonth} a ${toMonth} · ${basis === "cash" ? "caixa" : "competência"}` : "Selecione um período no relatório."} />
-    <p className="text-xs text-slate-600">Valores na moeda de origem de cada lançamento. O consolidado pode diferir porque converte as moedas para a moeda do perfil.</p>
+    <p className="text-xs text-slate-600">Valores na moeda de origem; o relatório converte para a moeda do perfil.</p>
     {result.hasError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Não foi possível carregar todos os lançamentos deste consolidado.</p> : null}
     {totals.size ? <div className="flex flex-wrap gap-2">{[...totals].map(([key, amount]) => {
       const [currency, kind] = key.split(":");

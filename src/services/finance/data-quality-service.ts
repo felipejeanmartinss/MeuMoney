@@ -24,7 +24,9 @@ export async function getCurrentUserDataQuality() {
   const staleDate = addDays(today, -30);
 
   const [unclassified, pendingImports, staleAccounts, staleQuotes, unreconciledTransfers, inconsistentInvoices, incompletePositions] = await Promise.all([
-    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).is("category_id", null),
+    // Technical investment and card-settlement entries intentionally have no category.
+    // Only user-classifiable entries belong in this check and its destination filter.
+    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).eq("origin_type", "manual").is("category_id", null),
     supabase.from("import_jobs").select("id").eq("user_id", user.id).in("status", ["review", "failed"]),
     supabase.from("account_balances").select("id").eq("user_id", user.id).is("archived_at", null).lt("updated_at", `${staleDate}T00:00:00Z`),
     supabase.from("investment_position_summary").select("id").eq("user_id", user.id).eq("is_active", true).lt("position_date", staleDate),
@@ -37,7 +39,7 @@ export async function getCurrentUserDataQuality() {
     Number(invoice.total_amount_minor) < 0 || Number(invoice.outstanding_amount_minor) < 0,
   ).length;
   const checks: DataQualityCheck[] = [
-    { id: "unclassified", title: "Lançamentos sem categoria", description: "Classifique as movimentações para manter relatórios e orçamento confiáveis.", count: unclassified.data?.length ?? 0, href: "/transactions", tone: "attention" },
+    { id: "unclassified", title: "Lançamentos sem categoria", description: "Lançamentos manuais que ainda precisam de classificação.", count: unclassified.data?.length ?? 0, href: "/transactions?uncategorized=true", tone: "attention" },
     { id: "imports", title: "Importações para revisar", description: "Há arquivos com linhas pendentes ou falhas de leitura.", count: pendingImports.data?.length ?? 0, href: "/imports", tone: "attention" },
     { id: "accounts", title: "Saldos sem atualização", description: "Contas sem atualização há mais de 30 dias.", count: staleAccounts.data?.length ?? 0, href: "/accounts", tone: "info" },
     { id: "quotes", title: "Cotações antigas", description: "Posições sem uma fotografia recente.", count: staleQuotes.data?.length ?? 0, href: "/investments/prices", tone: "info" },

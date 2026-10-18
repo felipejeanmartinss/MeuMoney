@@ -10,6 +10,18 @@ export function allocateBudgetGroupByPercent(
     throw new Error("Percentual ou base de receita inválidos.");
   }
   const target = (BigInt(incomeMinor) * BigInt(percent) + 50n) / 100n;
+  return allocateBudgetGroupByAmount(assertMinorUnits(Number(target)), rows);
+}
+
+export function allocateBudgetGroupByAmount(
+  targetMinor: number,
+  rows: readonly { id: string; plannedAmountMinor: number }[],
+) {
+  assertMinorUnits(targetMinor);
+  if (targetMinor < 0 || rows.length === 0) {
+    throw new Error("Valor planejado inválido.");
+  }
+  const target = BigInt(targetMinor);
   const weights = rows.map((row) => BigInt(Math.max(0, assertMinorUnits(row.plannedAmountMinor))));
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0n);
   let remaining = target;

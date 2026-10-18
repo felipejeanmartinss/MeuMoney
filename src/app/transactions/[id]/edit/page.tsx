@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { TransactionForm } from "@/components/forms/transaction-form";
 import { minorUnitsToInput } from "@/domain/money";
 import { transactionIdSchema } from "@/domain/transactions";
@@ -17,12 +17,13 @@ export default async function EditTransactionPage({
 }) {
   const parsedId = transactionIdSchema.safeParse((await params).id);
   if (!parsedId.success) notFound();
-  const { transaction, hasError } = await getCurrentUserTransaction(
+  const { transaction, investmentLink, hasError } = await getCurrentUserTransaction(
     parsedId.data,
   );
   if (hasError || !transaction || transaction.origin_type !== "manual") {
     notFound();
   }
+  if (investmentLink) redirect(`/investments/${investmentLink.position_id}/history/${investmentLink.id}/edit`);
   if (!transaction.category_id) notFound();
   const options = await getTransactionFormOptions({
     accountId: transaction.account_id,

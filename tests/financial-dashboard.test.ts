@@ -207,6 +207,20 @@ describe("financial dashboard aggregations", () => {
     });
   });
 
+  it("prioritizes a card-payment origin over a legacy expense category in cash", () => {
+    const cash = calculateFinancialDashboardMonth({
+      userId: "user-a",
+      referenceMonth: "2026-07",
+      basis: "cash",
+      budgets: [],
+      entries: [{ ...baseExpense, originType: "credit_card_invoice_payment" }],
+    });
+    expect(cash[0].expenseAmountMinor).toBe(10_000);
+    expect(cash[0].categoryExpenses).toEqual([
+      expect.objectContaining({ categoryId: "cash-card-payments", amountMinor: 10_000 }),
+    ]);
+  });
+
   it("keeps currencies and users isolated", () => {
     const result = calculateFinancialDashboardMonth({
       userId: "user-a",

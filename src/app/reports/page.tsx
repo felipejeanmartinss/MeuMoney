@@ -525,7 +525,7 @@ export default async function ReportsPage({
 
   return (
     <main className="app-page max-w-[1700px]">
-      <PageHeader title="Relatórios" description="Valores consolidados na moeda do perfil." />
+      <PageHeader title="Relatórios" />
 
       {reportMessage ? (
         <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
@@ -844,12 +844,6 @@ async function IncomeExpenseReport({
         <ApplyFiltersButton />
       </form>
       </details>
-      <details className="border-t border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-950"><summary className="cursor-pointer font-semibold">Como este relatório calcula os valores</summary><p className="mt-1">
-        <strong>
-          {filters.basis === "competence" ? "Competência" : "Caixa"}:
-        </strong>{" "}
-        {reportBasisDescription(filters.basis)}
-      </p></details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice
         currency={filters.currency}
@@ -879,11 +873,14 @@ async function IncomeExpenseReport({
           }
         />
       </div>
+      <h3 className="border-t border-slate-200 px-3 pt-3 text-center text-base font-bold text-slate-900">
+        Resultado · {filters.basis === "cash" ? "Caixa" : "Competência"}
+      </h3>
       {view === "chart" ? <IncomeExpenseColumnChart rows={result.rows} currency={filters.currency} /> : <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
         drilldownYear={filters.year}
-        caption={`Receitas e despesas mensais de ${monthLabel(period.startMonth, period.endMonth)}`}
+        caption={`Resultado · ${filters.basis === "cash" ? "Caixa" : "Competência"} · ${monthLabel(period.startMonth, period.endMonth)}`}
         emptyMessage="Nenhuma receita ou despesa encontrada neste recorte."
         months={result.months}
         timeGrouping={filters.timeGrouping}

@@ -49,8 +49,12 @@ export default async function TransactionsPage({
   const filters = parsedFilters.success
     ? parsedFilters.data
     : { activity: "active" as const, uncategorized: false };
-  const { transactions, accounts, categories, groups, hasError } =
+  const { transactions, investmentLinks, accounts, categories, groups, hasError } =
     await listCurrentUserTransactions(filters);
+  const investmentLinkByTransaction = new Map(investmentLinks.map((flow) => [
+    flow.transaction_id ?? flow.source_transaction_id,
+    flow,
+  ]));
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const categoryById = new Map(
     categories.map((category) => [category.id, category]),
@@ -271,6 +275,7 @@ export default async function TransactionsPage({
           const isTechnical =
             transaction.origin_type !== "manual";
           const isRecurring = Boolean(transaction.recurring_transaction_id);
+          const investmentLink = investmentLinkByTransaction.get(transaction.id);
           const income = transaction.transaction_type === "income";
           return (
             <article
@@ -312,7 +317,9 @@ export default async function TransactionsPage({
                     {isTechnical
                       ? isRecurring
                         ? "Gerado por recorrência"
-                        : "Liquidação de fatura"
+                        : transaction.origin_type === "investment"
+                          ? "Movimento de investimento"
+                          : "Liquidação de fatura"
                       : category
                         ? getCategoryQualifiedName(
                             category,
@@ -338,17 +345,20 @@ export default async function TransactionsPage({
                 </p>
               </div>
               <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
-                {transaction.is_active && transaction.origin_type === "credit_card_invoice_payment" ? (
+                {investmentLink ? (
+                  <Link href={`/investments/${investmentLink.position_id}/history/${investmentLink.id}/edit`}
+                    className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar</Link>
+                ) : transaction.is_active && transaction.origin_type === "credit_card_invoice_payment" ? (
                   <Link href={`/transactions/${transaction.id}/edit-date`} className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar data</Link>
                 ) : isTechnical && transaction.origin_type !== "system" ? (
                   <span className="text-xs text-slate-500">
-                    {isRecurring
-                      ? "Gerenciado pela recorrência"
-                      : "Gerenciado pela fatura"}
+                    {isRecurring ? "Gerenciado pela recorrência"
+                      : transaction.origin_type === "investment" ? "Gerenciado pelo investimento"
+                        : "Gerenciado pela fatura"}
                   </span>
                 ) : transaction.origin_type === "system" ? (
                   <>
-                    {transaction.is_active ? <Link href={`/transactions/${transaction.id}/edit-date`} className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar data</Link> : null}
+                    {transaction.is_active ? <Link href={`/transactions/${transaction.id}/edit-occurrence`} className="inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar</Link> : null}
                     <form action={deleteTransaction}>
                       <input type="hidden" name="id" value={transaction.id} />
                       <ConfirmSubmitButton
