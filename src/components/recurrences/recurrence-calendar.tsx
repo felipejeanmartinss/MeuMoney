@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { closeCreditCardInvoice } from "@/app/actions/credit-cards";
 
 export type RecurrenceCalendarEvent = {
   id: string;
@@ -9,26 +11,13 @@ export type RecurrenceCalendarEvent = {
   accountName: string;
   amountLabel: string;
   transactionType: "income" | "expense" | "transfer";
-  colorIndex: number;
+  href?: string;
+  invoice?: { cardId: string; invoiceId: string; closingDate: string; status: string; hasLinkedAccount: boolean };
 };
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
-const EVENT_COLORS = [
-  "bg-emerald-500",
-  "bg-blue-500",
-  "bg-violet-500",
-  "bg-amber-500",
-  "bg-rose-500",
-  "bg-cyan-500",
-] as const;
-const EVENT_TONES = [
-  "border-emerald-200 bg-emerald-50",
-  "border-blue-200 bg-blue-50",
-  "border-violet-200 bg-violet-50",
-  "border-amber-200 bg-amber-50",
-  "border-rose-200 bg-rose-50",
-  "border-cyan-200 bg-cyan-50",
-] as const;
+const EVENT_COLORS = { income: "bg-emerald-500", expense: "bg-rose-500", transfer: "bg-blue-500" } as const;
+const EVENT_TONES = { income: "border-emerald-200 bg-emerald-50", expense: "border-rose-200 bg-rose-50", transfer: "border-blue-200 bg-blue-50" } as const;
 
 function dateKey(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -37,9 +26,11 @@ function dateKey(year: number, month: number, day: number) {
 export function RecurrenceCalendar({
   month,
   events,
+  today,
 }: {
   month: string;
   events: RecurrenceCalendarEvent[];
+  today: string;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [year, monthNumber] = month.split("-").map(Number);
@@ -82,7 +73,7 @@ export function RecurrenceCalendar({
                 className={`relative flex aspect-square min-h-10 flex-col items-center justify-center rounded-xl border text-sm font-extrabold transition ${
                   highlighted
                     ? "scale-105 border-slate-950 bg-slate-950 text-white shadow-lg"
-                    : dayEvents.length
+                    : key >= today || dayEvents.length
                       ? "border-slate-300 bg-white text-slate-950"
                       : "border-transparent text-slate-500"
                 }`}
@@ -94,7 +85,7 @@ export function RecurrenceCalendar({
                       <span
                         key={event.id}
                         title={`${event.description}: ${event.amountLabel}`}
-                        className={`size-1.5 rounded-full ${EVENT_COLORS[event.colorIndex % EVENT_COLORS.length]}`}
+                        className={`size-1.5 rounded-full ${EVENT_COLORS[event.transactionType]}`}
                       />
                     ))}
                   </span>
@@ -111,20 +102,20 @@ export function RecurrenceCalendar({
             const active = event.id === hoveredId;
             return (
               <li key={event.id}>
-                <button
-                  type="button"
+                <Link
+                  href={event.href ?? "/recurring-transactions"}
                   onMouseEnter={() => setHoveredId(event.id)}
                   onMouseLeave={() => setHoveredId(null)}
                   onFocus={() => setHoveredId(event.id)}
                   onBlur={() => setHoveredId(null)}
                   className={`relative grid w-full grid-cols-[auto_1fr] gap-3 rounded-xl border p-3 text-left transition ${
                     active
-                      ? `${EVENT_TONES[event.colorIndex % EVENT_TONES.length]} shadow-md`
+                      ? `${EVENT_TONES[event.transactionType]} shadow-md`
                       : "border-slate-200 bg-white hover:bg-slate-50"
                   }`}
                 >
                   <span
-                    className={`mt-1 size-2.5 rounded-full ${EVENT_COLORS[event.colorIndex % EVENT_COLORS.length]}`}
+                    className={`mt-1 size-2.5 rounded-full ${EVENT_COLORS[event.transactionType]}`}
                   />
                   <span className="min-w-0">
                     <span className="block truncate font-bold text-slate-950">
@@ -147,7 +138,14 @@ export function RecurrenceCalendar({
                       Destacado no dia {event.date.slice(8, 10)}
                     </span>
                   ) : null}
-                </button>
+                </Link>
+                {event.invoice?.status === "open" && event.invoice.closingDate <= today ? (
+                  event.invoice.hasLinkedAccount ? <form action={closeCreditCardInvoice} className="mt-1 text-right">
+                    <input type="hidden" name="cardId" value={event.invoice.cardId} />
+                    <input type="hidden" name="invoiceId" value={event.invoice.invoiceId} />
+                    <button className="text-xs font-bold text-emerald-800 hover:underline">Fechar fatura e prever pagamento →</button>
+                  </form> : <Link href={`/credit-cards/${event.invoice.cardId}/edit`} className="mt-1 block text-right text-xs font-bold text-amber-800 hover:underline">Definir conta do cartão para prever pagamento →</Link>
+                ) : null}
               </li>
             );
           })}

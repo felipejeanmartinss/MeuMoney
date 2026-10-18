@@ -13,6 +13,29 @@ export function normalizeFinancingMoney(value: string) {
 const SCALE = 1_000_000_000_000n;
 const rounded = (a: bigint, b: bigint) => (a + b / 2n) / b;
 
+function nominalMonthlyRate(annualRate: string) {
+  const rateText = annualRate.trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,8})?$/.test(rateText)) throw new Error("Informe a taxa nominal anual.");
+  const [whole, decimals = ""] = rateText.split(".");
+  const rate = rounded((BigInt(whole) * 100_000_000n + BigInt(decimals.padEnd(8, "0"))) * SCALE, 1200n * 100_000_000n);
+  if (rate > SCALE) throw new Error("A taxa nominal anual deve ser de até 1.200%.");
+  return rate;
+}
+
+export function financingMonthlyInterestMinor(balanceMinor: number, annualRate: string) {
+  assertMinorUnits(balanceMinor);
+  if (balanceMinor < 0) throw new Error("Informe um saldo não negativo.");
+  return assertMinorUnits(Number(rounded(BigInt(balanceMinor) * nominalMonthlyRate(annualRate), SCALE)));
+}
+
+export function nextFinancingInstallment<T extends { dueDate: string; paymentStatus: "paid" | "scheduled" }>(
+  rows: readonly T[], balanceDate: string, today: string,
+): { next: T; remainingMonths: number } | null {
+  const future = rows.filter((row) => row.paymentStatus === "scheduled" && row.dueDate >= today && row.dueDate > balanceDate)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  return future[0] ? { next: future[0], remainingMonths: future.length } : null;
+}
+
 /** Monetary operations stay in integer cents, including PRICE interest rounding. */
 export function projectFinancingSchedule(input: {
   principalMinor: number; annualRate: string; months: number; method: "SAC" | "PRICE";
@@ -21,11 +44,7 @@ export function projectFinancingSchedule(input: {
   if (input.principalMinor <= 0 || !Number.isInteger(input.months) || input.months < 1 || input.months > 1200) {
     throw new Error("Informe saldo positivo e prazo entre 1 e 1.200 meses.");
   }
-  const rateText = input.annualRate.trim().replace(",", ".");
-  if (!/^\d+(\.\d{1,8})?$/.test(rateText)) throw new Error("Informe a taxa nominal anual.");
-  const [whole, decimals = ""] = rateText.split(".");
-  const rate = rounded((BigInt(whole) * 100_000_000n + BigInt(decimals.padEnd(8, "0"))) * SCALE, 1200n * 100_000_000n);
-  if (rate > SCALE) throw new Error("A taxa nominal anual deve ser de até 1.200%.");
+  const rate = nominalMonthlyRate(input.annualRate);
   let balance = BigInt(input.principalMinor);
   let factor = SCALE;
   for (let i = 0; i < input.months; i++) factor = rounded(factor * (SCALE + rate), SCALE);

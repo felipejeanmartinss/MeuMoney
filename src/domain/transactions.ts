@@ -69,6 +69,15 @@ export const transactionFormSchema = z.object({
   isSubscription: z.preprocess((value) => value === "true" || value === true, z.boolean()),
 });
 
+export const recurringOccurrenceEditSchema = z.object({
+  id: z.uuid(),
+  accountId: z.uuid(),
+  description: z.string().trim().min(1, "Informe a descrição.").max(180),
+  amountMinor: positiveMoneyInput,
+  transactionDate: z.string().refine(isValidIsoDate, "Informe uma data válida."),
+  notes: optionalText(1000, "Use até 1.000 caracteres."),
+});
+
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
   z.preprocess(
     (value) => (value === "" || value == null ? undefined : value),

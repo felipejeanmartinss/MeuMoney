@@ -26,15 +26,37 @@ export type BenchmarkSnapshot = { positionId: string; date: string; valueMinor: 
 export type BenchmarkFlow = { positionId: string; date: string; amountMinor: number; type: string };
 export type MonthlyBenchmark = { code: string; reference_month: string; return_percent: string | number };
 
+function netCapitalFlows(flows: BenchmarkFlow[], positionId: string, after: string, through: string) {
+  return flows.filter((flow) => flow.positionId === positionId && flow.date > after && flow.date <= through)
+    .reduce((total, flow) => total + (flow.type === "contribution" ? BigInt(flow.amountMinor) : flow.type === "redemption" ? -BigInt(flow.amountMinor) : 0n), 0n);
+}
+
+function estimatePositionAtDate(positionId: string, date: string, snapshots: BenchmarkSnapshot[], flows: BenchmarkFlow[]) {
+  const dated = snapshots.filter((row) => row.positionId === positionId).sort((left, right) => left.date.localeCompare(right.date));
+  const exact = dated.findLast((row) => row.date === date);
+  if (exact) return { valueMinor: BigInt(exact.valueMinor), estimated: false };
+  const before = dated.findLast((row) => row.date < date);
+  if (!before) return null;
+  const after = dated.find((row) => row.date > date);
+  const booked = netCapitalFlows(flows, positionId, before.date, date);
+  if (!after) return { valueMinor: BigInt(before.valueMinor) + booked, estimated: true };
+  const totalCapital = netCapitalFlows(flows, positionId, before.date, after.date);
+  const gain = BigInt(after.valueMinor) - BigInt(before.valueMinor) - totalCapital;
+  const elapsed = BigInt(Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${before.date}T12:00:00Z`)) / 86_400_000));
+  const span = BigInt(Math.round((Date.parse(`${after.date}T12:00:00Z`) - Date.parse(`${before.date}T12:00:00Z`)) / 86_400_000));
+  return { valueMinor: BigInt(before.valueMinor) + booked + gain * elapsed / span, estimated: true };
+}
+
 export function compareInvestmentBenchmarks(input: {
   positions: BenchmarkPosition[]; snapshots: BenchmarkSnapshot[]; flows: BenchmarkFlow[];
   months: string[]; benchmarks: MonthlyBenchmark[];
 }) {
   const gaps: string[] = [];
+  const estimates: string[] = [];
   const points: { month: string; returnBasisPoints: number }[] = [];
   if (!input.positions.length) gaps.push("Selecione um ativo ou uma classe com posições cadastradas.");
   for (const position of input.positions) {
-    if (!position.historyIsComplete) gaps.push(`${position.name}: histórico marcado como incompleto.`);
+    if (!position.historyIsComplete) estimates.push(`${position.name}: histórico anterior à primeira fotografia pode estar incompleto.`);
     if (position.currency !== "BRL") gaps.push(`${position.name}: a comparação com estes índices exige valores em BRL.`);
   }
   let accumulated = 1;
@@ -47,11 +69,11 @@ export function compareInvestmentBenchmarks(input: {
     const days = BigInt(end.getUTCDate());
     let opening = 0n, closing = 0n, netFlows = 0n, weightedFlows = 0n, income = 0n;
     for (const position of input.positions) {
-      const snapshots = input.snapshots.filter((row) => row.positionId === position.id);
-      const first = snapshots.findLast((row) => row.date === openingDate);
-      const last = snapshots.findLast((row) => row.date === endDate);
-      if (!first || !last) { gaps.push(`${position.name}: falta posição em ${!first ? openingDate : endDate}.`); continue; }
-      opening += BigInt(first.valueMinor); closing += BigInt(last.valueMinor);
+      const first = estimatePositionAtDate(position.id, openingDate, input.snapshots, input.flows);
+      const last = estimatePositionAtDate(position.id, endDate, input.snapshots, input.flows);
+      if (!first || !last) { gaps.push(`${position.name}: falta uma atualização anterior a ${!first ? openingDate : endDate}.`); continue; }
+      if (first.estimated || last.estimated) estimates.push(`${position.name}: fechamento de ${month.slice(0, 7)} estimado a partir de atualizações em outras datas.`);
+      opening += first.valueMinor; closing += last.valueMinor;
       for (const flow of input.flows.filter((row) => row.positionId === position.id && row.date >= month && row.date <= endDate)) {
         const amount = BigInt(flow.amountMinor);
         if (flow.type === "income") { income += amount; continue; }
@@ -85,7 +107,7 @@ export function compareInvestmentBenchmarks(input: {
       spreadBasisPoints: result !== null && portfolioReturn !== null ? portfolioReturn - result : null };
   });
   const inflation = comparisons.find((row) => row.code === "ipca")?.returnBasisPoints;
-  return { gaps: [...new Set(gaps)], points: valid ? points : [], portfolioReturn, comparisons,
+  return { gaps: [...new Set(gaps)], estimates: [...new Set(estimates)], points: valid ? points : [], portfolioReturn, comparisons,
     realReturn: portfolioReturn !== null && inflation != null && inflation > -10_000 ? calculateRealReturn(portfolioReturn, inflation) : null };
 }
 

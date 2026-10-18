@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { CheckboxFilter } from "@/components/reports/checkbox-filter";
 import { IncomeExpenseColumnChart } from "@/components/reports/income-expense-column-chart";
+import { NetWorthEvolutionChart } from "@/components/reports/net-worth-evolution-chart";
 import Link from "next/link";
 import {
   deleteSavedFinancialReport,
@@ -525,7 +526,7 @@ export default async function ReportsPage({
 
   return (
     <main className="app-page max-w-[1700px]">
-      <PageHeader title="Relatórios" description="Valores consolidados na moeda do perfil." />
+      <PageHeader title="Relatórios" />
 
       {reportMessage ? (
         <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
@@ -766,6 +767,13 @@ async function NetWorthEvolutionReport({
       </details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice currency={filters.currency} missingCurrencies={result.missingCurrencies} />
+      <p className="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">O saldo do financiamento anterior à primeira avaliação é reconstruído pelo contrato e suas parcelas. Outros ativos sem fotografia histórica não são retroprojetados.</p>
+      {result.rows.length ? <div className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-3">{[
+        ["Ativos", result.rows.at(-1)!.assetsMinor],
+        ["Passivos", result.rows.at(-1)!.liabilitiesMinor],
+        ["Patrimônio total (líquido)", result.rows.at(-1)!.netWorthMinor],
+      ].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-xs text-slate-500">{label} · {result.rows.at(-1)!.referenceMonth}</p><p className="text-lg font-bold tabular-nums">{formatMoney(Number(value), filters.currency)}</p></div>)}</div> : null}
+      <NetWorthEvolutionChart rows={result.rows} currency={filters.currency} />
       <NetWorthEvolutionMatrix rows={result.rows} currency={filters.currency} />
     </>
   );
@@ -796,6 +804,16 @@ async function IncomeExpenseReport({
     allDates: period.period === "all",
   });
   const totals = summarizeIncomeExpenseReport(result.rows);
+  const detailHref = (section?: "income" | "expense") => {
+    const query = new URLSearchParams({ from: result.months[0] ?? period.startMonth, to: result.months.at(-1) ?? period.endMonth, basis: filters.basis });
+    if (section) query.set("section", section);
+    const detailRows = result.matrix.filter((row) => !section || row.section === section).map((row) => row.rowId.slice(row.section.length + 1));
+    if (detailRows.length) query.set("rows", [...new Set(detailRows)].join(","));
+    if (context !== "all") query.set("context", context);
+    if (filters.sourceKeys.length) query.set("sources", filters.sourceKeys.join(","));
+    if (sourceCurrencies.length) query.set("currencies", sourceCurrencies.join(","));
+    return `/reports/entries?${query.toString()}`;
+  };
   const view = raw.view === "chart" ? "chart" : "table";
   const viewHref = (target: "chart" | "table") => {
     const query = new URLSearchParams();
@@ -834,12 +852,6 @@ async function IncomeExpenseReport({
         <ApplyFiltersButton />
       </form>
       </details>
-      <details className="border-t border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-950"><summary className="cursor-pointer font-semibold">Como este relatório calcula os valores</summary><p className="mt-1">
-        <strong>
-          {filters.basis === "competence" ? "Competência" : "Caixa"}:
-        </strong>{" "}
-        {reportBasisDescription(filters.basis)}
-      </p></details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice
         currency={filters.currency}
@@ -848,16 +860,19 @@ async function IncomeExpenseReport({
       <div className="grid grid-cols-3 border-t border-slate-200 bg-white">
         <SummaryCell
           label="Receitas"
+          href={detailHref("income")}
           value={formatMoney(totals.incomeAmountMinor, filters.currency)}
           color="text-emerald-700"
         />
         <SummaryCell
           label={filters.basis === "cash" ? "Saídas de caixa" : "Despesas"}
+          href={detailHref("expense")}
           value={formatMoney(totals.expenseAmountMinor, filters.currency)}
           color="text-rose-700"
         />
         <SummaryCell
           label="Resultado"
+          href={detailHref()}
           value={formatMoney(totals.resultAmountMinor, filters.currency)}
           color={
             totals.resultAmountMinor < 0
@@ -866,15 +881,22 @@ async function IncomeExpenseReport({
           }
         />
       </div>
+      <h3 className="border-t border-slate-200 px-3 pt-3 text-center text-base font-bold text-slate-900">
+        Resultado · {filters.basis === "cash" ? "Caixa" : "Competência"}
+      </h3>
       {view === "chart" ? <IncomeExpenseColumnChart rows={result.rows} currency={filters.currency} /> : <MonthlyFinancialMatrix
         rows={result.matrix}
         currency={filters.currency}
         drilldownYear={filters.year}
-        caption={`Receitas e despesas mensais de ${monthLabel(period.startMonth, period.endMonth)}`}
+        caption={`Resultado · ${filters.basis === "cash" ? "Caixa" : "Competência"} · ${monthLabel(period.startMonth, period.endMonth)}`}
         emptyMessage="Nenhuma receita ou despesa encontrada neste recorte."
         months={result.months}
         timeGrouping={filters.timeGrouping}
         categoryGrouping={filters.categoryGrouping}
+        basis={filters.basis}
+        sourceKeys={filters.sourceKeys}
+        reportContext={context}
+        sourceCurrencies={sourceCurrencies}
       />}
     </>
   );
@@ -932,6 +954,10 @@ async function FixedExpensesReport({
         showSections={false}
         timeGrouping={filters.timeGrouping}
         categoryGrouping={filters.categoryGrouping}
+        basis={filters.basis}
+        sourceKeys={filters.sourceKeys}
+        reportContext={context}
+        sourceCurrencies={sourceCurrencies}
       />
     </>
   );
@@ -1151,17 +1177,19 @@ function SummaryCell({
   label,
   value,
   color,
+  href,
 }: {
   label: string;
   value: string;
   color: string;
+  href?: string;
 }) {
-  return (
-    <div className="border-r border-slate-200 px-4 py-3 last:border-r-0">
+  const content = <>
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className={"mt-1 text-lg font-black tabular-nums " + color}>{value}</p>
-    </div>
-  );
+    </>;
+  return href ? <Link href={href} className="border-r border-slate-200 px-4 py-3 last:border-r-0 hover:bg-slate-50" title={`Abrir lançamentos de ${label.toLowerCase()}`}>{content}</Link>
+    : <div className="border-r border-slate-200 px-4 py-3 last:border-r-0">{content}</div>;
 }
 
 function MonthField({

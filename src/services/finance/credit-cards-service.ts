@@ -2,6 +2,7 @@ import "server-only";
 import { calculateCreditCardCommitment } from "@/domain/credit-cards";
 import { coerceMinorUnits } from "@/domain/money";
 import { requireUser } from "@/services/auth/server-auth";
+import { currentIsoDate } from "@/utils/dates";
 import type {
   CreditCardBrand,
   CreditCardEntryKind,
@@ -48,6 +49,13 @@ const invoiceColumns =
 const installmentColumns =
   "id, user_id, purchase_id, credit_card_id, invoice_id, installment_number, installment_count, amount, competence_date, status, created_at, updated_at";
 
+function lastVisibleSubscriptionMonth() {
+  const currentMonth = currentIsoDate().slice(0, 7);
+  const nextMonth = new Date(`${currentMonth}-01T12:00:00Z`);
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  return nextMonth.toISOString().slice(0, 7);
+}
+
 function withCalculatedCommitment(
   card: CreditCardSummary,
   purchases: readonly CreditCardPurchase[],
@@ -58,10 +66,10 @@ function withCalculatedCommitment(
     creditLimitMinor: coerceMinorUnits(card.credit_limit),
     closingDay: card.closing_day,
     invoices: invoices
-      .filter((invoice) => invoice.credit_card_id === card.id)
+      .filter((invoice) => invoice.credit_card_id === card.id && invoice.reference_month.slice(0, 7) <= lastVisibleSubscriptionMonth())
       .map((invoice) => ({ referenceMonth: invoice.reference_month })),
     purchases: purchases
-      .filter((purchase) => purchase.credit_card_id === card.id)
+      .filter((purchase) => purchase.credit_card_id === card.id && (!purchase.recurring_reference_month || purchase.recurring_reference_month.slice(0, 7) <= lastVisibleSubscriptionMonth()))
       .map((purchase) => ({
         id: purchase.id,
         totalAmountMinor: coerceMinorUnits(purchase.total_amount),
@@ -397,6 +405,7 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
   const purchases = purchasesResult.data ?? [];
   const installments = installmentsResult.data ?? [];
   const invoices = invoicesResult.data ?? [];
+  const horizon = lastVisibleSubscriptionMonth();
   return {
     card: cardResult.data
       ? withCalculatedCommitment(
@@ -406,7 +415,9 @@ export async function getCurrentUserCreditCardDetails(cardId: string) {
           invoices,
         )
       : null,
-    purchases,
+    purchases: purchases.filter((purchase) =>
+      purchase.status === "active" &&
+      (!purchase.recurring_reference_month || purchase.recurring_reference_month.slice(0, 7) <= horizon)),
     installments,
     invoices,
     categories: categoriesResult.data ?? [],

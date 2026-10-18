@@ -175,6 +175,9 @@ export const SECONDARY_NAVIGATION: Record<
     { href: "/reports?report=asset-performance-general", label: "Performance (geral)", icon: "reports", match: [] },
     { href: "/reports?report=net-worth-evolution", label: "Evolução patrimonial", icon: "reports", match: [], group: "Patrimônio" },
     { href: "/reports?report=cash-flow-forecast", label: "Projeção de fluxo de caixa", icon: "reports", match: [] },
+    { href: "/reports/price-history", label: "Preço histórico", icon: "reports", match: ["/reports/price-history"], group: "Investimentos" },
+    { href: "/reports/asset-allocation", label: "Alocação de ativos", icon: "reports", match: ["/reports/asset-allocation"] },
+    { href: "/reports/credit-cards", label: "Cartões de crédito", icon: "reports", match: ["/reports/credit-cards"], group: "Cartões" },
     { href: "/reports/irpf", label: "Simulador IRPF", icon: "reports", match: ["/reports/irpf"], group: "Impostos" },
   ],
   profile: [

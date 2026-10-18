@@ -47,7 +47,7 @@ describe("navigation model", () => {
     ).toContain("Cartões");
     expect(secondaryNavigationFor("/reports").map((item) => item.label)).toEqual([
       "Favoritos", "Receitas x despesas", "Despesas fixas", "Comparativo entre períodos",
-      "Performance (ativos)", "Performance (geral)", "Evolução patrimonial", "Projeção de fluxo de caixa", "Simulador IRPF",
+      "Performance (ativos)", "Performance (geral)", "Evolução patrimonial", "Projeção de fluxo de caixa", "Preço histórico", "Alocação de ativos", "Cartões de crédito", "Simulador IRPF",
     ]);
     expect(
       secondaryNavigationFor("/recurring-transactions").map(

@@ -16,13 +16,13 @@ type Row = {
   totalAmountMinor: string; principalMinor: string; interestMinor: string;
   correctionFactor: string; chargesMinor: string; outstandingBalanceMinor: string;
   paymentStatus: "paid" | "scheduled"; paymentDate: string; paidAmountMinor: string;
-  extraAmortizationMinor: string; installmentsReduced: string; linkedTransactionId: string;
+  extraAmortizationMinor: string; extraFgtsMinor: string; installmentsReduced: string; linkedTransactionId: string;
 };
-const monetaryFields = ["principalMinor", "totalAmountMinor", "interestMinor", "chargesMinor", "outstandingBalanceMinor", "paidAmountMinor", "extraAmortizationMinor"] as const;
+const monetaryFields = ["principalMinor", "totalAmountMinor", "interestMinor", "chargesMinor", "outstandingBalanceMinor", "paidAmountMinor", "extraAmortizationMinor", "extraFgtsMinor"] as const;
 const cell = "h-9 w-full min-w-24 rounded-md border border-slate-300 bg-white px-2 text-xs tabular-nums text-slate-900 focus:border-emerald-700";
 const initialState: FinancingImportFormState = { status: "idle" };
 function emptyRow(number: number, key: string): Row {
-  return { key, installmentNumber: String(number), dueDate: "", totalAmountMinor: "0,00", principalMinor: "0,00", interestMinor: "0,00", correctionFactor: "", chargesMinor: "0,00", outstandingBalanceMinor: "0,00", paymentStatus: "scheduled", paymentDate: "", paidAmountMinor: "0,00", extraAmortizationMinor: "0,00", installmentsReduced: "0", linkedTransactionId: "" };
+  return { key, installmentNumber: String(number), dueDate: "", totalAmountMinor: "0,00", principalMinor: "0,00", interestMinor: "0,00", correctionFactor: "", chargesMinor: "0,00", outstandingBalanceMinor: "0,00", paymentStatus: "scheduled", paymentDate: "", paidAmountMinor: "0,00", extraAmortizationMinor: "0,00", extraFgtsMinor: "0,00", installmentsReduced: "0", linkedTransactionId: "" };
 }
 function fromEntry(entry: FinancingScheduleEntry): Row {
   return { key: entry.id, id: entry.id, installmentNumber: String(entry.installment_number), dueDate: entry.due_date,
@@ -31,7 +31,7 @@ function fromEntry(entry: FinancingScheduleEntry): Row {
     chargesMinor: financingMoneyInput(entry.insurance_mip_minor + entry.insurance_dfi_minor + entry.service_fee_minor + entry.penalty_minor + entry.late_interest_minor),
     outstandingBalanceMinor: financingMoneyInput(entry.outstanding_balance_minor), paymentStatus: entry.payment_status,
     paymentDate: entry.payment_date ?? "", paidAmountMinor: financingMoneyInput(entry.paid_amount_minor),
-    extraAmortizationMinor: financingMoneyInput(entry.extra_amortization_minor ?? 0), installmentsReduced: String(entry.installments_reduced ?? 0),
+    extraAmortizationMinor: financingMoneyInput(entry.extra_amortization_minor ?? 0), extraFgtsMinor: financingMoneyInput(entry.extra_fgts_minor ?? 0), installmentsReduced: String(entry.installments_reduced ?? 0),
     linkedTransactionId: entry.linked_transaction_id ?? "" };
 }
 function monthlyDate(start: string, offset: number) {
@@ -45,7 +45,7 @@ function toWorkbookRow(row: Row): FinancingWorkbookRow {
     id: row.id, installmentNumber: Number(row.installmentNumber), dueDate: row.dueDate,
     principalMinor: parseMoneyInputToMinor(row.principalMinor), interestMinor: parseMoneyInputToMinor(row.interestMinor),
     totalAmountMinor: parseMoneyInputToMinor(row.totalAmountMinor), chargesMinor: parseMoneyInputToMinor(row.chargesMinor),
-    extraAmortizationMinor: parseMoneyInputToMinor(row.extraAmortizationMinor), outstandingBalanceMinor: parseMoneyInputToMinor(row.outstandingBalanceMinor),
+    extraAmortizationMinor: parseMoneyInputToMinor(row.extraAmortizationMinor), extraFgtsMinor: parseMoneyInputToMinor(row.extraFgtsMinor), outstandingBalanceMinor: parseMoneyInputToMinor(row.outstandingBalanceMinor),
     correctionFactor: row.correctionFactor, installmentsReduced: Number(row.installmentsReduced),
     paymentStatus: row.paymentStatus, paymentDate: row.paymentDate, paidAmountMinor: parseMoneyInputToMinor(row.paidAmountMinor),
     linkedTransactionId: row.linkedTransactionId || null,
@@ -55,7 +55,7 @@ function fromWorkbookRow(row: FinancingWorkbookRow, key: string): Row {
   return { key, id: row.id, installmentNumber: String(row.installmentNumber), dueDate: row.dueDate,
     principalMinor: financingMoneyInput(row.principalMinor), interestMinor: financingMoneyInput(row.interestMinor),
     totalAmountMinor: financingMoneyInput(row.totalAmountMinor), chargesMinor: financingMoneyInput(row.chargesMinor),
-    extraAmortizationMinor: financingMoneyInput(row.extraAmortizationMinor), outstandingBalanceMinor: financingMoneyInput(row.outstandingBalanceMinor),
+    extraAmortizationMinor: financingMoneyInput(row.extraAmortizationMinor), extraFgtsMinor: financingMoneyInput(row.extraFgtsMinor), outstandingBalanceMinor: financingMoneyInput(row.outstandingBalanceMinor),
     correctionFactor: row.correctionFactor, installmentsReduced: String(row.installmentsReduced), paymentStatus: row.paymentStatus,
     paymentDate: row.paymentDate, paidAmountMinor: financingMoneyInput(row.paidAmountMinor), linkedTransactionId: row.linkedTransactionId ?? "" };
 }
@@ -76,6 +76,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
   const [extraRow, setExtraRow] = useState(() => schedule.filter((row) => row.due_date <= (contract?.balance_date ?? "") && row.outstanding_balance_minor > 0).at(-1)?.id ?? "");
   const [extraValue, setExtraValue] = useState("");
   const [extraCount, setExtraCount] = useState("0");
+  const [extraSource, setExtraSource] = useState<"cash" | "fgts">("cash");
   const [preview, setPreview] = useState<Row[] | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [workbookBusy, setWorkbookBusy] = useState(false);
@@ -104,7 +105,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
       const result = mergeFinancingWorkbookRows(rows.map(toWorkbookRow), imported);
       const keys = new Map(rows.map((row) => [Number(row.installmentNumber), row.key]));
       setPreview(result.rows.map((row) => fromWorkbookRow(row, keys.get(row.installmentNumber) ?? rowKey())));
-      setImportSummary(`${result.updated} atualizadas · ${result.added} novas · ${result.preserved} pagas ou vinculadas preservadas. Parcelas ausentes na planilha também permanecem.`);
+      setImportSummary(`${result.updated} alteradas · ${result.added} novas · ${result.removed} sem pagamento/vínculo retiradas · ${result.preserved} pagas ou vinculadas preservadas. ${result.rows.filter((row) => row.paymentStatus === "paid").length} parcelas pagas na prévia.`);
       setMessage("Confira a prévia abaixo. Aplicar à tabela ainda não salva o contrato.");
     } catch (error) { setPreview(null); setImportSummary(null); setMessage(error instanceof Error ? error.message : "Não foi possível importar a planilha."); }
     finally { setWorkbookBusy(false); }
@@ -153,14 +154,16 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
   }
   function amortize() {
     try {
+      const addedMinor = extraValue.trim() ? parseMoneyInputToMinor(extraValue) : 0;
       const numeric = rows.map((row) => ({ ...row,
         ...Object.fromEntries(monetaryFields.map((field) => [field, parseMoneyInputToMinor(row[field])])) as Record<typeof monetaryFields[number], number>,
         installmentsReduced: Number(row.installmentsReduced), linkedTransactionId: row.linkedTransactionId || null }));
       const result = amortizeFinancingSchedule(numeric, rows.findIndex((row) => row.key === extraRow), {
-        amountMinor: extraValue.trim() ? parseMoneyInputToMinor(extraValue) : 0, installments: Number(extraCount), annualRate: rate, method,
+        amountMinor: addedMinor, installments: Number(extraCount), annualRate: rate, method,
       });
       setPreview(result.map((row) => ({ ...row,
         ...Object.fromEntries(monetaryFields.map((field) => [field, financingMoneyInput(row[field])])) as Record<typeof monetaryFields[number], string>,
+        extraFgtsMinor: row.key === extraRow && extraSource === "fgts" ? financingMoneyInput(row.extraFgtsMinor + addedMinor) : financingMoneyInput(row.extraFgtsMinor),
         installmentsReduced: String(row.installmentsReduced), linkedTransactionId: row.linkedTransactionId ?? "" })));
       setMessage("A prévia mantém as parcelas anteriores e recalcula as seguintes. Seguros e taxas são preservados; confira os reajustes do banco.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível amortizar."); }
@@ -204,12 +207,13 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
           <span className="font-medium">Editar em Excel</span>
           <button type="button" disabled={workbookBusy} onClick={downloadWorkbook} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 font-semibold disabled:opacity-50">Exportar base .xlsx</button>
           <label className="min-h-10 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold">Importar base .xlsx<input className="sr-only" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={workbookBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void loadWorkbook(file); event.target.value = ""; }} /></label>
-          <span className="text-xs text-slate-600">Pagamentos e vínculos existentes são preservados. Veja a prévia antes de aplicar e salvar.</span>
+          <span className="text-xs text-slate-600">Pagamentos e vínculos existentes são preservados. Parcelas sem pagamento/vínculo removidas do Excel saem do fluxo após aplicar a prévia e salvar.</span>
         </div>
         <p className="text-xs text-slate-600">Só valor: reduz as prestações seguintes. Só quantidade: antecipa o principal das últimas parcelas. Ambos: aplica o valor e reduz o prazo informado.</p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Amortizar após a parcela" compact><select className={cell} value={extraRow} onChange={(event) => { setPreview(null); setExtraRow(event.target.value); }}><option value="">Selecione</option>{rows.map((row) => <option key={row.key} value={row.key}>{row.installmentNumber} · {row.dueDate.split("-").reverse().join("/")}</option>)}</select></Field>
           <Field label="Valor extra" compact><input className={cell} value={extraValue} inputMode="decimal" placeholder="0,00" onChange={(event) => { setPreview(null); setExtraValue(event.target.value); }} onBlur={() => setExtraValue(normalizeFinancingMoney(extraValue))} /></Field>
+          <Field label="Origem do valor extra" compact><select className={cell} value={extraSource} onChange={(event) => { setPreview(null); setExtraSource(event.target.value as "cash" | "fgts"); }}><option value="cash">Recursos próprios</option><option value="fgts">FGTS</option></select></Field>
           <Field label="Parcelas a reduzir" compact><input className={cell} type="number" min="0" value={extraCount} onChange={(event) => { setPreview(null); setExtraCount(event.target.value); }} /></Field>
           <button type="button" onClick={amortize} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white">Prévia da amortização</button>
         </div>
@@ -221,8 +225,8 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
           <button type="button" disabled={Boolean(preview)} className="min-h-11 rounded-lg border px-3 text-sm font-semibold" onClick={() => setRows((current) => [...current, emptyRow(Math.max(0, ...current.map((row) => Number(row.installmentNumber))) + 1, rowKey())])}>+ Parcela</button>
         </div>
         <div className="max-h-[36rem] overflow-auto">
-          <table data-sortable="false" className="w-full min-w-[1840px] text-left text-xs">
-            <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr>{["Parcela", "Vencimento", "Principal", "Valor total", "Juros", "Correção", "Taxas/multas", "Amortização extra", "Parcelas reduzidas", "Saldo devedor", "Situação", "Pagamento", "Valor pago", "Lançamento vinculado", "Ações"].map((label) => <th key={label} className="px-2 py-2 font-semibold">{label}</th>)}</tr></thead>
+          <table data-sortable="false" className="w-full min-w-[1960px] text-left text-xs">
+            <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr>{["Parcela", "Vencimento", "Principal", "Valor total", "Juros", "Correção", "Taxas/multas", "Amortização extra", "FGTS da extra", "Parcelas reduzidas", "Saldo devedor", "Situação", "Pagamento", "Valor pago", "Lançamento vinculado", "Ações"].map((label) => <th key={label} className="px-2 py-2 font-semibold">{label}</th>)}</tr></thead>
             <tbody className="divide-y divide-slate-100">{displayRows.map((row) => <tr key={row.key}>
               <td className="p-1"><input aria-label="Número da parcela" className={cell} type="number" min="0" value={row.installmentNumber} disabled={Boolean(preview)} onChange={(event) => update(row.key, "installmentNumber", event.target.value)} required /></td>
               <td className="p-1"><input aria-label="Vencimento" className={cell} type="date" value={row.dueDate} disabled={Boolean(preview)} onChange={(event) => update(row.key, "dueDate", event.target.value)} required /></td>
@@ -232,6 +236,7 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
               <td className="p-1"><input aria-label="Fator de correção" className={cell} value={row.correctionFactor} disabled={Boolean(preview)} onChange={(event) => update(row.key, "correctionFactor", event.target.value)} /></td>
               <td className="p-1">{moneyCell(row, "chargesMinor", "Taxas e multas")}</td>
               <td className="p-1">{moneyCell(row, "extraAmortizationMinor", "Amortização extra")}</td>
+              <td className="p-1">{moneyCell(row, "extraFgtsMinor", "FGTS da amortização extra")}</td>
               <td className="p-1"><input aria-label="Parcelas reduzidas" className={cell} type="number" min="0" value={row.installmentsReduced} disabled={Boolean(preview)} onChange={(event) => update(row.key, "installmentsReduced", event.target.value)} /></td>
               <td className="p-1">{moneyCell(row, "outstandingBalanceMinor", "Saldo devedor")}</td>
               <td className="p-1"><select aria-label="Situação" className={cell} value={row.paymentStatus} disabled={Boolean(preview)} onChange={(event) => { try { paid(row.key, event.target.value as "paid" | "scheduled"); } catch { setMessage("Revise os valores antes de marcar o pagamento."); } }}><option value="scheduled">A vencer</option><option value="paid">Paga</option></select></td>

@@ -67,6 +67,15 @@ function transferErrorMessage(
   if (message.includes("linked_investment_transfer_is_immutable")) {
     return "Esta transferência já está vinculada a uma posição de investimento e não pode ser alterada.";
   }
+  if (message.includes("linked_investment_transfer_accounts_immutable")) {
+    return "Uma transferência vinculada a investimentos deve manter as mesmas contas e continuar realizada.";
+  }
+  if (message.includes("investment_cash_flow_reversal_conflict")) {
+    return "Há movimentos posteriores que impedem recalcular esta posição. Revise-os antes de alterar a transferência.";
+  }
+  if (message.includes("future_investment_cash_flow")) {
+    return "A data de uma transferência vinculada a investimento não pode ficar no futuro.";
+  }
   return "Não foi possível salvar a transferência.";
 }
 
@@ -187,7 +196,10 @@ export async function updateCurrentUserTransfer(
   input: TransferMutationInput,
 ) {
   const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("update_account_transfer", {
+  const linked = await supabase.from("investment_cash_flows")
+    .select("id").eq("source_transfer_id", id).limit(1);
+  if (linked.error) return { ok: false as const, message: "Não foi possível conferir os vínculos desta transferência." };
+  const arguments_ = {
     target_transfer_id: id,
     source_account_id: input.sourceAccountId,
     destination_account_id: input.destinationAccountId,
@@ -197,7 +209,10 @@ export async function updateCurrentUserTransfer(
     transfer_status: input.status,
     transfer_description: input.description,
     transfer_notes: input.notes,
-  });
+  };
+  const { error } = linked.data?.length
+    ? await supabase.rpc("update_linked_investment_transfer", arguments_)
+    : await supabase.rpc("update_account_transfer", arguments_);
 
   return error
     ? { ok: false as const, message: transferErrorMessage(error) }

@@ -102,7 +102,7 @@ export function calculateIrpf2026(months: readonly IrpfMonth[]) {
     const annualReductionMinor = incomeMinor <= 6_000_000 ? Math.min(progressiveMinor, 269_415)
       : incomeMinor <= 8_820_000 ? Math.min(progressiveMinor, Math.max(0, 842_973 - percent(incomeMinor, 95_575, 1_000_000))) : 0;
     const dueMinor = progressiveMinor - annualReductionMinor;
-    return { deductionMinor, baseMinor, progressiveMinor, annualReductionMinor, dueMinor, balanceMinor: dueMinor - withheldTaxMinor };
+    return { deductionMinor, baseMinor, progressiveMinor, annualReductionMinor, dueMinor, settlementMinor: withheldTaxMinor - dueMinor };
   }
   const complete = annualTax(completeDeductionMinor);
   const simplified = annualTax(simplifiedDeductionMinor);

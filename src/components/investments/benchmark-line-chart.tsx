@@ -18,17 +18,18 @@ export function BenchmarkLineChart({ months, series }: { months: string[]; serie
   const x = (index: number) => left + (index * (width - left - right)) / Math.max(1, months.length - 1);
   const y = (value: number) => top + ((high - value) / span) * (height - top - bottom);
   const ticks = Array.from({ length: 5 }, (_, index) => low + span * index / 4);
-  return <div className="overflow-x-auto" role="img" aria-label="Evolução acumulada de retornos em percentual">
+  return <div className="overflow-x-auto" role="img" aria-label="Retorno das séries selecionadas no período, em percentual">
     <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[540px] w-full" aria-hidden="true">
       {ticks.map((tick) => <g key={tick}><line x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} stroke="#e2e8f0" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" className="fill-slate-500 text-[10px]">{tick.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</text></g>)}
       {series.map((item) => {
         const valid = item.points.map((point, index) => point.returnBasisPoints == null ? null : { index, value: point.returnBasisPoints / 100 }).filter((point): point is { index: number; value: number } => point !== null);
         return <g key={item.code}>
-          <polyline fill="none" stroke={colors[item.code]} strokeWidth={item.code === "portfolio" ? 3 : 2} strokeLinejoin="round" strokeLinecap="round" points={valid.map((point) => `${x(point.index)},${y(point.value)}`).join(" ")} />
+          {valid.length > 1 ? <polyline fill="none" stroke={colors[item.code]} strokeWidth={item.code === "portfolio" ? 3 : 2} strokeLinejoin="round" strokeLinecap="round" points={valid.map((point) => `${x(point.index)},${y(point.value)}`).join(" ")} /> : null}
           {valid.map((point) => <circle key={point.index} cx={x(point.index)} cy={y(point.value)} r="4" fill={colors[item.code]} className="opacity-0 hover:opacity-100 focus:opacity-100"><title>{item.label} · {months[point.index].slice(0, 7)} · {point.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</title></circle>)}
         </g>;
       })}
-      {months.map((month, index) => index % Math.max(1, Math.ceil(months.length / 8)) === 0 || index === months.length - 1 ? <text key={month} x={x(index)} y={height - 8} textAnchor="middle" className="fill-slate-500 text-[10px]">{month.slice(5, 7)}/{month.slice(2, 4)}</text> : null)}
+      {months.map((month, index) => index % Math.max(1, Math.ceil(months.length / 8)) === 0 || index === months.length - 1 ? <text key={month} x={x(index)} y={height - 8} textAnchor="middle" className="fill-slate-500 text-[10px]">{month === "Início" ? month : `${month.slice(5, 7)}/${month.slice(2, 4)}`}</text> : null)}
     </svg>
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">{series.filter((item) => item.points.some((point) => point.returnBasisPoints != null)).map((item) => <span key={item.code} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" aria-hidden="true" style={{ backgroundColor: colors[item.code] }} />{item.label}</span>)}</div>
   </div>;
 }

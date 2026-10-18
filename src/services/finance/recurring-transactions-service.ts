@@ -95,7 +95,7 @@ function mutationErrorMessage(error: { message?: string } | null) {
 
 export async function listCurrentUserRecurringTransactions() {
   const { supabase, user } = await requireUser();
-  const [recurrencesResult, accountsResult, categoriesResult, groupsResult] =
+  const [recurrencesResult, accountsResult] =
     await Promise.all([
       supabase
         .from("recurring_transactions")
@@ -109,28 +109,14 @@ export async function listCurrentUserRecurringTransactions() {
         .select("id, name, currency, archived_at")
         .eq("user_id", user.id)
         .order("name"),
-      supabase
-        .from("categories")
-        .select("id, group_id, parent_id, name, kind, context, archived_at")
-        .eq("user_id", user.id)
-        .order("name"),
-      supabase
-        .from("category_groups")
-        .select("id, name, kind, context, archived_at")
-        .eq("user_id", user.id)
-        .order("name"),
     ]);
 
   return {
     recurrences: withSubscriptionDefaults(recurrencesResult.data ?? []),
     accounts: accountsResult.data ?? [],
-    categories: categoriesResult.data ?? [],
-    groups: groupsResult.data ?? [],
     hasError: Boolean(
       recurrencesResult.error ||
-        accountsResult.error ||
-        categoriesResult.error ||
-        groupsResult.error,
+        accountsResult.error,
     ),
   };
 }

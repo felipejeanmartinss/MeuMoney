@@ -1,5 +1,6 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
+import { categoryAndDescendantIds } from "@/domain/categories";
 import type { PendingRecurrenceMatch } from "@/domain/account-register";
 import {
   isMissingSubscriptionColumn,
@@ -52,9 +53,6 @@ export async function listCurrentUserTransactions(
   }
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
-  if (filters.categoryId) {
-    query = query.eq("category_id", filters.categoryId);
-  }
   if (filters.uncategorized) {
     query = query.eq("origin_type", "manual").is("category_id", null);
   }
@@ -66,9 +64,8 @@ export async function listCurrentUserTransactions(
     query = query.eq("is_active", filters.activity === "active");
   }
 
-  const [transactionsResult, accountsResult, categoriesResult, groupsResult] =
+  const [accountsResult, categoriesResult, groupsResult] =
     await Promise.all([
-      query,
       supabase
         .from("accounts")
         .select("id, name, currency, archived_at")
@@ -88,13 +85,31 @@ export async function listCurrentUserTransactions(
         .order("name"),
     ]);
 
+  if (filters.categoryId) {
+    query = query.in("category_id", categoryAndDescendantIds(filters.categoryId, categoriesResult.data ?? []));
+  }
+  const transactionsResult = await query;
+  const transactionIds = (transactionsResult.data ?? []).map((transaction) => transaction.id);
+  const [investmentEntries, linkedIncomes] = transactionIds.length
+    ? await Promise.all([
+        supabase.from("investment_cash_flows")
+          .select("id,position_id,transaction_id,source_transaction_id")
+          .eq("user_id", user.id).in("transaction_id", transactionIds),
+        supabase.from("investment_cash_flows")
+          .select("id,position_id,transaction_id,source_transaction_id")
+          .eq("user_id", user.id).in("source_transaction_id", transactionIds),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+
   return {
     transactions: withSubscriptionDefaults(transactionsResult.data ?? []),
+    investmentLinks: [...(investmentEntries.data ?? []), ...(linkedIncomes.data ?? [])],
     accounts: accountsResult.data ?? [],
     categories: categoriesResult.data ?? [],
     groups: groupsResult.data ?? [],
     hasError: Boolean(
       transactionsResult.error ||
+        investmentEntries.error || linkedIncomes.error ||
         accountsResult.error ||
         categoriesResult.error ||
         groupsResult.error,
@@ -158,9 +173,13 @@ export async function getCurrentUserTransaction(id: string) {
     .eq("origin_type", "manual")
     .maybeSingle();
 
+  const investmentLink = data ? await supabase.from("investment_cash_flows")
+    .select("id,position_id").eq("user_id", user.id)
+    .eq("source_transaction_id", id).maybeSingle() : null;
   return {
     transaction: data ? withSubscriptionDefaults([data])[0] : null,
-    hasError: Boolean(error),
+    investmentLink: investmentLink?.data ?? null,
+    hasError: Boolean(error || investmentLink?.error),
   };
 }
 
@@ -207,6 +226,32 @@ export async function getCurrentUserAutomaticTransaction(id: string) {
     .in("origin_type", ["system", "credit_card_invoice_payment"])
     .maybeSingle();
   return { transaction: data, hasError: Boolean(error) };
+}
+
+export async function getCurrentUserRecurringOccurrence(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("transactions")
+    .select("id,account_id,description,amount_minor,transaction_date,notes,status,scheduled_date")
+    .eq("user_id", user.id).eq("id", id).eq("is_active", true)
+    .eq("origin_type", "system").not("recurring_transaction_id", "is", null)
+    .maybeSingle();
+  return { transaction: data, hasError: Boolean(error) };
+}
+
+export async function updateCurrentUserRecurringOccurrence(id: string, input: {
+  description: string; amountMinor: number; transactionDate: string; notes: string | null;
+}) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("update_recurring_occurrence", {
+    target_transaction_id: id,
+    target_description: input.description,
+    target_amount_minor: input.amountMinor,
+    target_transaction_date: input.transactionDate,
+    target_notes: input.notes,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const };
 }
 
 export async function updateCurrentUserAutomaticTransactionDate(

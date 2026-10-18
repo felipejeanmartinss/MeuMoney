@@ -627,6 +627,41 @@ export async function deleteCurrentUserInvestmentCashFlow(id: string) {
     : { ok: true as const, positionId: data };
 }
 
+export async function getCurrentUserInvestmentCashFlow(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("investment_cash_flows")
+    .select("id,position_id,cash_flow_type,income_type,amount_minor,quantity,cash_flow_date,notes,transaction_id,source_transaction_id,source_transfer_id")
+    .eq("id", id).eq("user_id", user.id).maybeSingle();
+  if (error || !data) return { cashFlow: data, sourceDescription: null, hasError: Boolean(error) };
+  const sourceId = data.transaction_id ?? data.source_transaction_id;
+  const source = sourceId ? await supabase.from("transactions")
+    .select("description").eq("id", sourceId).eq("user_id", user.id).maybeSingle() : null;
+  return {
+    cashFlow: data,
+    sourceDescription: source?.data?.description ?? null,
+    hasError: Boolean(source?.error || (sourceId && !source?.data)),
+  };
+}
+
+export async function updateCurrentUserInvestmentCashFlow(id: string, input: InvestmentCashFlowMutationInput & { description: string | null }) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("update_investment_cash_flow", {
+    target_cash_flow_id: id,
+    target_amount_minor: input.amountMinor,
+    target_quantity: input.quantity,
+    target_cash_flow_date: input.cashFlowDate,
+    target_description: input.description,
+    target_notes: input.notes,
+  });
+  const message = error?.message?.toLowerCase() ?? "";
+  if (message.includes("investment_cash_flow_reversal_conflict")) {
+    return { ok: false as const, message: "Este valor depende de movimentos posteriores. Revise-os antes de alterar este lançamento." };
+  }
+  return error || !data
+    ? { ok: false as const, message: "Não foi possível atualizar o movimento e seu vínculo financeiro." }
+    : { ok: true as const, positionId: data };
+}
+
 export async function deleteCurrentUserInvestmentPositionSnapshot(id: string) {
   const { supabase } = await requireUser();
   const { data, error } = await supabase.rpc(

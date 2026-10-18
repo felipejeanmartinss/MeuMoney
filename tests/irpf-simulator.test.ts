@@ -32,7 +32,13 @@ describe("IRPF simulator", () => {
     expect(result.deductiblePensionMinor).toBe(1_200_000);
     expect(result.complete.deductionMinor).toBe(1_700_000);
     expect(result.simplified.deductionMinor).toBe(1_764_000);
-    expect(result.simplified.balanceMinor).toBe(result.simplified.dueMinor - 100_000);
+    expect(result.simplified.settlementMinor).toBe(100_000 - result.simplified.dueMinor);
+    expect(result.simplified.settlementMinor).toBeLessThan(0);
+    const refund = calculateIrpf2026(buildIrpfMonths(2026, [
+      { id: "small-income", date: "2026-01-01", kind: "salary", amountMinor: 100_000 },
+      { id: "withheld", date: "2026-01-01", kind: "withheld_tax", amountMinor: 10_000 },
+    ]));
+    expect(refund.simplified.settlementMinor).toBe(10_000);
   });
   it("applies the annual 2026 reduction to low taxable income", () => {
     const months = buildIrpfMonths(2026, [{ id: "salary", date: "2026-01-01", kind: "salary", amountMinor: 5_000_000 }]);

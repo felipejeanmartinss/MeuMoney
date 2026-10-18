@@ -666,6 +666,7 @@ export type FinancingImportJob = {
 
 export type FinancingScheduleEntry = {
   extra_amortization_minor?: number;
+  extra_fgts_minor?: number;
   installments_reduced?: number;
   linked_transaction_id?: string | null;
   id: string;
@@ -901,6 +902,23 @@ export type CriticalOperationEvent = {
 
 export type FinancialReportEntryBySource = FinancialReportCategoryMonthly & {
   source_key: string;
+};
+
+export type FinancialReportEntryDetail = {
+  basis: FinancialReportBasis;
+  user_id: string;
+  reference_month: string;
+  entry_date: string;
+  currency: SupportedCurrency;
+  section: "income" | "expense";
+  row_id: string;
+  category_id: string | null;
+  context: FinancialContext;
+  source_key: string;
+  entry_kind: "transaction" | "investment_income" | "card_installment" | "card_payment";
+  entry_id: string;
+  description: string;
+  amount_minor: number;
 };
 
 export type SavedFinancialReport = {
@@ -1348,6 +1366,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      financing_amortization_sources: {
+        Row: { contract_id: string; installment_number: number; fgts_amount_minor: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       financing_extra_amortizations: {
         Row: FinancingExtraAmortization;
         Insert: never;
@@ -1500,6 +1524,10 @@ export type Database = {
         Row: FinancialReportEntryBySource;
         Relationships: [];
       };
+      financial_report_entry_details: {
+        Row: FinancialReportEntryDetail;
+        Relationships: [];
+      };
       financial_dashboard_upcoming_recurrences: {
         Row: FinancialDashboardUpcomingRecurrence;
         Relationships: [];
@@ -1551,6 +1579,16 @@ export type Database = {
         Args: { target_transaction_id: string; target_transaction_date: string };
         Returns: string;
       };
+        update_recurring_occurrence: {
+          Args: {
+            target_transaction_id: string;
+            target_description: string;
+            target_amount_minor: number;
+            target_transaction_date: string;
+            target_notes: string | null;
+          };
+          Returns: string;
+        };
       confirm_recurring_transaction: {
         Args: {
           target_transaction_id: string;
@@ -1628,6 +1666,17 @@ export type Database = {
           target_quantity: string | null;
           target_cash_flow_date: string;
           target_notes?: string | null;
+        };
+        Returns: string;
+      };
+      update_investment_cash_flow: {
+        Args: {
+          target_cash_flow_id: string;
+          target_amount_minor: number;
+          target_quantity: string | null;
+          target_cash_flow_date: string;
+          target_description: string | null;
+          target_notes: string | null;
         };
         Returns: string;
       };
@@ -1854,6 +1903,10 @@ export type Database = {
         Args: { target_contract_id: string | null; expected_updated_at: string | null; target_contract: Json; target_schedule: Json };
         Returns: string;
       };
+      save_financing_contract_with_sources: {
+        Args: { target_contract_id: string | null; expected_updated_at: string | null; target_contract: Json; target_schedule: Json };
+        Returns: string;
+      };
       cancel_financing_import: {
         Args: { target_job_id: string };
         Returns: boolean;
@@ -1917,6 +1970,20 @@ export type Database = {
           transfer_status: TransactionStatus;
           transfer_description?: string | null;
           transfer_notes?: string | null;
+        };
+        Returns: boolean;
+      };
+      update_linked_investment_transfer: {
+        Args: {
+          target_transfer_id: string;
+          source_account_id: string;
+          destination_account_id: string;
+          source_amount_minor: number;
+          destination_amount_minor: number;
+          transaction_date: string;
+          transfer_status: TransactionStatus;
+          transfer_description: string | null;
+          transfer_notes: string | null;
         };
         Returns: boolean;
       };

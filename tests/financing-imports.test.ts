@@ -263,8 +263,58 @@ describe("financing PDF imports", () => {
       result.rows.at(-1)?.interestMinor ?? 0,
     );
     expect(result.rows.at(-1)?.balanceMinor).toBe(0);
-    expect(result.totalExtraAmortizationMinor).toBeGreaterThan(0);
+    expect(result.totalExtraAmortizationMinor).toBe(10_000);
+    expect(result.rows[0].extraAmortizationMinor).toBe(10_000);
+    expect(result.rows.slice(1).every((row) => row.extraAmortizationMinor === 0)).toBe(true);
     expect(result.totalPrincipalMinor).toBe(120_000);
+  });
+
+  it.each(["sac", "price"] as const)("applies one extra payment and keeps the remaining term when reducing %s payments", (method) => {
+    const base = { principalMinor: 1_200_000, annualRatePercent: 7.07, termMonths: 24, method };
+    const withoutExtra = simulateFinancing(base);
+    const scenario = simulateFinancing({ ...base, extraAmortizationMinor: 120_000, extraAmortizationMode: "payment" });
+
+    expect(scenario.rows).toHaveLength(withoutExtra.rows.length);
+    expect(scenario.rows[0].paymentMinor).toBe(withoutExtra.rows[0].paymentMinor);
+    expect(scenario.rows[0].balanceMinor).toBe(withoutExtra.rows[0].balanceMinor - 120_000);
+    expect(scenario.rows[1].paymentMinor).toBeLessThan(withoutExtra.rows[1].paymentMinor);
+    expect(scenario.rows.slice(1).every((row) => row.extraAmortizationMinor === 0)).toBe(true);
+    expect(scenario.totalPrincipalMinor).toBe(base.principalMinor);
+    expect(scenario.totalInterestMinor).toBeLessThan(withoutExtra.totalInterestMinor);
+  });
+
+  it("reduces the remaining term after a single extra payment", () => {
+    const base = { principalMinor: 1_200_000, annualRatePercent: 7.07, termMonths: 24, method: "sac" as const };
+    const withoutExtra = simulateFinancing(base);
+    const scenario = simulateFinancing({ ...base, extraAmortizationMinor: 180_000, extraAmortizationMode: "term" });
+
+    expect(scenario.rows.length).toBeLessThan(withoutExtra.rows.length);
+    expect(scenario.totalExtraAmortizationMinor).toBe(180_000);
+    expect(scenario.rows.at(-1)?.balanceMinor).toBe(0);
+    expect(scenario.totalPrincipalMinor).toBe(base.principalMinor);
+    expect(scenario.totalInterestMinor).toBeLessThan(withoutExtra.totalInterestMinor);
+  });
+
+  it("accepts exact payoff after the next installment and rejects excess", () => {
+    const base = { principalMinor: 120_000, annualRatePercent: 12, termMonths: 12, method: "sac" as const };
+    const withoutExtra = simulateFinancing(base);
+    const payoff = withoutExtra.rows[0].balanceMinor;
+
+    expect(simulateFinancing({ ...base, extraAmortizationMinor: payoff }).rows).toHaveLength(1);
+    expect(() => simulateFinancing({ ...base, extraAmortizationMinor: payoff + 1 })).toThrow(/exceder o saldo/);
+  });
+
+  it("uses the actual next installment instead of inventing a first payment", () => {
+    const input = { principalMinor: 1_200_000, annualRatePercent: 7.07, termMonths: 24, method: "sac" as const,
+      nextPrincipalMinor: 40_000, nextInterestMinor: 7_070 };
+    const baseline = simulateFinancing(input);
+    const scenario = simulateFinancing({ ...input, extraAmortizationMinor: 100_000, extraAmortizationMode: "payment" });
+
+    expect(baseline.rows[0]).toMatchObject({ principalMinor: 40_000, interestMinor: 7_070, paymentMinor: 47_070, balanceMinor: 1_160_000 });
+    expect(scenario.rows[0]).toMatchObject({ principalMinor: 40_000, interestMinor: 7_070, paymentMinor: 47_070, extraAmortizationMinor: 100_000, balanceMinor: 1_060_000 });
+    expect(scenario.rows.slice(1).every((row) => row.extraAmortizationMinor === 0)).toBe(true);
+    expect(scenario.rows).toHaveLength(baseline.rows.length);
+    expect(() => simulateFinancing({ ...input, nextPrincipalMinor: 1_200_001 })).toThrow(/principal e os juros/);
   });
 
   it("simulates PRICE with stable payments when no extra is applied", () => {

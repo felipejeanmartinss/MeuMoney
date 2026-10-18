@@ -21,16 +21,15 @@ import {
   RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_STATE_LABELS,
 } from "@/domain/recurring-transactions";
-import { getCategoryQualifiedName } from "@/domain/categories";
-import { TRANSACTION_TYPE_LABELS } from "@/domain/transactions";
 import { getSubscriptionOverview, listCurrentUserRecurringTransactions } from "@/services/finance/recurring-transactions-service";
 import { listCurrentUserRecurringTransfers } from "@/services/finance/recurring-transfers-service";
+import { listCurrentUserCreditCards } from "@/services/finance/credit-cards-service";
 import type {
   RecurringTransactionState,
   SupportedCurrency,
   TransactionType,
 } from "@/types/database";
-import { toIsoDate } from "@/utils/dates";
+import { currentIsoDate, toIsoDate } from "@/utils/dates";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
 export const metadata = { title: "Recorrências" };
@@ -70,10 +69,6 @@ function referenceMonthEnd(referenceMonth: string) {
   const [year, month] = referenceMonth.split("-").map(Number);
   const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return `${referenceMonth}-${String(day).padStart(2, "0")}`;
-}
-
-function stableColorIndex(value: string) {
-  return [...value].reduce((total, character) => total + character.charCodeAt(0), 0) % 6;
 }
 
 function CurrencyAmounts({
@@ -181,18 +176,18 @@ export default async function RecurringTransactionsPage({
 }) {
   const rawParams = await searchParams;
   const [
-    { recurrences, accounts, categories, groups, hasError },
+    { recurrences, accounts, hasError },
     subscriptionOverview,
     transferOverview,
+    cardOverview,
   ] = await Promise.all([
     listCurrentUserRecurringTransactions(),
     getSubscriptionOverview(),
     listCurrentUserRecurringTransfers(),
+    listCurrentUserCreditCards(),
   ]);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
-  const categoryById = new Map(
-    categories.map((category) => [category.id, category]),
-  );
+  const cardById = new Map(cardOverview.cards.map((card) => [card.id, card]));
   const asString = (value: string | string[] | undefined) =>
     typeof value === "string" ? value : undefined;
   const period = asString(rawParams.period);
@@ -202,7 +197,7 @@ export default async function RecurringTransactionsPage({
     | "active"
     | "suspended"
     | undefined;
-  const today = toIsoDate(new Date());
+  const today = currentIsoDate();
   const timelineMonth =
     period && /^\d{4}-\d{2}$/.test(period) ? period : currentReferenceMonth();
   const groupFilter = asString(rawParams.group) === "recurrence" ? "recurrence" : "subscription";
@@ -252,6 +247,17 @@ export default async function RecurringTransactionsPage({
   }
   attentionCount += filteredTransfers.filter((transfer) =>
     transfer.is_active && transfer.next_occurrence < today).length;
+  if (!typeFilter || typeFilter === "expense") {
+    for (const invoice of cardOverview.invoices) {
+      if (invoice.due_date < today || invoice.total_amount <= 0 ||
+        (period && !invoice.due_date.startsWith(period))) continue;
+      const card = cardById.get(invoice.credit_card_id);
+      if (!card || (accountFilter && card.linked_account_id !== accountFilter) ||
+        (stateFilter && stateFilter !== "active")) continue;
+      const currency = card.currency as SupportedCurrency;
+      upcomingExpense.set(currency, (upcomingExpense.get(currency) ?? 0) + invoice.total_amount);
+    }
+  }
 
   const timelineStart = `${timelineMonth}-01`;
   const timelineEnd = referenceMonthEnd(timelineMonth);
@@ -289,7 +295,7 @@ export default async function RecurringTransactionsPage({
             CURRENCY_LOCALES[currency],
           ),
           transactionType: recurrence.transaction_type,
-          colorIndex: stableColorIndex(recurrence.account_id),
+          href: `/recurring-transactions/${recurrence.id}/edit`,
         }),
       );
     })
@@ -310,9 +316,30 @@ export default async function RecurringTransactionsPage({
       accountName: `${accountById.get(transfer.source_account_id)?.name ?? "Conta"} → ${accountById.get(transfer.destination_account_id)?.name ?? "Conta"}`,
       amountLabel: formatMoney(transfer.amount_minor,
         (accountById.get(transfer.source_account_id)?.currency ?? "BRL") as SupportedCurrency),
-      transactionType: "transfer" as const, colorIndex: stableColorIndex(transfer.id),
+      transactionType: "transfer" as const,
+      href: `/recurring-transactions/transfers/${transfer.id}/edit`,
     })));
-  const timelineEvents = [...transactionTimelineEvents, ...transferTimelineEvents]
+  const cardTimelineEvents: RecurrenceCalendarEvent[] = cardOverview.invoices
+    .filter((invoice) => invoice.due_date >= timelineStart && invoice.due_date <= timelineEnd &&
+      invoice.total_amount > 0 && ["open", "closed", "overdue"].includes(invoice.status))
+    .flatMap((invoice) => {
+      const card = cardById.get(invoice.credit_card_id);
+      if (!card || (accountFilter && card.linked_account_id !== accountFilter) ||
+        (typeFilter && typeFilter !== "expense") || (stateFilter && stateFilter !== "active")) return [];
+      const accountName = accountById.get(card.linked_account_id ?? "")?.name ?? "Escolha uma conta ao pagar";
+      return [{
+        id: `card-invoice:${invoice.id}`,
+        date: invoice.due_date,
+        description: `Fatura ${card.name}${invoice.status === "open" ? " · fechar para prever pagamento" : " · pagamento previsto"}`,
+        accountName: `${accountName} · fecha ${formatFinancialDate(invoice.closing_date)}`,
+        amountLabel: formatMoney(invoice.total_amount, card.currency as SupportedCurrency),
+        transactionType: "expense" as const,
+        href: `/credit-cards/${card.id}/invoices/${invoice.id}`,
+        invoice: { cardId: card.id, invoiceId: invoice.id, closingDate: invoice.closing_date,
+          status: invoice.status, hasLinkedAccount: Boolean(card.linked_account_id) },
+      }];
+    });
+  const timelineEvents = [...transactionTimelineEvents, ...transferTimelineEvents, ...cardTimelineEvents]
     .sort((left, right) => left.date.localeCompare(right.date) ||
       left.description.localeCompare(right.description, "pt-BR"));
   const reviewableRecurrences = recurrences.filter(
@@ -336,13 +363,13 @@ export default async function RecurringTransactionsPage({
   return (
     <main className="app-page">
       <PageHeader title="Recorrências" actions={<div className="flex flex-wrap gap-2">
-        <Link href="/recurring-transactions/transfers/new"
-          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-700 px-4 font-bold text-emerald-800 hover:bg-emerald-50">
-          Nova transferência recorrente
-        </Link>
+        {!transferOverview.unavailable ? <Link href="/recurring-transactions/transfers/new"
+          className="inline-flex min-h-10 items-center justify-center rounded-xl border border-emerald-700 px-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
+          Nova transferência
+        </Link> : null}
         <Link
           href="/recurring-transactions/new"
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800"
+          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800"
         >
           Nova recorrência
         </Link></div>
@@ -361,17 +388,17 @@ export default async function RecurringTransactionsPage({
         </p>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="grid gap-2 sm:grid-cols-3">
+        <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <p className="text-sm font-bold text-slate-500">Próximas entradas</p>
           <CurrencyAmounts values={upcomingIncome} />
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <p className="text-sm font-bold text-slate-500">Próximas saídas</p>
           <CurrencyAmounts values={upcomingExpense} />
         </article>
         <article
-          className={`rounded-2xl border p-5 shadow-sm ${
+          className={`rounded-xl border p-3 shadow-sm ${
             attentionCount
               ? "border-amber-200 bg-amber-50"
               : "border-slate-200 bg-white"
@@ -381,9 +408,7 @@ export default async function RecurringTransactionsPage({
           <p className="mt-2 text-2xl font-black text-slate-950">
             {attentionCount}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Itens ativos com próxima ocorrência vencida.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Próxima data vencida</p>
         </article>
       </section>
 
@@ -464,13 +489,9 @@ export default async function RecurringTransactionsPage({
         </form>
       </details>
 
-      <section className="grid gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:grid-cols-[1fr_auto] sm:items-end">
+      <section className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <div>
           <h2 className="font-extrabold text-emerald-950">Gerar previsões</h2>
-          <p className="mt-1 text-sm text-emerald-900">
-            O processamento continua idempotente: repetir o período não cria
-            duplicidades.
-          </p>
         </div>
         <form
           action={generateRecurringTransactions}
@@ -555,6 +576,7 @@ export default async function RecurringTransactionsPage({
           Não foi possível carregar as recorrências. Tente novamente.
         </p>
       ) : null}
+      {transferOverview.unavailable ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Transferências recorrentes exigem a atualização pendente do banco de dados; as demais recorrências continuam disponíveis.</p> : null}
 
       {!hasError && !transferOverview.hasError && filtered.length === 0 && filteredTransfers.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
@@ -569,97 +591,14 @@ export default async function RecurringTransactionsPage({
 
       {filtered.length > 0 ? (
         <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="hidden overflow-visible lg:block">
-            <table className="w-full border-collapse text-left text-sm">
-              <caption className="sr-only">
-                Agenda de receitas e despesas recorrentes
-              </caption>
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-bold">Descrição</th>
-                  <th className="px-4 py-3 font-bold">Valor-base</th>
-                  <th className="px-4 py-3 font-bold">Frequência</th>
-                  <th className="px-4 py-3 font-bold">Regra</th>
-                  <th className="px-4 py-3 font-bold">Próxima</th>
-                  <th className="px-4 py-3 font-bold">Conta</th>
-                  <th className="px-4 py-3 font-bold">Tipo</th>
-                  <th className="px-4 py-3 font-bold">Situação</th>
-                  <th className="px-5 py-3 text-right font-bold">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((recurrence) => {
-                  const account = accountById.get(recurrence.account_id);
-                  const currency =
-                    (account?.currency as SupportedCurrency | undefined) ??
-                    "BRL";
-                  const category = categoryById.get(recurrence.category_id);
-                  const state = recurrenceState(recurrence);
-                  return (
-                    <tr key={recurrence.id}>
-                      <td className="max-w-64 px-5 py-4">
-                        <p className="truncate font-bold text-slate-950">
-                          {recurrence.description}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {category
-                            ? getCategoryQualifiedName(
-                                category,
-                                categories,
-                                groups,
-                              )
-                            : "Categoria indisponível"}
-                        </p>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-4 font-extrabold text-slate-950">
-                        {formatMoney(
-                          recurrence.amount_minor,
-                          currency,
-                          CURRENCY_LOCALES[currency],
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-slate-600">
-                        {RECURRENCE_FREQUENCY_LABELS[recurrence.frequency]}
-                      </td>
-                      <td className="px-4 py-4 text-slate-600">
-                        {recurrence.is_amount_fixed
-                          ? RECURRENCE_AMOUNT_MODE_LABELS.fixed
-                          : RECURRENCE_AMOUNT_MODE_LABELS.approximate}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-4 text-slate-600">
-                        {formatFinancialDate(recurrence.next_occurrence)}
-                      </td>
-                      <td className="px-4 py-4 text-slate-600">
-                        {account?.name ?? "Conta indisponível"}
-                      </td>
-                      <td className="px-4 py-4 text-slate-600">
-                        {TRANSACTION_TYPE_LABELS[recurrence.transaction_type]}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                          {RECURRENCE_STATE_LABELS[state]}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end">
-                          <RecurrenceMenu id={recurrence.id} state={state} nextOccurrence={recurrence.next_occurrence} amountMinor={recurrence.amount_minor} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid divide-y divide-slate-100 lg:hidden">
+          <div className="grid divide-y divide-slate-100">
             {filtered.map((recurrence) => {
               const account = accountById.get(recurrence.account_id);
               const currency =
                 (account?.currency as SupportedCurrency | undefined) ?? "BRL";
               const state = recurrenceState(recurrence);
               return (
-                <article key={recurrence.id} className="grid gap-3 p-5">
+                <article key={recurrence.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h2 className="truncate font-extrabold text-slate-950">
@@ -756,7 +695,7 @@ export default async function RecurringTransactionsPage({
             Passe o mouse por uma ocorrência para destacar sua data no calendário.
           </p>
         </div>
-        <RecurrenceCalendar month={timelineMonth} events={timelineEvents} />
+        <RecurrenceCalendar month={timelineMonth} events={timelineEvents} today={today} />
       </section>
       <section className="rounded-xl border border-slate-200 bg-white p-3" aria-labelledby="subscriptions-title">
         <div className="flex flex-wrap items-center justify-between gap-2">

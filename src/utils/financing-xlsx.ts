@@ -5,8 +5,22 @@ import { parseMoneyInputToMinor } from "@/domain/money";
 const MARKER = "MEUMONEY_FINANCING_V1";
 const HEADERS = ["Parcela", "Vencimento", "Principal (R$)", "Juros (R$)", "Valor total (R$)",
   "Taxas/multas (R$)", "Amortização extra (R$)", "Saldo devedor (R$)", "Fator de correção",
-  "Parcelas reduzidas", "Situação (histórico)", "Pagamento (histórico)", "Valor pago (histórico)", "ID interno"];
+  "Parcelas reduzidas", "Situação (histórico)", "Pagamento (histórico)", "Valor pago (histórico)", "ID interno", "FGTS da amortização extra (R$)"];
 const moneyKeys = ["principalMinor", "interestMinor", "totalAmountMinor", "chargesMinor", "extraAmortizationMinor", "outstandingBalanceMinor"] as const;
+
+function excelDate(value: string) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function dateValue(value: unknown) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new Error("Data inválida na planilha.");
+    return value.toISOString().slice(0, 10);
+  }
+  return String(cellValue(value)).trim();
+}
 
 function cellValue(value: unknown): string | number {
   if (typeof value === "string" || typeof value === "number") return value;
@@ -40,7 +54,7 @@ export async function exportFinancingWorkbook(rows: readonly FinancingWorkbookRo
   const sheet = workbook.addWorksheet("Parcelas", { views: [{ state: "frozen", ySplit: 4 }] });
   sheet.getCell("A1").value = MARKER;
   sheet.getCell("A2").value = `Fluxo de financiamento · ${contractName}`;
-  sheet.getCell("A3").value = "Edite as parcelas futuras. Pagas e vinculadas serão preservadas; importar gera prévia antes de salvar.";
+  sheet.getCell("A3").value = "Parcelas pagas/vinculadas na aplicação são preservadas. Linhas sem pagamento/vínculo removidas serão excluídas após conferir a prévia e salvar.";
   sheet.getRow(4).values = HEADERS;
   sheet.getRow(4).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(4).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF047857" } };
@@ -49,13 +63,16 @@ export async function exportFinancingWorkbook(rows: readonly FinancingWorkbookRo
   for (const row of rows) {
     // An unsaved contract starts with a blank installment: export it as a fillable template.
     if (row.dueDate) validateFinancingWorkbookRow(row);
-    const excelRow = sheet.addRow([row.installmentNumber, row.dueDate,
+    const excelRow = sheet.addRow([row.installmentNumber, excelDate(row.dueDate),
       ...moneyKeys.map((key) => row[key] / 100), row.correctionFactor, row.installmentsReduced,
-      row.paymentStatus === "paid" ? "Paga" : "A vencer", row.paymentDate, row.paidAmountMinor / 100, row.id ?? ""]);
+      row.paymentStatus === "paid" ? "Paga" : "A vencer", excelDate(row.paymentDate), row.paidAmountMinor / 100, row.id ?? "", row.extraFgtsMinor / 100]);
+    excelRow.getCell(2).numFmt = "dd/mm/yyyy";
+    excelRow.getCell(12).numFmt = "dd/mm/yyyy";
     for (let column = 3; column <= 8; column += 1) excelRow.getCell(column).numFmt = '#,##0.00';
     excelRow.getCell(13).numFmt = '#,##0.00';
+    excelRow.getCell(15).numFmt = '#,##0.00';
   }
-  sheet.autoFilter = { from: "A4", to: "M4" };
+  sheet.autoFilter = { from: "A4", to: "O4" };
   return workbook.xlsx.writeBuffer();
 }
 
@@ -66,7 +83,8 @@ export async function importFinancingWorkbook(file: File): Promise<FinancingWork
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
   const sheet = workbook.getWorksheet("Parcelas");
-  if (!sheet || sheet.getCell("A1").value !== MARKER || HEADERS.some((header, index) => sheet.getRow(4).getCell(index + 1).value !== header)) {
+  if (!sheet || sheet.getCell("A1").value !== MARKER || HEADERS.slice(0, 14).some((header, index) => sheet.getRow(4).getCell(index + 1).value !== header)
+    || (sheet.getRow(4).getCell(15).value != null && sheet.getRow(4).getCell(15).value !== HEADERS[14])) {
     throw new Error("Use a base Excel exportada pelo MeuMoney, sem alterar os cabeçalhos.");
   }
   if (sheet.rowCount > 1204) throw new Error("A planilha excede 1.200 parcelas.");
@@ -81,12 +99,12 @@ export async function importFinancingWorkbook(file: File): Promise<FinancingWork
       const row: FinancingWorkbookRow = {
         id: String(get(14)).trim() || undefined,
         installmentNumber: integer(cells.getCell(1).value, "Parcela"),
-        dueDate: String(get(2)).trim(),
+        dueDate: dateValue(cells.getCell(2).value),
         principalMinor: moneyToMinor(cells.getCell(3).value), interestMinor: moneyToMinor(cells.getCell(4).value),
         totalAmountMinor: moneyToMinor(cells.getCell(5).value), chargesMinor: moneyToMinor(cells.getCell(6).value),
-        extraAmortizationMinor: moneyToMinor(cells.getCell(7).value), outstandingBalanceMinor: moneyToMinor(cells.getCell(8).value),
+        extraAmortizationMinor: moneyToMinor(cells.getCell(7).value), extraFgtsMinor: moneyToMinor(cells.getCell(15).value), outstandingBalanceMinor: moneyToMinor(cells.getCell(8).value),
         correctionFactor: String(get(9)).trim(), installmentsReduced: integer(cells.getCell(10).value, "Parcelas reduzidas"),
-        paymentStatus: status === "Paga" ? "paid" : "scheduled", paymentDate: String(get(12)).trim(),
+        paymentStatus: status === "Paga" ? "paid" : "scheduled", paymentDate: dateValue(cells.getCell(12).value),
         paidAmountMinor: moneyToMinor(cells.getCell(13).value), linkedTransactionId: null,
       };
       validateFinancingWorkbookRow(row);

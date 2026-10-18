@@ -24,8 +24,12 @@ export type MonthlyCheckinData = {
     unclassifiedCount: number;
     unreconciledCount: number;
     upcomingRecurrencesCount: number;
+    unclassifiedItems: Array<{ id: string; accountId: string; accountName: string; description: string; date: string }>;
+    unreconciledItems: Array<{ id: string; accountId: string; accountName: string; description: string; date: string }>;
+    upcomingRecurrences: Array<{ id: string; description: string; date: string; accountName: string }>;
     upcomingInvoices: Array<{
       id: string;
+      credit_card_id: string;
       credit_card_name: string;
       due_date: string;
       outstanding_amount_minor: number;
@@ -47,16 +51,21 @@ export async function getCurrentUserMonthlyCheckin(referenceMonth: string): Prom
   const { supabase, user } = await requireUser();
   const monthEnd = nextMonth(referenceMonth);
   const today = currentIsoDate();
-  const [checkinResult, unclassifiedResult, unreconciledTransactions, unreconciledTransfers, recurrencesResult, invoicesResult, budgetResult, positionsResult] = await Promise.all([
+  const [checkinResult, unclassifiedResult, unreconciledTransactions, unreconciledTransfers, recurrencesResult, invoicesResult, budgetResult, positionsResult, accountsResult] = await Promise.all([
     supabase.from("monthly_financial_checkins").select("id, user_id, reference_month, status, observation, closed_at, created_at, updated_at").eq("user_id", user.id).eq("reference_month", referenceMonth).maybeSingle(),
-    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).eq("origin_type", "manual").is("category_id", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd),
-    supabase.from("transactions").select("id").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd).lte("transaction_date", today),
-    supabase.from("transfer_entries").select("id").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd).lte("transaction_date", today),
-    supabase.from("financial_dashboard_upcoming_recurrences").select("id").eq("user_id", user.id).gte("next_occurrence", today).lte("next_occurrence", addDays(today, 30)),
-    supabase.from("financial_dashboard_invoices").select("id, credit_card_name, due_date, outstanding_amount_minor, currency").eq("user_id", user.id).gte("due_date", today).lte("due_date", addDays(today, 45)).in("effective_status", ["open", "closed", "overdue"]).order("due_date").limit(12),
+    supabase.from("transactions").select("id, account_id, description, transaction_date").eq("user_id", user.id).eq("is_active", true).eq("origin_type", "manual").is("category_id", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd),
+    supabase.from("transactions").select("id, account_id, description, transaction_date").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd).lte("transaction_date", today),
+    supabase.from("transfer_entries").select("id, account_id, direction, transaction_date").eq("user_id", user.id).eq("is_active", true).is("reconciled_at", null).gte("transaction_date", referenceMonth).lt("transaction_date", monthEnd).lte("transaction_date", today),
+    supabase.from("financial_dashboard_upcoming_recurrences").select("id, description, next_occurrence, account_name").eq("user_id", user.id).gte("next_occurrence", today).lte("next_occurrence", addDays(today, 30)),
+    supabase.from("financial_dashboard_invoices").select("id, credit_card_id, credit_card_name, due_date, outstanding_amount_minor, currency").eq("user_id", user.id).gte("due_date", today).lte("due_date", addDays(today, 45)).in("effective_status", ["open", "closed", "overdue"]).order("due_date").limit(12),
     supabase.from("monthly_budget_progress").select("category_id, category_name, planned_amount_minor, realized_amount_minor, percentage_consumed").eq("user_id", user.id).eq("reference_month", referenceMonth).eq("category_kind", "expense"),
     supabase.from("investment_positions").select("id, asset_name, position_date").eq("user_id", user.id).eq("is_active", true).lt("position_date", addDays(today, -30)).order("position_date"),
+    supabase.from("accounts").select("id, name").eq("user_id", user.id),
   ]);
+  const accountNames = new Map((accountsResult.data ?? []).map((account) => [account.id, account.name]));
+  const transactionItem = (row: { id: string; account_id: string; description: string; transaction_date: string }) => ({
+    id: row.id, accountId: row.account_id, accountName: accountNames.get(row.account_id) ?? "Conta", description: row.description, date: row.transaction_date,
+  });
   const overBudget = (budgetResult.data ?? []).flatMap((row) => row.percentage_consumed !== null && Number(row.percentage_consumed) >= 80 ? [{ category_id: row.category_id, category_name: row.category_name, percentage_consumed: Number(row.percentage_consumed), realized_amount_minor: coerceMinorUnits(row.realized_amount_minor), planned_amount_minor: coerceMinorUnits(row.planned_amount_minor) }] : []);
   const upcomingInvoices = (invoicesResult.data ?? []).map((row) => ({ ...row, outstanding_amount_minor: coerceMinorUnits(row.outstanding_amount_minor) }));
   const staleQuotes = (positionsResult.data ?? []).map((row) => ({ ...row, position_date: row.position_date }));
@@ -67,11 +76,17 @@ export async function getCurrentUserMonthlyCheckin(referenceMonth: string): Prom
       unclassifiedCount: unclassifiedResult.data?.length ?? 0,
       unreconciledCount: (unreconciledTransactions.data?.length ?? 0) + (unreconciledTransfers.data?.length ?? 0),
       upcomingRecurrencesCount: recurrencesResult.data?.length ?? 0,
+      unclassifiedItems: (unclassifiedResult.data ?? []).map(transactionItem),
+      unreconciledItems: [
+        ...(unreconciledTransactions.data ?? []).map(transactionItem),
+        ...(unreconciledTransfers.data ?? []).map((row) => ({ id: row.id, accountId: row.account_id, accountName: accountNames.get(row.account_id) ?? "Conta", description: row.direction === "outflow" ? "Transferência enviada" : "Transferência recebida", date: row.transaction_date })),
+      ],
+      upcomingRecurrences: (recurrencesResult.data ?? []).map((row) => ({ id: row.id, description: row.description, date: row.next_occurrence, accountName: row.account_name })),
       upcomingInvoices,
       overBudget,
       staleQuotes,
     },
-    hasError: Boolean(checkinResult.error || unclassifiedResult.error || unreconciledTransactions.error || unreconciledTransfers.error || recurrencesResult.error || invoicesResult.error || budgetResult.error || positionsResult.error),
+    hasError: Boolean(checkinResult.error || unclassifiedResult.error || unreconciledTransactions.error || unreconciledTransfers.error || recurrencesResult.error || invoicesResult.error || budgetResult.error || positionsResult.error || accountsResult.error),
   };
 }
 

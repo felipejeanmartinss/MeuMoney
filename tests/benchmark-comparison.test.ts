@@ -25,8 +25,10 @@ describe("same-period benchmark comparison", () => {
     const result = compareInvestmentBenchmarks({ ...base, months: ["2026-01-01"], flows: [{ positionId: "asset", date: "2026-01-15", amountMinor: 1000, type: "income" }] });
     expect(result.portfolioReturn).toBe(1100);
   });
-  it("blocks incomplete asset history and missing month-end valuations", () => {
-    expect(compareInvestmentBenchmarks({ ...base, positions: [{ ...base.positions[0], historyIsComplete: false }] }).portfolioReturn).toBeNull();
+  it("labels incomplete history but blocks periods before the first known valuation", () => {
+    const incomplete = compareInvestmentBenchmarks({ ...base, positions: [{ ...base.positions[0], historyIsComplete: false }] });
+    expect(incomplete.portfolioReturn).toBe(2100);
+    expect(incomplete.estimates.join(" ")).toContain("histórico anterior");
     const missing = compareInvestmentBenchmarks({ ...base, snapshots: base.snapshots.slice(1) });
     expect(missing.portfolioReturn).toBeNull();
     expect(missing.points).toEqual([]);

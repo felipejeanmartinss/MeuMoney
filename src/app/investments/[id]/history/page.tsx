@@ -24,6 +24,7 @@ export const metadata = { title: "Histórico do investimento" };
 const messages: Record<string, { text: string; error?: boolean }> = {
   "flow-created": { text: "Movimento registrado e posição atualizada." },
   "flow-linked": { text: "Movimento e lançamento na conta de investimento registrados juntos." },
+  "flow-updated": { text: "Movimento, posição e lançamento vinculado atualizados juntos." },
   "flow-deleted": { text: "Movimento excluído e efeito na posição revertido." },
   "flow-delete-error": {
     text: "Não foi possível excluir este movimento.",
@@ -104,7 +105,7 @@ export default async function InvestmentHistoryPage({
         </div>
       </div>
 
-      <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">Para acompanhar a performance mês a mês, registre uma posição no fechamento de cada mês. A data inicial não cria valores históricos por estimativa.</p>
+      <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">Atualize nas datas em que tiver o valor. O benchmarking identifica os fechamentos estimados entre essas fotografias; a data inicial, sozinha, não inventa histórico.</p>
 
       {feedback ? (
         <p
@@ -176,6 +177,10 @@ export default async function InvestmentHistoryPage({
                       </p>
                     ) : null}
                     </div>
+                    <Link href={`/investments/${position.id}/history/${cashFlow.id}/edit`}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
+                      Editar
+                    </Link>
                     <form action={deleteInvestmentCashFlow}>
                       <input type="hidden" name="cashFlowId" value={cashFlow.id} />
                       <input type="hidden" name="positionId" value={position.id} />
