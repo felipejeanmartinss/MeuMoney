@@ -229,10 +229,12 @@ export async function getCurrentUserAccountHub(id: string) {
         editHref:
           transaction.origin_type === "manual"
             ? `/transactions/${transaction.id}/edit`
-            : transaction.origin_type === "system" || transaction.origin_type === "credit_card_invoice_payment"
-              ? `/transactions/${transaction.id}/edit-date`
+            : transaction.origin_type === "system"
+              ? `/transactions/${transaction.id}/edit-occurrence`
+              : transaction.origin_type === "credit_card_invoice_payment"
+                ? `/transactions/${transaction.id}/edit-date`
             : null,
-        automaticDateOnly: transaction.origin_type === "system" || transaction.origin_type === "credit_card_invoice_payment",
+        automaticDateOnly: transaction.origin_type === "credit_card_invoice_payment",
         canDelete:
           transaction.origin_type === "manual" ||
           transaction.origin_type === "system",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule, reprojectRemainingFinancingSchedule } from "../src/domain/financing-schedule";
+import { amortizeFinancingSchedule, financingMoneyInput, nextFinancingInstallment, normalizeFinancingMoney, projectFinancingSchedule, reprojectRemainingFinancingSchedule } from "../src/domain/financing-schedule";
 
 function schedule() {
   return projectFinancingSchedule({ principalMinor: 120_000, months: 12, annualRate: "12", method: "SAC" }).map((row, i) => ({
@@ -9,6 +9,17 @@ function schedule() {
   }));
 }
 describe("editable financing schedule", () => {
+  it("selects the next unpaid due date after today and the balance reference date", () => {
+    const rows = [
+      { dueDate: "2026-12-01", paymentStatus: "scheduled" as const },
+      { dueDate: "2026-09-01", paymentStatus: "scheduled" as const },
+      { dueDate: "2026-11-01", paymentStatus: "scheduled" as const },
+      { dueDate: "2026-10-01", paymentStatus: "paid" as const },
+    ];
+    const result = nextFinancingInstallment(rows, "2026-10-01", "2026-10-18");
+    expect(result).toEqual({ next: rows[2], remainingMonths: 2 });
+    expect(nextFinancingInstallment(rows, "2027-01-01", "2026-10-18")).toBeNull();
+  });
   it("reprojects only after the balance date and keeps earlier installments unchanged", () => {
     const before = schedule().map((row, index) => ({ ...row, installmentNumber: index + 1, dueDate: `2026-${String(index + 1).padStart(2, "0")}-01` }));
     const after = reprojectRemainingFinancingSchedule(before, {

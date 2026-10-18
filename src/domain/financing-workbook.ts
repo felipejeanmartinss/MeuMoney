@@ -10,6 +10,7 @@ export type FinancingWorkbookRow = {
   totalAmountMinor: number;
   chargesMinor: number;
   extraAmortizationMinor: number;
+  extraFgtsMinor: number;
   outstandingBalanceMinor: number;
   paymentStatus: "paid" | "scheduled";
   paymentDate: string;
@@ -21,7 +22,12 @@ export type FinancingWorkbookRow = {
 
 const moneyFields = [
   "principalMinor", "interestMinor", "totalAmountMinor", "chargesMinor",
-  "extraAmortizationMinor", "outstandingBalanceMinor", "paidAmountMinor",
+  "extraAmortizationMinor", "extraFgtsMinor", "outstandingBalanceMinor", "paidAmountMinor",
+] as const;
+const editableFields = [
+  "dueDate", "principalMinor", "interestMinor", "totalAmountMinor", "chargesMinor",
+  "extraAmortizationMinor", "extraFgtsMinor", "outstandingBalanceMinor", "paymentStatus", "paymentDate",
+  "paidAmountMinor", "installmentsReduced", "correctionFactor",
 ] as const;
 
 export function validateFinancingWorkbookRow(row: FinancingWorkbookRow) {
@@ -35,6 +41,7 @@ export function validateFinancingWorkbookRow(row: FinancingWorkbookRow) {
   for (const field of moneyFields) {
     if (assertMinorUnits(row[field]) < 0) throw new Error(`Valor negativo na parcela ${row.installmentNumber}.`);
   }
+  if (row.extraFgtsMinor > row.extraAmortizationMinor) throw new Error(`FGTS maior que a amortização extra na parcela ${row.installmentNumber}.`);
   if (row.paymentStatus === "paid" && !isValidIsoDate(row.paymentDate)) {
     throw new Error(`Informe a data de pagamento da parcela ${row.installmentNumber}.`);
   }
@@ -46,7 +53,7 @@ export function validateFinancingWorkbookRow(row: FinancingWorkbookRow) {
   }
 }
 
-/** Updates matching rows, appends new ones, never drops omitted rows or edits paid/linked history. */
+/** The workbook is the editable schedule; paid or linked history in the app is immutable. */
 export function mergeFinancingWorkbookRows(
   existing: readonly FinancingWorkbookRow[],
   imported: readonly FinancingWorkbookRow[],
@@ -56,12 +63,13 @@ export function mergeFinancingWorkbookRows(
   }
   const existingById = new Map(existing.filter((row) => row.id).map((row) => [row.id, row]));
   const existingByNumber = new Map(existing.map((row) => [row.installmentNumber, row]));
-  const merged = new Map(existing.map((row) => [row.installmentNumber, { ...row }]));
+  const merged = new Map<number, FinancingWorkbookRow>();
   const seenIds = new Set<string>();
   const seenNumbers = new Set<number>();
   let updated = 0;
   let added = 0;
   let preserved = 0;
+  let removed = 0;
 
   for (const row of imported) {
     validateFinancingWorkbookRow(row);
@@ -77,24 +85,31 @@ export function mergeFinancingWorkbookRows(
       throw new Error(`Não altere o número da parcela ${matched.installmentNumber}; ajuste apenas seus valores ou vencimento.`);
     }
     if (matched && (matched.paymentStatus === "paid" || matched.linkedTransactionId)) {
+      merged.set(matched.installmentNumber, { ...matched });
       preserved += 1;
       continue;
     }
     if (matched) {
       merged.set(matched.installmentNumber, {
         ...row, id: matched.id, linkedTransactionId: matched.linkedTransactionId,
-        paymentStatus: matched.paymentStatus, paymentDate: matched.paymentDate,
-        paidAmountMinor: matched.paidAmountMinor,
       });
-      updated += 1;
+      if (editableFields.some((field) => row[field] !== matched[field])) updated += 1;
     } else {
       if (merged.has(row.installmentNumber)) throw new Error(`Parcela ${row.installmentNumber} duplicada.`);
-      merged.set(row.installmentNumber, { ...row, id: undefined, linkedTransactionId: null,
-        paymentStatus: "scheduled", paymentDate: "", paidAmountMinor: 0 });
+      merged.set(row.installmentNumber, { ...row, id: undefined, linkedTransactionId: null });
       added += 1;
+    }
+  }
+  for (const row of existing) {
+    if (seenNumbers.has(row.installmentNumber)) continue;
+    if (row.paymentStatus === "paid" || row.linkedTransactionId) {
+      merged.set(row.installmentNumber, { ...row });
+      preserved += 1;
+    } else {
+      removed += 1;
     }
   }
   const rows = [...merged.values()].sort((left, right) => left.installmentNumber - right.installmentNumber);
   if (rows.length > 1200) throw new Error("O fluxo não pode exceder 1.200 parcelas.");
-  return { rows, updated, added, preserved };
+  return { rows, updated, added, preserved, removed };
 }

@@ -41,6 +41,7 @@ const messages: Record<string, { text: string; error?: boolean }> = {
     text: "Lançamento criado com sucesso.",
   },
   "automatic-date-updated": { text: "Data do lançamento automático atualizada." },
+  "recurring-occurrence-updated": { text: "Ocorrência atualizada no extrato; as próximas previsões não foram alteradas." },
   "automatic-date-error": { text: "Não foi possível atualizar a data do lançamento automático.", error: true },
   "transfer-created": {
     text: "Transferência criada com sucesso.",
@@ -361,6 +362,10 @@ export function AccountRegister({
                             >
                               Posição
                             </Link>
+                            {entry.investmentCashFlowId ? <Link
+                              href={`/investments/${entry.investmentPositionId}/history/${entry.investmentCashFlowId}/edit`}
+                              className="text-sm font-bold text-blue-700 hover:underline"
+                            >Editar</Link> : entry.editHref ? <Link href={entry.editHref} className="text-sm font-bold text-blue-700 hover:underline">Editar</Link> : null}
                             {entry.investmentCashFlowId ? (
                               <form action={deleteInvestmentCashFlow}>
                                 <input type="hidden" name="cashFlowId" value={entry.investmentCashFlowId} />
@@ -517,6 +522,10 @@ export function AccountRegister({
                           >
                             Posição
                           </Link>
+                          {entry.investmentCashFlowId ? <Link
+                            href={`/investments/${entry.investmentPositionId}/history/${entry.investmentCashFlowId}/edit`}
+                            className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700"
+                          >Editar</Link> : entry.editHref ? <Link href={entry.editHref} className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm font-bold text-blue-700">Editar</Link> : null}
                           {entry.investmentCashFlowId ? (
                             <form action={deleteInvestmentCashFlow}>
                               <input type="hidden" name="cashFlowId" value={entry.investmentCashFlowId} />

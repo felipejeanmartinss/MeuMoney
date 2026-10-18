@@ -61,6 +61,7 @@ for (const code of ["cdi", "selic", "ipca", "usd"]) {
     if (!scoped.some((row) => row.code === code && row.reference_month === month.toISOString().slice(0, 10))) throw new Error("Falta referência: " + code + " " + month.toISOString().slice(0, 7));
   }
 }
+if (args.includes("--json")) console.log(JSON.stringify(scoped));
 if (supabase) {
   const { error } = await supabase.from("investment_benchmark_months").upsert(scoped, { onConflict: "code,reference_month" });
   if (error) throw new Error("Falha ao gravar benchmarks: " + error.message);

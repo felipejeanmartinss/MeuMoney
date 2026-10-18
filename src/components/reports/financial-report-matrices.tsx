@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import {
   calculateVariationBasisPoints,
   type MonthlyReportMatrixRow,
@@ -18,6 +18,7 @@ import { assertMinorUnits } from "@/domain/money";
 import type {
   InvestmentClass,
   InvestmentPositionPerformanceSummary,
+  FinancialReportBasis,
   SupportedCurrency,
 } from "@/types/database";
 
@@ -88,7 +89,7 @@ function aggregateMonthlyColumns(
       };
     }),
     labels: grouped.map((bucket) => bucket.label),
-    drilldownMonths: undefined,
+    drilldownMonths: grouped.map((bucket) => `${monthKeys[bucket.indexes[0]]}:${monthKeys[bucket.indexes.at(-1)!]}`),
   };
 }
 
@@ -100,18 +101,22 @@ function amount(value: number, currency: SupportedCurrency) {
   }).format(Math.round(assertMinorUnits(value) / 100));
 }
 
-function monthTransactionHref(monthKey: string, categoryKey?: string) {
-  const [year, month] = monthKey.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+const ReportDrilldownContext = createContext<{ basis: FinancialReportBasis; sourceKeys: string[]; context: string; currencies: string[]; visibleRowIds: string[] }>({ basis: "competence", sourceKeys: [], context: "all", currencies: [], visibleRowIds: [] });
+
+function monthTransactionHref(monthKey: string, filters: { basis: FinancialReportBasis; sourceKeys: string[]; context: string; currencies: string[]; visibleRowIds: string[] }, section?: "income" | "expense", rowIds?: string[]) {
+  const [from, to = from] = monthKey.split(":");
   const query = new URLSearchParams({
-    dateFrom: `${monthKey}-01`,
-    dateTo: `${monthKey}-${String(lastDay).padStart(2, "0")}`,
-    activity: "active",
+    from,
+    to,
+    basis: filters.basis,
   });
-  if (categoryKey && /^[0-9a-f-]{36}$/i.test(categoryKey)) {
-    query.set("categoryId", categoryKey);
-  }
-  return `/transactions?${query.toString()}`;
+  if (section) query.set("section", section);
+  const selectedRows = rowIds ?? filters.visibleRowIds;
+  if (selectedRows.length) query.set("rows", [...new Set(selectedRows)].join(","));
+  if (filters.sourceKeys.length) query.set("sources", filters.sourceKeys.join(","));
+  if (filters.context !== "all") query.set("context", filters.context);
+  if (filters.currencies.length) query.set("currencies", filters.currencies.join(","));
+  return `/reports/entries?${query.toString()}`;
 }
 
 function MonthAmount({
@@ -120,20 +125,23 @@ function MonthAmount({
   year,
   monthIndex,
   monthKey,
-  categoryKey,
+  section,
+  rowIds,
 }: {
   value: number;
   currency: SupportedCurrency;
   year?: number;
   monthIndex: number;
   monthKey?: string;
-  categoryKey?: string;
+  section?: "income" | "expense";
+  rowIds?: string[];
 }) {
+  const drilldown = useContext(ReportDrilldownContext);
   const resolvedMonth = monthKey ?? (year ? `${year}-${String(monthIndex + 1).padStart(2, "0")}` : null);
   if (!resolvedMonth || value === 0) return <>{amount(value, currency)}</>;
   return (
     <Link
-      href={monthTransactionHref(resolvedMonth, categoryKey)}
+      href={monthTransactionHref(resolvedMonth, drilldown, section, rowIds)}
       target="_blank"
       rel="noreferrer"
       title="Abrir lançamentos deste consolidado"
@@ -247,8 +255,8 @@ function groupMonthlyRows(rows: readonly MonthlyReportMatrixRow[]) {
   );
 }
 
-function sumMonths(rows: readonly MonthlyReportMatrixRow[]) {
-  return Array.from({ length: rows[0]?.monthAmountsMinor.length ?? 12 }, (_, index) =>
+function sumMonths(rows: readonly MonthlyReportMatrixRow[], emptyLength = 12) {
+  return Array.from({ length: rows[0]?.monthAmountsMinor.length ?? emptyLength }, (_, index) =>
     rows.reduce(
       (total, row) =>
         assertMinorUnits(total + row.monthAmountsMinor[index]),
@@ -264,6 +272,15 @@ function sumMoney(values: readonly number[]) {
   );
 }
 
+function reportRowId(row: MonthlyReportMatrixRow) {
+  return row.rowId.slice(row.section.length + 1);
+}
+
+function totalPeriod(months: readonly string[] | undefined, year: number | undefined) {
+  if (months?.length) return `${months[0].split(":")[0]}:${months.at(-1)!.split(":").at(-1)}`;
+  return year ? `${year}-01:${year}-12` : undefined;
+}
+
 export function MonthlyFinancialMatrix({
   rows,
   currency,
@@ -274,6 +291,10 @@ export function MonthlyFinancialMatrix({
   months,
   timeGrouping = "month",
   categoryGrouping = "category",
+  basis = "competence",
+  sourceKeys = [],
+  reportContext = "all",
+  sourceCurrencies = [],
 }: {
   rows: readonly MonthlyReportMatrixRow[];
   currency: SupportedCurrency;
@@ -284,6 +305,10 @@ export function MonthlyFinancialMatrix({
   months?: readonly string[];
   timeGrouping?: ReportTimeGrouping;
   categoryGrouping?: ReportCategoryGrouping;
+  basis?: FinancialReportBasis;
+  sourceKeys?: string[];
+  reportContext?: string;
+  sourceCurrencies?: string[];
 }) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     () => new Set(),
@@ -310,9 +335,11 @@ export function MonthlyFinancialMatrix({
   const columnLabels = aggregation.labels;
   const incomeMonths = sumMonths(
     aggregation.rows.filter((row) => row.section === "income"),
+    columnLabels.length,
   );
   const expenseMonths = sumMonths(
     aggregation.rows.filter((row) => row.section === "expense"),
+    columnLabels.length,
   );
   function toggleCategory(key: string) {
     setExpandedCategories((current) => {
@@ -323,6 +350,7 @@ export function MonthlyFinancialMatrix({
     });
   }
   return (
+    <ReportDrilldownContext.Provider value={{ basis, sourceKeys, context: reportContext, currencies: sourceCurrencies, visibleRowIds: rows.map(reportRowId) }}>
     <div>
       <p className="border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
         Valores em {currency}, sem símbolo monetário. Visualização por {timeGrouping === "month" ? "mês" : timeGrouping === "quarter" ? "trimestre" : "ano"} e por {categoryGrouping === "category" ? "categoria" : "subcategoria"}.
@@ -389,6 +417,7 @@ export function MonthlyFinancialMatrix({
       </table>
       </div>
     </div>
+    </ReportDrilldownContext.Provider>
   );
 }
 
@@ -419,7 +448,7 @@ function MonthlyResultRow({
         </td>
       ))}
       <td className="bg-slate-800 px-3 py-2 text-center">
-        {amount(sumMoney(results), currency)}
+        <MonthAmount value={sumMoney(results)} currency={currency} monthKey={totalPeriod(months, drilldownYear)} monthIndex={0} />
       </td>
     </tr>
   );
@@ -465,6 +494,7 @@ function ReportSectionRows({
         <ReportGroupRows
           key={[section, group.label].join(":")}
           group={group}
+          section={section}
           currency={currency}
           expandedCategories={expandedCategories}
           onToggleCategory={onToggleCategory}
@@ -479,11 +509,11 @@ function ReportSectionRows({
         </th>
         {sectionMonths.map((value, index) => (
           <td key={index} className="px-2 py-2 text-center">
-            {amount(value, currency)}
+            <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} section={section} />
           </td>
         ))}
         <td className="bg-slate-200 px-3 py-2 text-center">
-          {amount(sumMoney(sectionMonths), currency)}
+          <MonthAmount value={sumMoney(sectionMonths)} currency={currency} monthKey={totalPeriod(months, drilldownYear)} monthIndex={0} section={section} />
         </td>
       </tr>
     </>
@@ -492,6 +522,7 @@ function ReportSectionRows({
 
 function ReportGroupRows({
   group,
+  section,
   currency,
   expandedCategories,
   onToggleCategory,
@@ -500,6 +531,7 @@ function ReportGroupRows({
   showSubcategories,
 }: {
   group: MonthlyGroupNode;
+  section: "income" | "expense";
   currency: SupportedCurrency;
   expandedCategories: ReadonlySet<string>;
   onToggleCategory: (key: string) => void;
@@ -515,11 +547,11 @@ function ReportGroupRows({
         </th>
         {group.monthAmountsMinor.map((value, index) => (
           <td key={index} className="px-2 py-1.5 text-center">
-            <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} />
+            <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} section={section} rowIds={group.categories.flatMap((category) => category.rows.map(reportRowId))} />
           </td>
         ))}
         <td className="bg-emerald-100 px-3 py-1.5 text-center">
-          {amount(group.totalAmountMinor, currency)}
+          <MonthAmount value={group.totalAmountMinor} currency={currency} monthKey={totalPeriod(months, drilldownYear)} monthIndex={0} section={section} rowIds={group.categories.flatMap((category) => category.rows.map(reportRowId))} />
         </td>
       </tr>
       {group.categories.flatMap((category) => {
@@ -552,11 +584,11 @@ function ReportGroupRows({
               key={index}
               className="px-2 py-1.5 text-center text-slate-700"
             >
-              <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} categoryKey={category.rows[0]?.categoryKey} />
+              <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} section={section} rowIds={category.rows.map(reportRowId)} />
             </td>
           ))}
           <td className="bg-slate-50 px-3 py-1.5 text-center font-bold text-slate-900">
-            {amount(category.totalAmountMinor, currency)}
+            <MonthAmount value={category.totalAmountMinor} currency={currency} monthKey={totalPeriod(months, drilldownYear)} monthIndex={0} section={section} rowIds={category.rows.map(reportRowId)} />
           </td>
         </tr>
         );
@@ -571,11 +603,11 @@ function ReportGroupRows({
             </th>
             {row.monthAmountsMinor.map((value, index) => (
               <td key={index} className="px-2 py-1 text-center">
-                <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} categoryKey={row.subcategoryKey ?? row.categoryKey} />
+                <MonthAmount value={value} currency={currency} year={drilldownYear} monthKey={months?.[index]} monthIndex={index} section={section} rowIds={[reportRowId(row)]} />
               </td>
             ))}
             <td className="bg-slate-100/80 px-3 py-1 text-center font-semibold">
-              {amount(row.totalAmountMinor, currency)}
+              <MonthAmount value={row.totalAmountMinor} currency={currency} monthKey={totalPeriod(months, drilldownYear)} monthIndex={0} section={section} rowIds={[reportRowId(row)]} />
             </td>
           </tr>
         ));

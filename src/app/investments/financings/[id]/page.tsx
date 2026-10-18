@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FinancingAmortizationSimulator } from "@/components/financing/financing-amortization-simulator";
+import { nextFinancingInstallment } from "@/domain/financing-schedule";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserFinancingContract } from "@/services/finance/financing-imports-service";
+import { currentIsoDate } from "@/utils/dates";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
 const messages: Record<string, string> = {
@@ -26,6 +28,12 @@ export default async function FinancingDetailPage({
   const { contract, schedule, extraAmortizations, hasError } =
     await getCurrentUserFinancingContract(id);
   if (!contract) notFound();
+  const nextInstallment = nextFinancingInstallment(
+    schedule.map((row) => ({ ...row, dueDate: row.due_date, paymentStatus: row.payment_status })),
+    contract.balance_date,
+    currentIsoDate(),
+  );
+  const simulationMethod = contract.amortization_system?.toLowerCase();
 
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:py-10">
@@ -110,12 +118,25 @@ export default async function FinancingDetailPage({
         </dl>
       </section>
 
-      <FinancingAmortizationSimulator
-        currency={contract.currency}
-        principalMinor={contract.current_balance_minor}
-        annualRate={contract.nominal_annual_rate}
-        termMonths={contract.original_term_months}
-      />
+      {nextInstallment && contract.nominal_annual_rate && (simulationMethod === "sac" || simulationMethod === "price") && contract.current_balance_minor > 0 ? (
+        <FinancingAmortizationSimulator
+          currency={contract.currency}
+          principalMinor={contract.current_balance_minor}
+          balanceDate={contract.balance_date}
+          annualRate={contract.nominal_annual_rate}
+          termMonths={nextInstallment.remainingMonths}
+          method={simulationMethod}
+          nextDueDate={nextInstallment.next.dueDate}
+          nextPrincipalMinor={nextInstallment.next.principal_minor}
+          nextInterestMinor={nextInstallment.next.interest_minor}
+          nextTotalMinor={nextInstallment.next.total_amount_minor}
+        />
+      ) : (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+          <h2 className="font-bold text-slate-950">Simular amortização</h2>
+          <p className="mt-1">Para simular, mantenha saldo positivo, taxa nominal, sistema SAC ou PRICE e uma próxima parcela em aberto no fluxo.</p>
+        </section>
+      )}
 
       {extraAmortizations.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -126,6 +147,7 @@ export default async function FinancingDetailPage({
                 <p className="font-bold text-slate-950">{formatFinancialDate(entry.event_date)}</p>
                 <p className="mt-1 text-sm text-slate-600">{entry.reduction_type === "term" ? "Redução do prazo" : "Redução da prestação"}</p>
                 <p className="mt-2 font-extrabold text-emerald-800">{formatMoney(entry.cash_amount_minor + entry.fgts_amount_minor, contract.currency)}</p>
+                <p className="mt-1 text-xs text-slate-600">FGTS: {formatMoney(entry.fgts_amount_minor, contract.currency)} · Recursos próprios: {formatMoney(entry.cash_amount_minor, contract.currency)}</p>
               </article>
             ))}
           </div>
@@ -149,7 +171,7 @@ export default async function FinancingDetailPage({
                   <tr key={entry.id}>
                     <td className="px-3 py-2 font-bold">{entry.installment_number}</td>
                     <td className="px-3 py-2">{formatFinancialDate(entry.due_date)}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}{(entry.extra_amortization_minor ?? 0) > 0 ? <p className="mt-1 text-emerald-800">Extra: {formatMoney(entry.extra_amortization_minor ?? 0, contract.currency)}{(entry.installments_reduced ?? 0) > 0 ? ` · ${entry.installments_reduced} parcelas amortizadas` : ""}</p> : null}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}{(entry.extra_amortization_minor ?? 0) > 0 ? <p className="mt-1 text-emerald-800">Extra: {formatMoney(entry.extra_amortization_minor ?? 0, contract.currency)}{(entry.installments_reduced ?? 0) > 0 ? ` · ${entry.installments_reduced} parcelas reduzidas` : ""}<span className="block text-slate-600">FGTS: {formatMoney(entry.extra_fgts_minor ?? 0, contract.currency)} · Próprios: {formatMoney((entry.extra_amortization_minor ?? 0) - (entry.extra_fgts_minor ?? 0), contract.currency)}</span></p> : null}</td>
                     <td className="px-3 py-2 font-bold">{formatMoney(entry.total_amount_minor, contract.currency)}</td>
                     <td className="px-3 py-2">{formatMoney(entry.interest_minor, contract.currency)}</td>
                     <td className="px-3 py-2">{entry.correction_factor == null ? "—" : String(entry.correction_factor).replace(".", ",")}</td>
