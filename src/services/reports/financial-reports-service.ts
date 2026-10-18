@@ -519,6 +519,8 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
     transfersResult,
     itemsResult,
     valuationsResult,
+    financingsResult,
+    financingScheduleResult,
     positionsResult,
     snapshotsResult,
     cardsResult,
@@ -530,6 +532,8 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
     supabase.from("transfer_entries").select("account_id, direction, amount_minor, transaction_date, status, is_active").eq("user_id", user.id).eq("is_active", true),
     supabase.from("net_worth_items").select("id, kind, currency, context, archived_at").eq("user_id", user.id),
     supabase.from("net_worth_valuations").select("item_id, value_minor, valuation_date").eq("user_id", user.id).order("valuation_date"),
+    supabase.from("financing_contracts").select("id, net_worth_item_id, contract_date, original_principal_minor, current_balance_minor, balance_date").eq("user_id", user.id),
+    supabase.from("financing_schedule_entries").select("contract_id, due_date, payment_date, payment_status, outstanding_balance_minor").eq("user_id", user.id).order("due_date"),
     supabase.from("investment_positions").select("id, currency, context, archived_at").eq("user_id", user.id),
     supabase.from("investment_position_snapshots").select("position_id, current_value_minor, position_date").eq("user_id", user.id).order("position_date"),
     supabase.from("credit_cards").select("id, currency, linked_account_id").eq("user_id", user.id).eq("is_active", true),
@@ -583,6 +587,9 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
     ...(valuationsResult.data ?? []).flatMap((row) =>
       itemIds.has(row.item_id) ? [row.valuation_date.slice(0, 7)] : [],
     ),
+    ...(financingsResult.data ?? []).flatMap((row) =>
+      itemIds.has(row.net_worth_item_id) ? [row.contract_date.slice(0, 7)] : [],
+    ),
     ...(snapshotsResult.data ?? []).flatMap((row) =>
       positionIds.has(row.position_id) ? [row.position_date.slice(0, 7)] : [],
     ),
@@ -624,8 +631,16 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
     for (const item of items) {
       if (item.archived_at && item.archived_at.slice(0, 10) <= endDate) continue;
       const valuation = (valuationsResult.data ?? []).filter((row) => row.item_id === item.id && row.valuation_date <= endDate).at(-1);
-      if (!valuation) continue;
-      const amount = convert(coerceMinorUnits(valuation.value_minor), itemCurrency.get(item.id)!, endDate);
+      const financing = (financingsResult.data ?? []).find((row) => row.net_worth_item_id === item.id);
+      const financingBalance = financing && financing.contract_date <= endDate
+        ? (financingScheduleResult.data ?? []).filter((row) => row.contract_id === financing.id &&
+          (row.payment_status === "paid" ? (row.payment_date ?? row.due_date) : row.due_date) <= endDate).at(-1)?.outstanding_balance_minor
+          ?? financing.original_principal_minor
+        : null;
+      // A valuation is authoritative when present. Earlier months use the contract's
+      // dated schedule rather than hiding the liability until its first snapshot.
+      if (!valuation && financingBalance == null) continue;
+      const amount = convert(coerceMinorUnits(valuation?.value_minor ?? financingBalance ?? 0), itemCurrency.get(item.id)!, endDate);
       if (item.kind === "asset") assetsMinor = coerceMinorUnits(assetsMinor + amount);
       else liabilitiesMinor = coerceMinorUnits(liabilitiesMinor + amount);
     }
@@ -663,6 +678,7 @@ export async function getCurrentUserNetWorthEvolutionReport(input: {
     hasError: Boolean(
       accountsResult.error || transactionsResult.error || transfersResult.error ||
       itemsResult.error || valuationsResult.error || positionsResult.error ||
+      financingsResult.error || financingScheduleResult.error ||
       snapshotsResult.error || cardsResult.error || invoicesResult.error ||
       conversionResult.hasError,
     ),

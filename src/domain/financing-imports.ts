@@ -777,10 +777,14 @@ const manualScheduleRowSchema = z
     paymentDate: z.string(),
     paidAmountMinor: manualMoneyInput.refine((value) => value >= 0),
     extraAmortizationMinor: manualMoneyInput.refine((value) => value >= 0).default(0),
+    extraFgtsMinor: manualMoneyInput.refine((value) => value >= 0).default(0),
     installmentsReduced: z.coerce.number().int().min(0).max(1200).default(0),
     linkedTransactionId: z.preprocess((value) => value === "" || value == null ? null : value, z.uuid().nullable()).default(null),
   })
   .superRefine((row, context) => {
+    if (row.extraFgtsMinor > row.extraAmortizationMinor) {
+      context.addIssue({ code: "custom", path: ["extraFgtsMinor"], message: "O FGTS não pode exceder a amortização extra." });
+    }
     if (row.paymentStatus === "scheduled" && row.paidAmountMinor !== 0) {
       context.addIssue({ code: "custom", path: ["paidAmountMinor"], message: "Parcela a vencer não deve ter valor pago." });
     }

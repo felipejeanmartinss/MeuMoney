@@ -58,6 +58,7 @@ function normalizeSchedule<T extends FinancingScheduleEntry | FinancingImportSch
   return {
     ...row,
     extra_amortization_minor: coerceMinorUnits(row.extra_amortization_minor ?? 0),
+    extra_fgts_minor: coerceMinorUnits(row.extra_fgts_minor ?? 0),
     total_amount_minor: coerceMinorUnits(row.total_amount_minor),
     principal_minor: coerceMinorUnits(row.principal_minor),
     interest_minor: coerceMinorUnits(row.interest_minor),
@@ -246,6 +247,7 @@ export async function createCurrentUserManualFinancingContract(
   const schedule = input.schedule.map((row, index) => ({
     id: row.id ?? null,
     extra_amortization_minor: row.extraAmortizationMinor,
+    extra_fgts_minor: row.extraFgtsMinor,
     installments_reduced: row.installmentsReduced,
     linked_transaction_id: row.linkedTransactionId,
     source_sequence: index + 1,
@@ -269,7 +271,7 @@ export async function createCurrentUserManualFinancingContract(
     source_pages: [],
   }));
   const { data, error } = await supabase.rpc(
-    "save_financing_contract",
+    "save_financing_contract_with_sources",
     {
       target_contract_id: contractId,
       expected_updated_at: expectedUpdatedAt,
@@ -320,7 +322,7 @@ export async function getCurrentUserFinancingContract(id: string) {
       if (page.data.length < 1000) return { data, error: null };
     }
   }
-  const [contractResult, scheduleResult, extraResult] = await Promise.all([
+  const [contractResult, scheduleResult, extraResult, sourceResult] = await Promise.all([
     supabase
       .from("financing_contract_summaries")
       .select(contractSummaryColumns)
@@ -334,16 +336,18 @@ export async function getCurrentUserFinancingContract(id: string) {
       .eq("user_id", user.id)
       .eq("contract_id", id)
       .order("event_date"),
+    supabase.from("financing_amortization_sources").select("installment_number,fgts_amount_minor").eq("contract_id", id),
   ]);
+  const sources = new Map((sourceResult.data ?? []).map((row) => [row.installment_number, coerceMinorUnits(row.fgts_amount_minor)]));
 
   return {
     contract: contractResult.data
       ? normalizeSummary(contractResult.data)
       : null,
-    schedule: (scheduleResult.data ?? []).map((row) => normalizeSchedule(row)),
+    schedule: (scheduleResult.data ?? []).map((row) => normalizeSchedule({ ...row, extra_fgts_minor: sources.get(row.installment_number) ?? 0 })),
     extraAmortizations: (extraResult.data ?? []).map(normalizeExtra),
     hasError: Boolean(
-      contractResult.error || scheduleResult.error || extraResult.error,
+      contractResult.error || scheduleResult.error || extraResult.error || sourceResult.error,
     ),
   };
 }

@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { CheckboxFilter } from "@/components/reports/checkbox-filter";
 import { IncomeExpenseColumnChart } from "@/components/reports/income-expense-column-chart";
+import { NetWorthEvolutionChart } from "@/components/reports/net-worth-evolution-chart";
 import Link from "next/link";
 import {
   deleteSavedFinancialReport,
@@ -766,6 +767,13 @@ async function NetWorthEvolutionReport({
       </details>
       {result.hasError ? <ReportError /> : null}
       <ReportCurrencyNotice currency={filters.currency} missingCurrencies={result.missingCurrencies} />
+      <p className="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">O saldo do financiamento anterior à primeira avaliação é reconstruído pelo contrato e suas parcelas. Outros ativos sem fotografia histórica não são retroprojetados.</p>
+      {result.rows.length ? <div className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-3">{[
+        ["Ativos", result.rows.at(-1)!.assetsMinor],
+        ["Passivos", result.rows.at(-1)!.liabilitiesMinor],
+        ["Patrimônio total (líquido)", result.rows.at(-1)!.netWorthMinor],
+      ].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-xs text-slate-500">{label} · {result.rows.at(-1)!.referenceMonth}</p><p className="text-lg font-bold tabular-nums">{formatMoney(Number(value), filters.currency)}</p></div>)}</div> : null}
+      <NetWorthEvolutionChart rows={result.rows} currency={filters.currency} />
       <NetWorthEvolutionMatrix rows={result.rows} currency={filters.currency} />
     </>
   );

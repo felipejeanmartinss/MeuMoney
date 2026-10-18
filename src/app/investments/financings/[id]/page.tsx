@@ -126,6 +126,7 @@ export default async function FinancingDetailPage({
                 <p className="font-bold text-slate-950">{formatFinancialDate(entry.event_date)}</p>
                 <p className="mt-1 text-sm text-slate-600">{entry.reduction_type === "term" ? "Redução do prazo" : "Redução da prestação"}</p>
                 <p className="mt-2 font-extrabold text-emerald-800">{formatMoney(entry.cash_amount_minor + entry.fgts_amount_minor, contract.currency)}</p>
+                <p className="mt-1 text-xs text-slate-600">FGTS: {formatMoney(entry.fgts_amount_minor, contract.currency)} · Recursos próprios: {formatMoney(entry.cash_amount_minor, contract.currency)}</p>
               </article>
             ))}
           </div>
@@ -149,7 +150,7 @@ export default async function FinancingDetailPage({
                   <tr key={entry.id}>
                     <td className="px-3 py-2 font-bold">{entry.installment_number}</td>
                     <td className="px-3 py-2">{formatFinancialDate(entry.due_date)}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}{(entry.extra_amortization_minor ?? 0) > 0 ? <p className="mt-1 text-emerald-800">Extra: {formatMoney(entry.extra_amortization_minor ?? 0, contract.currency)}{(entry.installments_reduced ?? 0) > 0 ? ` · ${entry.installments_reduced} parcelas amortizadas` : ""}</p> : null}</td>
+                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}{(entry.extra_amortization_minor ?? 0) > 0 ? <p className="mt-1 text-emerald-800">Extra: {formatMoney(entry.extra_amortization_minor ?? 0, contract.currency)}{(entry.installments_reduced ?? 0) > 0 ? ` · ${entry.installments_reduced} parcelas reduzidas` : ""}<span className="block text-slate-600">FGTS: {formatMoney(entry.extra_fgts_minor ?? 0, contract.currency)} · Próprios: {formatMoney((entry.extra_amortization_minor ?? 0) - (entry.extra_fgts_minor ?? 0), contract.currency)}</span></p> : null}</td>
                     <td className="px-3 py-2 font-bold">{formatMoney(entry.total_amount_minor, contract.currency)}</td>
                     <td className="px-3 py-2">{formatMoney(entry.interest_minor, contract.currency)}</td>
                     <td className="px-3 py-2">{entry.correction_factor == null ? "—" : String(entry.correction_factor).replace(".", ",")}</td>

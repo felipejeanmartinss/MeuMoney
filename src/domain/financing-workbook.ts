@@ -10,6 +10,7 @@ export type FinancingWorkbookRow = {
   totalAmountMinor: number;
   chargesMinor: number;
   extraAmortizationMinor: number;
+  extraFgtsMinor: number;
   outstandingBalanceMinor: number;
   paymentStatus: "paid" | "scheduled";
   paymentDate: string;
@@ -21,11 +22,11 @@ export type FinancingWorkbookRow = {
 
 const moneyFields = [
   "principalMinor", "interestMinor", "totalAmountMinor", "chargesMinor",
-  "extraAmortizationMinor", "outstandingBalanceMinor", "paidAmountMinor",
+  "extraAmortizationMinor", "extraFgtsMinor", "outstandingBalanceMinor", "paidAmountMinor",
 ] as const;
 const editableFields = [
   "dueDate", "principalMinor", "interestMinor", "totalAmountMinor", "chargesMinor",
-  "extraAmortizationMinor", "outstandingBalanceMinor", "paymentStatus", "paymentDate",
+  "extraAmortizationMinor", "extraFgtsMinor", "outstandingBalanceMinor", "paymentStatus", "paymentDate",
   "paidAmountMinor", "installmentsReduced", "correctionFactor",
 ] as const;
 
@@ -40,6 +41,7 @@ export function validateFinancingWorkbookRow(row: FinancingWorkbookRow) {
   for (const field of moneyFields) {
     if (assertMinorUnits(row[field]) < 0) throw new Error(`Valor negativo na parcela ${row.installmentNumber}.`);
   }
+  if (row.extraFgtsMinor > row.extraAmortizationMinor) throw new Error(`FGTS maior que a amortização extra na parcela ${row.installmentNumber}.`);
   if (row.paymentStatus === "paid" && !isValidIsoDate(row.paymentDate)) {
     throw new Error(`Informe a data de pagamento da parcela ${row.installmentNumber}.`);
   }

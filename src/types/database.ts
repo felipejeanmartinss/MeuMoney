@@ -666,6 +666,7 @@ export type FinancingImportJob = {
 
 export type FinancingScheduleEntry = {
   extra_amortization_minor?: number;
+  extra_fgts_minor?: number;
   installments_reduced?: number;
   linked_transaction_id?: string | null;
   id: string;
@@ -1365,6 +1366,12 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      financing_amortization_sources: {
+        Row: { contract_id: string; installment_number: number; fgts_amount_minor: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       financing_extra_amortizations: {
         Row: FinancingExtraAmortization;
         Insert: never;
@@ -1893,6 +1900,10 @@ export type Database = {
         Returns: string;
       };
       save_financing_contract: {
+        Args: { target_contract_id: string | null; expected_updated_at: string | null; target_contract: Json; target_schedule: Json };
+        Returns: string;
+      };
+      save_financing_contract_with_sources: {
         Args: { target_contract_id: string | null; expected_updated_at: string | null; target_contract: Json; target_schedule: Json };
         Returns: string;
       };

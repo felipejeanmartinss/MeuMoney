@@ -5,7 +5,7 @@ import { exportFinancingWorkbook, importFinancingWorkbook } from "../src/utils/f
 function row(number: number): FinancingWorkbookRow {
   return { id: `id-${number}`, installmentNumber: number, dueDate: `2026-${String(number).padStart(2, "0")}-10`,
     principalMinor: 10_000, interestMinor: 1000, totalAmountMinor: 11_000, chargesMinor: 0,
-    extraAmortizationMinor: 0, outstandingBalanceMinor: 30_000 - number * 10_000,
+    extraAmortizationMinor: 0, extraFgtsMinor: 0, outstandingBalanceMinor: 30_000 - number * 10_000,
     correctionFactor: "", installmentsReduced: 0, paymentStatus: "scheduled", paymentDate: "",
     paidAmountMinor: 0, linkedTransactionId: null };
 }
@@ -54,9 +54,10 @@ describe("financing Excel merge", () => {
   it("rejects duplicate installments and invalid dates", () => {
     expect(() => mergeFinancingWorkbookRows([], [{ ...row(1), id: undefined }, { ...row(1), id: undefined }])).toThrow(/repetida/);
     expect(() => mergeFinancingWorkbookRows([], [{ ...row(1), id: undefined, dueDate: "2026-02-30" }])).toThrow(/Vencimento/);
+    expect(() => mergeFinancingWorkbookRows([], [{ ...row(1), id: undefined, extraAmortizationMinor: 1000, extraFgtsMinor: 1001 }])).toThrow(/FGTS/);
   });
   it("round-trips the exported Excel base with cents, dates and IDs", async () => {
-    const original = [{ ...row(1), paymentStatus: "paid" as const, paymentDate: "2026-01-12", paidAmountMinor: 11_000 }, row(2)];
+    const original = [{ ...row(1), paymentStatus: "paid" as const, paymentDate: "2026-01-12", paidAmountMinor: 11_000, extraAmortizationMinor: 2500, extraFgtsMinor: 2500 }, row(2)];
     const bytes = await exportFinancingWorkbook(original, "Contrato de teste");
     const imported = await importFinancingWorkbook(new File([bytes], "contrato.xlsx"));
     expect(imported).toEqual(original);
@@ -71,5 +72,15 @@ describe("financing Excel merge", () => {
     sheet.getCell("L5").value = original.paymentDate;
     const imported = await importFinancingWorkbook(new File([await workbook.xlsx.writeBuffer()], "legado.xlsx"));
     expect(imported).toEqual([original]);
+  });
+  it("accepts the older Excel model without an FGTS column", async () => {
+    const { default: ExcelJS } = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await exportFinancingWorkbook([row(1)], "Contrato legado"));
+    const sheet = workbook.getWorksheet("Parcelas")!;
+    sheet.getCell("O4").value = null;
+    sheet.getCell("O5").value = null;
+    const imported = await importFinancingWorkbook(new File([await workbook.xlsx.writeBuffer()], "legado.xlsx"));
+    expect(imported).toEqual([row(1)]);
   });
 });
