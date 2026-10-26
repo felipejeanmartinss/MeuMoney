@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildCreditCardExpenseReportRows } from "../src/domain/credit-card-reports";
+import { buildCreditCardExpenseReportData, buildCreditCardExpenseReportRows } from "../src/domain/credit-card-reports";
 
 describe("card report competence", () => {
   it("recognizes October purchases and credits in October even when their invoice is in November", () => {
@@ -35,5 +35,27 @@ describe("card report competence", () => {
     expect(sql).not.toContain("i.competence_date");
     expect(sql.match(/with \(security_invoker = true\)/g)).toHaveLength(2);
     expect(sql).toContain("tr.destination_credit_card_id is not null");
+  });
+
+  it("reconciles month drilldowns to the chart in both regimes", () => {
+    const report = buildCreditCardExpenseReportData({
+      selectedCardIds: new Set(["card-a"]),
+      purchases: [
+        { id: "oct", description: "Restaurante", entry_kind: "purchase", purchase_date: "2026-10-24", status: "active" },
+        { id: "credit", description: "Estorno", entry_kind: "refund", purchase_date: "2026-10-25", status: "active" },
+      ],
+      installments: [
+        { id: "first", purchase_id: "oct", credit_card_id: "card-a", invoice_id: "nov-invoice", installment_number: 1, amount: 17_500, status: "pending" },
+        { id: "second", purchase_id: "oct", credit_card_id: "card-a", invoice_id: "dec-invoice", installment_number: 2, amount: 17_500, status: "pending" },
+        { id: "refund", purchase_id: "credit", credit_card_id: "card-a", invoice_id: "nov-invoice", installment_number: 1, amount: 2_500, status: "pending" },
+      ],
+      payments: [{ id: "payment", credit_card_id: "card-a", invoice_id: "nov-invoice", payment_date: "2026-11-20", amount_minor: 15_000 }],
+    });
+
+    expect(report.rows.find((row) => row.month === "2026-10")?.competenceMinor).toBe(15_000);
+    expect(report.competenceEntries.filter((entry) => entry.month === "2026-10").reduce((sum, entry) => sum + entry.amountMinor, 0)).toBe(15_000);
+    expect(report.rows.find((row) => row.month === "2026-11")?.cashMinor).toBe(15_000);
+    expect(report.cashEntries.filter((entry) => entry.month === "2026-11").reduce((sum, entry) => sum + entry.amountMinor, 0)).toBe(15_000);
+    expect(report.invoicePurchases.get("nov-invoice")?.map((entry) => entry.description)).toEqual(["Restaurante", "Estorno"]);
   });
 });

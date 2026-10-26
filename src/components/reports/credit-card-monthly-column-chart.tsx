@@ -4,7 +4,7 @@ import type { SupportedCurrency } from "@/types/database";
 
 type MonthlyAmount = { month: string; amountMinor: number };
 
-export function CreditCardMonthlyColumnChart({ rows, currency, label, color }: { rows: MonthlyAmount[]; currency: SupportedCurrency; label: string; color: string }) {
+export function CreditCardMonthlyColumnChart({ rows, currency, label, color, monthHref }: { rows: MonthlyAmount[]; currency: SupportedCurrency; label: string; color: string; monthHref?: (month: string) => string }) {
   if (!rows.length) return <p className="p-6 text-center text-sm text-slate-500">Nenhum valor no período.</p>;
 
   const values = rows.map((row) => row.amountMinor);
@@ -27,7 +27,9 @@ export function CreditCardMonthlyColumnChart({ rows, currency, label, color }: {
         const barBottom = y(Math.min(0, row.amountMinor));
         const x = center(index);
         return <g key={row.month}>
-          <rect x={x - 16} y={barTop} width="32" height={Math.max(0, barBottom - barTop)} rx="3" fill={row.amountMinor < 0 ? "#e11d48" : color}><title>{`${row.month.slice(5, 7)}/${row.month.slice(0, 4)} · ${formatMoney(row.amountMinor, currency)}`}</title></rect>
+          {monthHref ? <a href={monthHref(row.month)} aria-label={`Ver lançamentos de ${row.month.slice(5, 7)}/${row.month.slice(0, 4)}`}>
+            <rect x={x - 17} y={Math.min(barTop, barBottom) - 4} width="34" height={Math.max(12, Math.abs(barBottom - barTop) + 8)} rx="3" fill={row.amountMinor < 0 ? "#e11d48" : color} className="cursor-pointer hover:opacity-75"><title>{`${row.month.slice(5, 7)}/${row.month.slice(0, 4)} · ${formatMoney(row.amountMinor, currency)} · abrir lançamentos`}</title></rect>
+          </a> : <rect x={x - 16} y={barTop} width="32" height={Math.max(0, barBottom - barTop)} rx="3" fill={row.amountMinor < 0 ? "#e11d48" : color}><title>{`${row.month.slice(5, 7)}/${row.month.slice(0, 4)} · ${formatMoney(row.amountMinor, currency)}`}</title></rect>}
           <text x={x} y={height - 12} textAnchor="middle" fill="#475569" fontSize="10">{row.month.slice(5, 7)}/{row.month.slice(2, 4)}</text>
         </g>;
       })}
