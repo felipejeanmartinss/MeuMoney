@@ -5,6 +5,7 @@ import {
   calculateCreditCardCommitment,
   creditCardPurchaseFormSchema,
   effectiveInvoiceStatus,
+  getCardReportCompetenceMonth,
   getInvoiceDueDate,
   getInvoiceBillingMonth,
   getPurchaseReferenceMonth,
@@ -25,6 +26,14 @@ describe("credit card cycles", () => {
 
   it("moves a purchase after closing to the next competence", () => {
     expect(getPurchaseReferenceMonth("2026-07-21", 20)).toBe("2026-08-01");
+  });
+
+  it("recognizes card spending from the purchase month rather than the invoice month", () => {
+    expect(getPurchaseReferenceMonth("2026-10-25", 14)).toBe("2026-11-01");
+    expect(getCardReportCompetenceMonth("2026-10-25", 1)).toBe("2026-10-01");
+    expect(getCardReportCompetenceMonth("2026-10-25", 2)).toBe("2026-11-01");
+    expect(getCardReportCompetenceMonth("2026-10-25", 3)).toBe("2026-12-01");
+    expect(getCardReportCompetenceMonth("2026-12-31", 2)).toBe("2027-01-01");
   });
 
   it("bounds closing and due days in short and leap-year months", () => {

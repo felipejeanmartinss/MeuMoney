@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocationShare, buildAssetAllocationText } from "../src/domain/asset-allocation-report";
+import { allocationQuantityLabel, allocationShare, buildAssetAllocationText } from "../src/domain/asset-allocation-report";
 
 describe("resumo de alocação de ativos", () => {
   it("exports the total, category and every asset in the selected currency", () => {
@@ -18,5 +18,16 @@ describe("resumo de alocação de ativos", () => {
   it("keeps the empty state and avoids dividing by zero", () => {
     expect(allocationShare(0, 0)).toBe("0,0%");
     expect(buildAssetAllocationText("USD", 0, [])).toContain("Nenhum investimento ativo nesta moeda.");
+  });
+
+  it("shows shares and real-estate fund units in the allocation and export", () => {
+    expect(allocationQuantityLabel("stock", "100.5")).toBe("100,5 ações");
+    expect(allocationQuantityLabel("real_estate_fund", "42")).toBe("42 cotas");
+    expect(allocationQuantityLabel("etf", "3")).toBe("3 cotas");
+    expect(allocationQuantityLabel("fixed_income", "12")).toBeNull();
+    const content = buildAssetAllocationText("BRL", 10_000, [
+      { key: "stock", value: 10_000, rows: [{ asset_name: "VALE3", current_value_minor: 10_000, quantity: "10" }] },
+    ]);
+    expect(content).toContain("VALE3: R$ 100,00 (100,0%) · 10 ações");
   });
 });

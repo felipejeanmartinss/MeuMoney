@@ -1,6 +1,7 @@
 import "server-only";
 import { requireUser } from "@/services/auth/server-auth";
 import { coerceMinorUnits } from "@/domain/money";
+import { buildCreditCardExpenseReportData } from "@/domain/credit-card-reports";
 import type { SupportedCurrency } from "@/types/database";
 
 export async function getInvestmentInsightData(currency: SupportedCurrency) {
@@ -23,30 +24,18 @@ export async function getCreditCardExpenseReport(currency: SupportedCurrency, ca
   const { supabase, user } = await requireUser();
   const [cardsResult, purchasesResult, installmentsResult, paymentsResult] = await Promise.all([
     supabase.from("credit_cards").select("id,name,currency").eq("user_id", user.id).eq("currency", currency).order("name"),
-    supabase.from("credit_card_purchases").select("id,credit_card_id,entry_kind,status").eq("user_id", user.id).limit(5000),
-    supabase.from("credit_card_installments").select("purchase_id,credit_card_id,invoice_id,amount,competence_date,status").eq("user_id", user.id).limit(5000),
-    supabase.from("credit_card_payments").select("credit_card_id,invoice_id,amount_minor,payment_date,state").eq("user_id", user.id).eq("state", "active").limit(5000),
+    supabase.from("credit_card_purchases").select("id,credit_card_id,entry_kind,description,purchase_date,status").eq("user_id", user.id).limit(5000),
+    supabase.from("credit_card_installments").select("id,purchase_id,credit_card_id,invoice_id,installment_number,amount,status").eq("user_id", user.id).limit(5000),
+    supabase.from("credit_card_payments").select("id,credit_card_id,invoice_id,amount_minor,payment_date,state").eq("user_id", user.id).eq("state", "active").limit(5000),
   ]);
   const cards = cardsResult.data ?? [];
   const selected = new Set(cards.filter((card) => !cardId || card.id === cardId).map((card) => card.id));
-  const purchases = new Map((purchasesResult.data ?? []).filter((row) => row.status === "active").map((row) => [row.id, row]));
-  const months = new Map<string, { competenceMinor: number; cashMinor: number }>();
-  const add = (month: string, key: "competenceMinor" | "cashMinor", amount: number) => {
-    const row = months.get(month) ?? { competenceMinor: 0, cashMinor: 0 };
-    row[key] = coerceMinorUnits(row[key] + amount);
-    months.set(month, row);
-  };
-  for (const installment of installmentsResult.data ?? []) {
-    const purchase = purchases.get(installment.purchase_id);
-    if (!purchase || !selected.has(installment.credit_card_id) || installment.status === "cancelled") continue;
-    const month = installment.competence_date.slice(0, 7);
-    const signed = purchase.entry_kind === "purchase" ? 1 : -1;
-    add(month, "competenceMinor", signed * coerceMinorUnits(installment.amount));
-  }
-  for (const payment of paymentsResult.data ?? []) {
-    if (!selected.has(payment.credit_card_id)) continue;
-    add(payment.payment_date.slice(0, 7), "cashMinor", coerceMinorUnits(payment.amount_minor));
-  }
-  return { cards, rows: [...months.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, totals]) => ({ month, ...totals })),
+  const report = buildCreditCardExpenseReportData({
+    selectedCardIds: selected,
+    purchases: purchasesResult.data ?? [],
+    installments: installmentsResult.data ?? [],
+    payments: paymentsResult.data ?? [],
+  });
+  return { cards, ...report,
     hasError: Boolean(cardsResult.error || purchasesResult.error || installmentsResult.error || paymentsResult.error) };
 }

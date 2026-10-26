@@ -29,6 +29,13 @@ export default async function CreditCardsReportPage({ searchParams }: { searchPa
     if (to) query.set("to", to);
     return `/reports/credit-cards?${query.toString()}`;
   };
+  const monthHref = (month: string) => {
+    const query = new URLSearchParams({ month, currency, regime });
+    if (selectedCardId) query.set("card", selectedCardId);
+    if (from) query.set("from", from);
+    if (to) query.set("to", to);
+    return `/reports/credit-cards/details?${query.toString()}`;
+  };
 
   return <main className="app-page max-w-[1500px]">
     <PageHeader title="Gastos com cartões" />
@@ -50,9 +57,9 @@ export default async function CreditCardsReportPage({ searchParams }: { searchPa
         <div className="text-left sm:text-right"><p className="text-xs text-slate-500">{title}</p><p className="text-xl font-bold tabular-nums">{formatMoney(total, currency)}</p></div>
       </div>
       <h2 className="px-4 pt-4 text-sm font-semibold">{title} por mês</h2>
-      <CreditCardMonthlyColumnChart rows={selectedRows} currency={currency} label={`Gráfico de colunas: ${title.toLowerCase()} por mês`} color={regime === "cash" ? "#2563eb" : "#059669"} />
-      <div className="overflow-x-auto border-t"><table className="w-full min-w-[320px] text-sm"><thead className="bg-slate-100 text-left"><tr><th className="px-4 py-2">Mês</th><th className="px-4 py-2 text-right">{title}</th></tr></thead><tbody>{selectedRows.map((row) => <tr key={row.month} className="border-t"><td className="px-4 py-2">{row.month.slice(5, 7)}/{row.month.slice(0, 4)}</td><td className="px-4 py-2 text-right tabular-nums">{formatMoney(row.amountMinor, currency)}</td></tr>)}</tbody></table>{!selectedRows.length ? <p className="p-4 text-sm text-slate-500">Nenhum gasto ou pagamento neste período.</p> : null}</div>
+      <CreditCardMonthlyColumnChart rows={selectedRows} currency={currency} label={`Gráfico de colunas: ${title.toLowerCase()} por mês. Clique na barra para ver os lançamentos.`} color={regime === "cash" ? "#2563eb" : "#059669"} monthHref={monthHref} />
+      <div className="overflow-x-auto border-t"><table className="w-full min-w-[320px] text-sm"><thead className="bg-slate-100 text-left"><tr><th className="px-4 py-2">Mês</th><th className="px-4 py-2 text-right">{title}</th></tr></thead><tbody>{selectedRows.map((row) => <tr key={row.month} className="border-t"><td className="px-4 py-2"><Link href={monthHref(row.month)} className="font-semibold text-emerald-800 hover:underline">{row.month.slice(5, 7)}/{row.month.slice(0, 4)} →</Link></td><td className="px-4 py-2 text-right tabular-nums"><Link href={monthHref(row.month)} className="hover:underline" aria-label={`Ver lançamentos de ${row.month.slice(5, 7)}/${row.month.slice(0, 4)}`}>{formatMoney(row.amountMinor, currency)}</Link></td></tr>)}</tbody></table>{!selectedRows.length ? <p className="p-4 text-sm text-slate-500">Nenhum gasto ou pagamento neste período.</p> : null}</div>
     </section>
-    <p className="text-xs text-slate-500">Competência considera as parcelas das faturas, exceto compras canceladas. Caixa considera os pagamentos registrados, sem duplicar compras como saída bancária.</p>
+    <p className="text-xs text-slate-500">Competência considera a primeira parcela no mês da compra e as seguintes nos meses posteriores. Caixa considera pagamentos registrados. Clique em um mês para conferir os itens.</p>
   </main>;
 }
