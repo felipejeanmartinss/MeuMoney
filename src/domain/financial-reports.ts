@@ -123,7 +123,7 @@ export function summarizeIncomeExpenseReport(
 
 export function reportBasisDescription(basis: FinancialReportBasis) {
   return basis === "competence"
-    ? "Compras de cartão entram pela competência das parcelas; pagamentos de fatura e movimentações de capital de investimentos não duplicam o resultado."
+    ? "A primeira parcela do cartão entra no mês da compra e as parcelas seguintes nos meses subsequentes; pagamentos de fatura e movimentações de capital de investimentos não duplicam o resultado."
     : "Saídas são reconhecidas quando o dinheiro deixa a conta, incluindo pagamentos de cartão; aplicações e resgates de investimento permanecem movimentos patrimoniais.";
 }
 

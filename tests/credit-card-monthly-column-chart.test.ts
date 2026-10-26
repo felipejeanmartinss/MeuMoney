@@ -25,4 +25,16 @@ describe("gráfico mensal dos cartões", () => {
     expect(html).toContain("#e11d48");
     expect(html).toContain("-R$");
   });
+
+  it("links each month to its own detail when a destination is provided", () => {
+    const html = renderToStaticMarkup(createElement(CreditCardMonthlyColumnChart, {
+      rows: [{ month: "2026-10", amountMinor: 12_345 }],
+      currency: "BRL", label: "Gastos por competência", color: "#059669",
+      monthHref: (month) => `/reports/credit-cards/details?month=${month}`,
+    }));
+
+    expect(html).toContain('href="/reports/credit-cards/details?month=2026-10"');
+    expect(html).toContain("Ver lançamentos de 10/2026");
+    expect(html).toContain("R$ 123,45");
+  });
 });

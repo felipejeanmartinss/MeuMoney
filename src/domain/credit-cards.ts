@@ -250,6 +250,18 @@ export function getPurchaseReferenceMonth(
   return boundedDayDate(reference.year, reference.month, 1);
 }
 
+export function getCardReportCompetenceMonth(
+  purchaseDate: string,
+  installmentNumber: number,
+) {
+  if (!Number.isSafeInteger(installmentNumber) || installmentNumber < 1) {
+    throw new Error("Número da parcela inválido.");
+  }
+  const purchase = parseIsoDate(purchaseDate);
+  const reference = shiftMonth(purchase.year, purchase.month, installmentNumber - 1);
+  return boundedDayDate(reference.year, reference.month, 1);
+}
+
 export function getInvoiceDueDate(
   referenceMonth: string,
   closingDay: number,

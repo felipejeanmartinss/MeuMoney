@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { AllocationExportButton } from "@/components/reports/allocation-export-button";
-import { allocationShare, buildAssetAllocationText } from "@/domain/asset-allocation-report";
+import { allocationQuantityLabel, allocationShare, buildAssetAllocationText } from "@/domain/asset-allocation-report";
 import { INVESTMENT_CLASS_LABELS } from "@/domain/investments";
 import { formatMoney } from "@/domain/money";
 import { getInvestmentInsightData } from "@/services/reports/investment-insights-service";
@@ -34,7 +34,7 @@ export default async function AssetAllocationPage({ searchParams }: { searchPara
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm"><span className="font-semibold"><span aria-hidden="true" className="mr-2 inline-block text-slate-500 transition-transform group-open:rotate-90">▸</span>{INVESTMENT_CLASS_LABELS[group.key]} <span className="font-normal text-slate-500">({group.rows.length})</span></span><span className="tabular-nums">{formatMoney(group.value, currency)} <span className="ml-2 text-slate-500">{allocationShare(group.value, total)}</span></span></div>
             <div className="mt-2 h-1.5 rounded-full bg-slate-100"><div className="h-1.5 rounded-full bg-emerald-700" style={{ width: `${Math.max(0, Math.min(100, total > 0 ? group.value / total * 100 : 0))}%` }} /></div>
           </summary>
-          <div className="border-t bg-slate-50 px-4 py-2 sm:pl-9"><div className="divide-y divide-slate-200">{group.rows.map((row) => <div key={row.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-2 text-sm"><span>{row.asset_name}</span><span className="tabular-nums">{formatMoney(row.current_value_minor, currency)} <span className="ml-2 text-slate-500">{allocationShare(row.current_value_minor, total)}</span></span></div>)}</div></div>
+          <div className="border-t bg-slate-50 px-4 py-2 sm:pl-9"><div className="divide-y divide-slate-200">{group.rows.map((row) => <div key={row.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-2 text-sm"><span>{row.asset_name}{allocationQuantityLabel(group.key, row.quantity) ? <span className="ml-2 text-xs text-slate-500">{allocationQuantityLabel(group.key, row.quantity)}</span> : null}</span><span className="tabular-nums">{formatMoney(row.current_value_minor, currency)} <span className="ml-2 text-slate-500">{allocationShare(row.current_value_minor, total)}</span></span></div>)}</div></div>
         </details>)}
         {!groups.length ? <p className="p-4 text-sm text-slate-500">Nenhum investimento ativo nesta moeda.</p> : null}
       </div>
