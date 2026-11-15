@@ -4,7 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FinancingAmortizationSimulator } from "@/components/financing/financing-amortization-simulator";
 import { nextFinancingInstallment } from "@/domain/financing-schedule";
-import { financingPaymentReport } from "@/domain/financing-payment-report";
+import { financingPaymentReport, financingPaymentsByYear } from "@/domain/financing-payment-report";
+import { FinancingNavigation } from "@/components/financing/financing-navigation";
+import type { SupportedCurrency } from "@/types/database";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserFinancingContract } from "@/services/finance/financing-imports-service";
 import { currentIsoDate } from "@/utils/dates";
@@ -20,6 +22,13 @@ const messages: Record<string, string> = {
 
 function formatRate(value: string | null, suffix = "a.a.") {
   return value ? `${String(value).replace(".", ",")}% ${suffix}` : "Não informado";
+}
+
+function Breakdown({ payments, currency }: { payments: ReturnType<typeof financingPaymentReport>; currency: SupportedCurrency }) {
+  return <table className="mt-2 w-full text-sm"><thead><tr><th className="p-2 text-left">Tipo</th><th className="p-2 text-right">Valor pago</th></tr></thead>
+    <tbody>{payments.lines.map(([label, amount]) => <tr className="border-t" key={label}><th scope="row" className="p-2 text-left font-normal">{label}</th><td className="p-2 text-right tabular-nums">{formatMoney(amount, currency)}</td></tr>)}</tbody>
+    <tfoot><tr className="border-t font-bold"><th className="p-2 text-left">Total pago</th><td className="p-2 text-right">{formatMoney(payments.total, currency)}</td></tr></tfoot>
+  </table>;
 }
 
 export default async function FinancingDetailPage({
@@ -72,12 +81,7 @@ export default async function FinancingDetailPage({
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">Parte dos detalhes não pôde ser carregada.</p>
       ) : null}
 
-      <nav aria-label="Financiamento" className="flex flex-wrap gap-4 rounded-xl border bg-white p-3 font-bold text-emerald-800">
-        <Link aria-current={installmentsTab ? "page" : undefined} href={base}>Parcelas</Link>
-        <Link aria-current={simulation ? "page" : undefined} href={base + "?aba=simular"}>Simular amortização</Link>
-        <Link aria-current={report ? "page" : undefined} href={base + "?aba=relatorio"}>Relatório do contrato</Link>
-        <Link href={base + "/edit"}>Editar fluxo e Excel</Link>
-      </nav>
+      <FinancingNavigation base={base} active={simulation ? "simulation" : report ? "summary" : "general"} />
       {installmentsTab && nextInstallment && <section className="rounded-xl bg-emerald-50 p-4">
         <h2 className="font-bold">Próxima parcela · nº {nextInstallment.next.installment_number}</h2>
         <p>{formatFinancialDate(nextInstallment.next.dueDate)} · {formatMoney(nextInstallment.next.total_amount_minor,contract.currency)}</p>
@@ -103,10 +107,15 @@ export default async function FinancingDetailPage({
       {payments && <section className="rounded-2xl border bg-white p-5">
         <h2 className="font-bold">Composição dos pagamentos</h2>
         <p className="mt-1 text-sm text-slate-600">{payments.paidCount} parcela(s) paga(s) no histórico, com ou sem vínculo bancário. Inclui amortizações extraordinárias registradas à parte.</p>
-        <table className="mt-3 w-full text-sm"><thead><tr><th className="p-2 text-left">Tipo</th><th className="p-2 text-right">Valor pago</th></tr></thead>
-          <tbody>{payments.lines.map(([label, amount]) => <tr className="border-t" key={label}><th scope="row" className="p-2 text-left font-normal">{label}</th><td className="p-2 text-right tabular-nums">{formatMoney(amount, contract.currency)}</td></tr>)}</tbody>
-          <tfoot><tr className="border-t font-bold"><th className="p-2 text-left">Total pago</th><td className="p-2 text-right">{formatMoney(payments.total, contract.currency)}</td></tr></tfoot>
-        </table>
+        <p className="my-3 text-sm text-slate-600">Abra um ano para conferir os valores pela data do pagamento, não pelo vencimento.</p>
+        {financingPaymentsByYear(schedule, extraAmortizations).map(({ year, report: period }) =>
+          <details key={year} className="border-t py-2">
+            <summary className="cursor-pointer p-1 font-semibold">{year} · {formatMoney(period.total, contract.currency)}</summary>
+            <Breakdown payments={period} currency={contract.currency} />
+          </details>)}
+        <details className="border-t py-2"><summary className="cursor-pointer p-1 font-bold">Histórico completo · {formatMoney(payments.total, contract.currency)}</summary>
+          <Breakdown payments={payments} currency={contract.currency} />
+        </details>
       </section>}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-black text-slate-950">Condições do contrato</h2>

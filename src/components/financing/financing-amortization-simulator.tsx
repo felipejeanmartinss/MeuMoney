@@ -4,10 +4,29 @@ import { useState, type FormEvent } from "react";
 import { normalizeFinancingMoney } from "@/domain/financing-schedule";
 import { simulateFinancing, type FinancingAmortizationMethod, type FinancingSimulation } from "@/domain/financing-imports";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
+import { compareReinvestment, monthlyYieldBps } from "@/domain/financing-reinvestment";
 import type { SupportedCurrency } from "@/types/database";
 import { formatIsoDatePtBr } from "@/utils/dates";
 
 type Comparison = [FinancingSimulation, FinancingSimulation, FinancingSimulation];
+
+export function ReinvestmentResult({ result, currency }: { result: ReturnType<typeof compareReinvestment>; currency: SupportedCurrency }) {
+  const money = (minor: number) => formatMoney(minor, currency);
+  const gap = result.payment.balance - result.term.balance;
+  const rate = (result.rateBps / 100).toLocaleString("pt-BR");
+  return <section className="mt-5 rounded-xl border border-slate-200 p-4" aria-label="Comparação com reinvestimento">
+    <h3 className="font-bold">Se investir a diferença</h3>
+    <p className="my-2 text-sm">Ao final de {result.months} meses, com as duas dívidas quitadas e rendimento de {rate}% ao mês:</p>
+    <p className="font-bold text-emerald-800">{gap === 0 ? "As duas alternativas terminam com o mesmo saldo investido."
+      : `Reduzir ${gap > 0 ? "a prestação" : "o prazo"} termina com ${money(Math.abs(gap))} a mais investidos.`}</p>
+    <div className="my-3 overflow-x-auto"><table className="w-full text-left text-sm tabular-nums">
+      <thead><tr>{["Estratégia", "Aportes", "Rendimentos", "Saldo final"].map(title => <th className="p-2" key={title}>{title}</th>)}</tr></thead>
+      <tbody>{([["Reduzir prazo", result.term], ["Reduzir prestação", result.payment]] as const).map(([label, value]) =>
+        <tr key={label} className="border-t"><th scope="row" className="p-2">{label}</th><td className="p-2">{money(value.contributions)}</td><td className="p-2">{money(value.balance - value.contributions)}</td><td className="p-2 font-bold">{money(value.balance)}</td></tr>)}</tbody>
+    </table></div>
+    <p className="text-xs text-slate-600">O orçamento de cada mês é igual nas duas opções: a maior prestação entre os três cenários, sem encargos. O que sobra é aplicado no fim do mês e rende a partir do mês seguinte. Após quitar, todo esse orçamento é investido até o fim do prazo original. A taxa líquida é uma hipótese, não uma garantia.</p>
+  </section>;
+}
 
 export function AmortizationDecision({ comparison: [baseline, term, payment], currency }: { comparison: Comparison; currency: SupportedCurrency }) {
   const money = (value: number) => formatMoney(value, currency);
@@ -45,7 +64,8 @@ export function FinancingAmortizationSimulator({
   nextInterestMinor: number;
   nextTotalMinor: number;
 }) {
-  const [comparison, setComparison] = useState<Comparison | null>(null);
+  const [projection, setProjection] = useState<{ comparison: Comparison; investment: ReturnType<typeof compareReinvestment> } | null>(null);
+  const comparison = projection?.comparison;
   const [error, setError] = useState<string | null>(null);
 
   function calculate(event: FormEvent<HTMLFormElement>) {
@@ -57,13 +77,15 @@ export function FinancingAmortizationSimulator({
       const annualRatePercent = Number(String(annualRate).replace(",", "."));
       const baseInput = { principalMinor, annualRatePercent, termMonths, method, nextPrincipalMinor, nextInterestMinor };
       const baseline = simulateFinancing(baseInput);
-      setComparison([baseline,
+      const scenarios: Comparison = [baseline,
         simulateFinancing({ ...baseInput, extraAmortizationMinor, extraAmortizationMode: "term" }),
         simulateFinancing({ ...baseInput, extraAmortizationMinor, extraAmortizationMode: "payment" }),
-      ]);
+      ];
+      const rate = monthlyYieldBps(String(data.get("monthlyYield") ?? ""));
+      setProjection({ comparison: scenarios, investment: compareReinvestment(...scenarios, rate) });
       setError(null);
     } catch (caughtError) {
-      setComparison(null);
+      setProjection(null);
       setError(caughtError instanceof Error ? caughtError.message : "Não foi possível calcular a simulação.");
     }
   }
@@ -79,14 +101,18 @@ export function FinancingAmortizationSimulator({
       <div><span className="block text-xs text-slate-500">Parcelas restantes</span><strong>{termMonths}</strong></div>
       <div><span className="block text-xs text-slate-500">Sistema · taxa nominal anual</span><strong>{method.toUpperCase()} · {String(annualRate).replace(".", ",")}%</strong></div>
     </div>
-    <form onChange={() => setComparison(null)} onSubmit={calculate} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.6fr)_auto] sm:items-end">
+    <form onChange={() => { setProjection(null); setError(null); }} onSubmit={calculate} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.6fr)_auto] sm:items-end">
       <label className="grid gap-1 text-xs font-bold text-slate-700">Amortização única no próximo vencimento ({currency})
         <input name="extraAmortization" inputMode="decimal" defaultValue="0,00" onBlur={(event) => { event.target.value = normalizeFinancingMoney(event.target.value); }} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm" required />
+      </label>
+      <label className="grid gap-1 text-xs font-bold text-slate-700">Rendimento líquido estimado (% ao mês)
+        <input name="monthlyYield" inputMode="decimal" defaultValue="1,00" className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm" required />
       </label>
       <button className="min-h-10 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">Comparar prazo e prestação</button>
     </form>
     {error ? <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
     {comparison && <AmortizationDecision comparison={comparison} currency={currency} />}
+    {projection && <ReinvestmentResult result={projection.investment} currency={currency} />}
     {comparison && <div className="mt-5 overflow-x-auto"><table className="w-full text-sm tabular-nums">
       <caption className="text-left font-bold">Impacto estimado da amortização única</caption>
       <thead><tr>{["Indicador","Sem extra","Reduzir prazo","Reduzir prestação"].map(label => <th key={label} className="p-2 text-left">{label}</th>)}</tr></thead>

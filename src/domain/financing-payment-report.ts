@@ -24,3 +24,23 @@ export function financingPaymentReport(schedule: readonly Entry[], extras: reado
   if (difference !== 0) lines.push(["Diferença entre pagamentos e composição registrada", difference]);
   return { total, lines, paidCount: paid.length };
 }
+
+type DatedEntry = Entry & Pick<FinancingScheduleEntry, "payment_date">;
+type DatedExtra = Extra & Pick<FinancingExtraAmortization, "event_date">;
+
+export function financingPaymentsByYear(schedule: readonly DatedEntry[], extras: readonly DatedExtra[]) {
+  const groups = new Map<string, { entries: Entry[]; extras: Extra[] }>();
+  function group(date: string | null) {
+    const year = date?.slice(0, 4) ?? "";
+    const existing = groups.get(year);
+    if (existing) return existing;
+    const created = { entries: [] as Entry[], extras: [] as Extra[] };
+    groups.set(year, created);
+    return created;
+  }
+  for (const entry of schedule) if (entry.payment_status === "paid") group(entry.payment_date).entries.push(entry);
+  for (const extra of extras) group(extra.event_date).extras.push(extra);
+  return [...groups].sort(([a], [b]) => b.localeCompare(a)).map(([year, rows]) => ({
+    year: year || "Sem data de pagamento", report: financingPaymentReport(rows.entries, rows.extras),
+  }));
+}
