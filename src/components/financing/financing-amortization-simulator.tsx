@@ -4,27 +4,23 @@ import { useState, type FormEvent } from "react";
 import { normalizeFinancingMoney } from "@/domain/financing-schedule";
 import { simulateFinancing, type FinancingAmortizationMethod, type FinancingSimulation } from "@/domain/financing-imports";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
-import { compareReinvestment, monthlyYieldBps } from "@/domain/financing-reinvestment";
+import { projectInstallmentDifference, monthlyYieldBps } from "@/domain/financing-reinvestment";
 import type { SupportedCurrency } from "@/types/database";
 import { formatIsoDatePtBr } from "@/utils/dates";
 
 type Comparison = [FinancingSimulation, FinancingSimulation, FinancingSimulation];
 
-export function ReinvestmentResult({ result, currency }: { result: ReturnType<typeof compareReinvestment>; currency: SupportedCurrency }) {
+function ReinvestmentResult({ result, currency }: { result: ReturnType<typeof projectInstallmentDifference>; currency: SupportedCurrency }) {
   const money = (minor: number) => formatMoney(minor, currency);
-  const gap = result.payment.balance - result.term.balance;
   const rate = (result.rateBps / 100).toLocaleString("pt-BR");
-  return <section className="mt-5 rounded-xl border border-slate-200 p-4" aria-label="Comparação com reinvestimento">
-    <h3 className="font-bold">Se investir a diferença</h3>
-    <p className="my-2 text-sm">Ao final de {result.months} meses, com as duas dívidas quitadas e rendimento de {rate}% ao mês:</p>
-    <p className="font-bold text-emerald-800">{gap === 0 ? "As duas alternativas terminam com o mesmo saldo investido."
-      : `Reduzir ${gap > 0 ? "a prestação" : "o prazo"} termina com ${money(Math.abs(gap))} a mais investidos.`}</p>
-    <div className="my-3 overflow-x-auto"><table className="w-full text-left text-sm tabular-nums">
-      <thead><tr>{["Estratégia", "Aportes", "Rendimentos", "Saldo final"].map(title => <th className="p-2" key={title}>{title}</th>)}</tr></thead>
-      <tbody>{([["Reduzir prazo", result.term], ["Reduzir prestação", result.payment]] as const).map(([label, value]) =>
-        <tr key={label} className="border-t"><th scope="row" className="p-2">{label}</th><td className="p-2">{money(value.contributions)}</td><td className="p-2">{money(value.balance - value.contributions)}</td><td className="p-2 font-bold">{money(value.balance)}</td></tr>)}</tbody>
-    </table></div>
-    <p className="text-xs text-slate-600">O orçamento de cada mês é igual nas duas opções: a maior prestação entre os três cenários, sem encargos. O que sobra é aplicado no fim do mês e rende a partir do mês seguinte. Após quitar, todo esse orçamento é investido até o fim do prazo original. A taxa líquida é uma hipótese, não uma garantia.</p>
+  return <section className="mt-4 rounded-xl border border-slate-200 p-4" aria-label="Reinvestimento da diferença">
+    <h3 className="font-bold">Reduzir prestação e investir a diferença</h3>
+    <p className="my-2 text-sm">A cada mês, você aplica o que pagaria a mais na opção de reduzir prazo. Quando essa opção quita, os aportes param; o saldo segue rendendo até a última prestação.</p>
+    <dl className="grid gap-3 text-sm sm:grid-cols-3">
+      <div><dt>Total aportado</dt><dd className="font-bold">{money(result.contributions)}</dd></div>
+      <div><dt>Rendimento a {rate}% ao mês</dt><dd className="font-bold">{money(result.earnings)}</dd></div>
+      <div><dt>Saldo em {result.months} mês(es)</dt><dd className="font-bold">{money(result.balance)}</dd></div>
+    </dl>
   </section>;
 }
 
@@ -37,6 +33,7 @@ export function AmortizationDecision({ comparison: [baseline, term, payment], cu
       <h3 className="font-bold">Reduzir prazo</h3>
       <p className="mt-2 text-xl font-bold">{months === 0 ? "Mesmo número de parcelas" : `${months} parcela(s) a menos`}</p>
       <p className="text-sm">{term.rows.length} parcela(s) até quitar, contra {baseline.rows.length} sem a amortização.</p>
+      <p className="mt-1 text-sm font-semibold">{money(baseline.totalInterestMinor - term.totalInterestMinor)} de juros poupados em relação ao contrato sem extra. Sem reinvestimento.</p>
     </article>
     <article className="rounded-xl border border-sky-200 bg-sky-50 p-4">
       <h3 className="font-bold">Reduzir valor das parcelas</h3>
@@ -64,7 +61,7 @@ export function FinancingAmortizationSimulator({
   nextInterestMinor: number;
   nextTotalMinor: number;
 }) {
-  const [projection, setProjection] = useState<{ comparison: Comparison; investment: ReturnType<typeof compareReinvestment> } | null>(null);
+  const [projection, setProjection] = useState<{ comparison: Comparison; investment: ReturnType<typeof projectInstallmentDifference> } | null>(null);
   const comparison = projection?.comparison;
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +79,7 @@ export function FinancingAmortizationSimulator({
         simulateFinancing({ ...baseInput, extraAmortizationMinor, extraAmortizationMode: "payment" }),
       ];
       const rate = monthlyYieldBps(String(data.get("monthlyYield") ?? ""));
-      setProjection({ comparison: scenarios, investment: compareReinvestment(...scenarios, rate) });
+      setProjection({ comparison: scenarios, investment: projectInstallmentDifference(scenarios[1], scenarios[2], rate) });
       setError(null);
     } catch (caughtError) {
       setProjection(null);

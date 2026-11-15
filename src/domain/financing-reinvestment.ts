@@ -11,24 +11,18 @@ export function monthlyYieldBps(input: string) {
 
 type Schedule = { rows: ReadonlyArray<Pick<FinancingSimulation["rows"][number], "paymentMinor">> };
 
-export function compareReinvestment(baseline: Schedule, term: Schedule, payment: Schedule, rateBps: number) {
+export function projectInstallmentDifference(term: Schedule, payment: Schedule, rateBps: number) {
   if (!Number.isSafeInteger(rateBps) || rateBps < 0 || rateBps > 10000) throw new Error("Taxa de reinvestimento inválida.");
   const rate = BigInt(rateBps);
-  const account = () => ({ contributions: 0, balance: 0 });
-  const shorter = account(), smaller = account();
-  function closeMonth(portfolio: ReturnType<typeof account>, deposit: number) {
-    const interest = (BigInt(portfolio.balance) * rate + 5000n) / 10000n;
-    const balance = BigInt(portfolio.balance) + interest + BigInt(deposit);
+  let balance = 0n;
+  let contributions = 0;
+  for (const [index, row] of payment.rows.entries()) {
+    const termDue = term.rows[index]?.paymentMinor ?? 0;
+    const deposit = Math.max(0, termDue - row.paymentMinor);
+    const interest = (balance * rate + 5000n) / 10000n;
+    balance += interest + BigInt(deposit);
     if (balance > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("O saldo projetado excede o limite de cálculo. Experimente uma taxa mensal menor.");
-    portfolio.contributions = assertMinorUnits(portfolio.contributions + deposit);
-    portfolio.balance = Number(balance);
+    contributions = assertMinorUnits(contributions + deposit);
   }
-  for (let i = 0; i < baseline.rows.length; i++) {
-    const termDue = term.rows[i]?.paymentMinor ?? 0;
-    const paymentDue = payment.rows[i]?.paymentMinor ?? 0;
-    const budget = Math.max(baseline.rows[i].paymentMinor, termDue, paymentDue);
-    closeMonth(shorter, budget - termDue);
-    closeMonth(smaller, budget - paymentDue);
-  }
-  return { term: shorter, payment: smaller, months: baseline.rows.length, rateBps };
+  return { contributions, earnings: Number(balance) - contributions, balance: Number(balance), months: payment.rows.length, rateBps };
 }
