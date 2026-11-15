@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { ManualFinancingForm } from "@/components/forms/manual-financing-form";
-import { getFinancingPaymentOptions } from "@/services/finance/financing-payments-service";
 
 export const metadata = { title: "Cadastrar financiamento" };
 
 export default async function NewFinancingPage() {
-  const options = await getFinancingPaymentOptions();
   return (
     <main className="app-page">
       <header>
@@ -27,8 +25,7 @@ export default async function NewFinancingPage() {
         </p>
       </header>
 
-      {options.hasError ? <p role="alert" className="text-sm text-amber-800">Lançamentos indisponíveis para vínculo. Você pode salvar o contrato e vincular depois.</p> : null}
-      <ManualFinancingForm transactions={options.transactions} />
+      <ManualFinancingForm />
     </main>
   );
 }

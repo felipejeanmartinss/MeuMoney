@@ -1,13 +1,20 @@
+import { FinancingPaymentPicker } from "@/components/financing/financing-payment-picker";
+import { getFinancingPaymentOptions } from "@/services/finance/financing-payments-service";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FinancingAmortizationSimulator } from "@/components/financing/financing-amortization-simulator";
 import { nextFinancingInstallment } from "@/domain/financing-schedule";
+import { financingPaymentReport, financingPaymentsByYear } from "@/domain/financing-payment-report";
+import { FinancingNavigation } from "@/components/financing/financing-navigation";
+import type { SupportedCurrency } from "@/types/database";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserFinancingContract } from "@/services/finance/financing-imports-service";
 import { currentIsoDate } from "@/utils/dates";
 import { formatFinancialDate } from "@/utils/financial-formatters";
 
 const messages: Record<string, string> = {
+  linked: "Pagamento vinculado. Nenhuma movimentação foi criada na conta.",
+  "link-error": "Não foi possível vincular. Reabra a parcela e confira se o débito já foi usado ou alterado.",
   imported: "Financiamento criado a partir do PDF revisado.",
   created: "Financiamento e histórico cadastrados.",
   updated: "Financiamento e fluxo de parcelas atualizados.",
@@ -17,12 +24,19 @@ function formatRate(value: string | null, suffix = "a.a.") {
   return value ? `${String(value).replace(".", ",")}% ${suffix}` : "Não informado";
 }
 
+function Breakdown({ payments, currency }: { payments: ReturnType<typeof financingPaymentReport>; currency: SupportedCurrency }) {
+  return <table className="mt-2 w-full text-sm"><thead><tr><th className="p-2 text-left">Tipo</th><th className="p-2 text-right">Valor pago</th></tr></thead>
+    <tbody>{payments.lines.map(([label, amount]) => <tr className="border-t" key={label}><th scope="row" className="p-2 text-left font-normal">{label}</th><td className="p-2 text-right tabular-nums">{formatMoney(amount, currency)}</td></tr>)}</tbody>
+    <tfoot><tr className="border-t font-bold"><th className="p-2 text-left">Total pago</th><td className="p-2 text-right">{formatMoney(payments.total, currency)}</td></tr></tfoot>
+  </table>;
+}
+
 export default async function FinancingDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ message?: string }>;
+  searchParams: Promise<{ message?: string; aba?: string; periodo?: string; parcela?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const { contract, schedule, extraAmortizations, hasError } =
@@ -33,6 +47,16 @@ export default async function FinancingDetailPage({
     contract.balance_date,
     currentIsoDate(),
   );
+  const today = currentIsoDate();
+  const base = "/investments/financings/" + id;
+  const simulation = query.aba === "simular";
+  const report = query.aba === "relatorio";
+  const installmentsTab = !simulation && !report;
+  const payments = report && !hasError ? financingPaymentReport(schedule, extraAmortizations) : null;
+  const all = query.periodo === "todas";
+  const visible = schedule.filter(e => all || e.due_date >= today.slice(0,7) + "-01").sort((a,b) => a.due_date.localeCompare(b.due_date));
+  const selected = installmentsTab && !hasError ? schedule.find(e => e.id === query.parcela && !e.linked_transaction_id) : undefined;
+  const options = selected ? await getFinancingPaymentOptions(contract.currency) : null;
   const simulationMethod = contract.amortization_system?.toLowerCase();
 
   return (
@@ -45,7 +69,6 @@ export default async function FinancingDetailPage({
           Fluxo financeiro do contrato
         </p>
         <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">{contract.name}</h1>
-        <Link href={`/investments/financings/${id}/edit`} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white">Editar contrato e parcelas</Link>
         <p className="mt-2 text-slate-600">
           {contract.institution} · {contract.amortization_system ?? "Sistema não informado"} · saldo em {formatFinancialDate(contract.balance_date)}
         </p>
@@ -58,15 +81,20 @@ export default async function FinancingDetailPage({
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">Parte dos detalhes não pôde ser carregada.</p>
       ) : null}
 
+      <FinancingNavigation base={base} active={simulation ? "simulation" : report ? "summary" : "general"} />
+      {installmentsTab && nextInstallment && <section className="rounded-xl bg-emerald-50 p-4">
+        <h2 className="font-bold">Próxima parcela · nº {nextInstallment.next.installment_number}</h2>
+        <p>{formatFinancialDate(nextInstallment.next.dueDate)} · {formatMoney(nextInstallment.next.total_amount_minor,contract.currency)}</p>
+        {!nextInstallment.next.linked_transaction_id && <Link href={base + "?parcela=" + nextInstallment.next.id + "#vinculo"} className="text-emerald-800 underline">Vincular pagamento</Link>}
+      </section>}
+      {selected && options && <div id="vinculo">{options.hasError ? <p role="alert">Não foi possível carregar os débitos.</p> : <FinancingPaymentPicker key={selected.id} contractId={id} entryId={selected.id} version={contract.updated_at}
+        number={selected.installment_number} expected={(selected.payment_status === "paid" ? selected.paid_amount_minor : selected.total_amount_minor + (selected.extra_amortization_minor ?? 0)) - (selected.extra_fgts_minor ?? 0)}
+        currency={contract.currency} options={options.transactions} />}</div>}
+      {report && <section className="grid gap-4" aria-label="Relatório do contrato">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Saldo devedor", contract.current_balance_minor],
-          ["Valor pago", contract.total_paid_minor],
-          ["Principal amortizado", contract.principal_paid_minor],
-          ["Juros pagos", contract.interest_paid_minor],
-          ["Encargos pagos", contract.charges_paid_minor],
-          ["Extra com recursos próprios", contract.extra_cash_minor],
-          ["Extra com FGTS", contract.extra_fgts_minor],
+          ["Total pago registrado", contract.total_paid_minor],
           ["Valor original", contract.original_principal_minor],
         ].map(([label, value]) => (
           <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -76,6 +104,19 @@ export default async function FinancingDetailPage({
         ))}
       </section>
 
+      {payments && <section className="rounded-2xl border bg-white p-5">
+        <h2 className="font-bold">Composição dos pagamentos</h2>
+        <p className="mt-1 text-sm text-slate-600">{payments.paidCount} parcela(s) paga(s) no histórico, com ou sem vínculo bancário. Inclui amortizações extraordinárias registradas à parte.</p>
+        <p className="my-3 text-sm text-slate-600">Abra um ano para conferir os valores pela data do pagamento, não pelo vencimento.</p>
+        {financingPaymentsByYear(schedule, extraAmortizations).map(({ year, report: period }) =>
+          <details key={year} className="border-t py-2">
+            <summary className="cursor-pointer p-1 font-semibold">{year} · {formatMoney(period.total, contract.currency)}</summary>
+            <Breakdown payments={period} currency={contract.currency} />
+          </details>)}
+        <details className="border-t py-2"><summary className="cursor-pointer p-1 font-bold">Histórico completo · {formatMoney(payments.total, contract.currency)}</summary>
+          <Breakdown payments={payments} currency={contract.currency} />
+        </details>
+      </section>}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-black text-slate-950">Condições do contrato</h2>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -118,7 +159,8 @@ export default async function FinancingDetailPage({
         </dl>
       </section>
 
-      {nextInstallment && contract.nominal_annual_rate && (simulationMethod === "sac" || simulationMethod === "price") && contract.current_balance_minor > 0 ? (
+      </section>}
+      {simulation && (nextInstallment && contract.nominal_annual_rate && (simulationMethod === "sac" || simulationMethod === "price") && contract.current_balance_minor > 0 ? (
         <FinancingAmortizationSimulator
           currency={contract.currency}
           principalMinor={contract.current_balance_minor}
@@ -136,9 +178,9 @@ export default async function FinancingDetailPage({
           <h2 className="font-bold text-slate-950">Simular amortização</h2>
           <p className="mt-1">Para simular, mantenha saldo positivo, taxa nominal, sistema SAC ou PRICE e uma próxima parcela em aberto no fluxo.</p>
         </section>
-      )}
+      ))}
 
-      {extraAmortizations.length ? (
+      {report && extraAmortizations.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-black text-slate-950">Amortizações extraordinárias</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -154,39 +196,20 @@ export default async function FinancingDetailPage({
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-black text-slate-950">Parcelas e projeção</h2>
-          <p className="mt-1 text-sm text-slate-600">Histórico do contrato; nenhuma baixa bancária é criada automaticamente.</p>
+      {installmentsTab && <section className="overflow-auto rounded-2xl border bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold">Parcelas · {all ? "histórico completo" : "desde o mês atual"}</h2>
+          <Link href={all ? base : base + "?periodo=todas"} className="text-emerald-700 underline">{all ? "Voltar ao mês atual" : "Mostrar todas desde o início"}</Link>
         </div>
-        <div className="max-h-[38rem] overflow-auto">
-          <table className="w-full min-w-[1480px] text-xs">
-            <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="px-3 py-2">Parcela</th><th className="px-3 py-2">Data</th><th className="px-3 py-2">Amortização</th><th className="px-3 py-2">Valor total</th><th className="px-3 py-2">Juros</th><th className="px-3 py-2">Correção</th><th className="px-3 py-2">Taxas/multas</th><th className="px-3 py-2">Saldo devedor</th><th className="px-3 py-2">Situação</th><th className="px-3 py-2">Data pagamento</th><th className="px-3 py-2">Valor pagamento</th></tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {schedule.map((entry) => {
-                const charges = entry.insurance_mip_minor + entry.insurance_dfi_minor + entry.service_fee_minor + entry.penalty_minor + entry.late_interest_minor;
-                return (
-                  <tr key={entry.id}>
-                    <td className="px-3 py-2 font-bold">{entry.installment_number}</td>
-                    <td className="px-3 py-2">{formatFinancialDate(entry.due_date)}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.principal_minor, contract.currency)}{(entry.extra_amortization_minor ?? 0) > 0 ? <p className="mt-1 text-emerald-800">Extra: {formatMoney(entry.extra_amortization_minor ?? 0, contract.currency)}{(entry.installments_reduced ?? 0) > 0 ? ` · ${entry.installments_reduced} parcelas reduzidas` : ""}<span className="block text-slate-600">FGTS: {formatMoney(entry.extra_fgts_minor ?? 0, contract.currency)} · Próprios: {formatMoney((entry.extra_amortization_minor ?? 0) - (entry.extra_fgts_minor ?? 0), contract.currency)}</span></p> : null}</td>
-                    <td className="px-3 py-2 font-bold">{formatMoney(entry.total_amount_minor, contract.currency)}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.interest_minor, contract.currency)}</td>
-                    <td className="px-3 py-2">{entry.correction_factor == null ? "—" : String(entry.correction_factor).replace(".", ",")}</td>
-                    <td className="px-3 py-2">{formatMoney(charges, contract.currency)}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.outstanding_balance_minor, contract.currency)}</td>
-                    <td className="px-3 py-2">{entry.payment_status === "paid" ? "Paga" : "A vencer"}</td>
-                    <td className="px-3 py-2">{entry.payment_date ? formatFinancialDate(entry.payment_date) : "—"}</td>
-                    <td className="px-3 py-2">{formatMoney(entry.paid_amount_minor, contract.currency)}{entry.linked_transaction_id ? <p className="mt-1 text-slate-500">Lançamento vinculado</p> : null}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <table className="mt-3 w-full text-left text-sm"><thead><tr>{["Parcela","Vencimento","Prestação","Situação","Pagamento"].map(label => <th key={label} className="p-2">{label}</th>)}</tr></thead>
+          <tbody>{visible.map(entry => <tr key={entry.id} className="border-t">
+            <th className="p-2">{entry.installment_number}</th><td>{formatFinancialDate(entry.due_date)}</td><td>{formatMoney(entry.total_amount_minor,contract.currency)}</td>
+            <td>{entry.payment_status === "paid" ? (entry.linked_transaction_id ? "Paga · vinculada" : "Paga · sem vínculo") : (entry.due_date < today ? "Vencida" : "A vencer")}</td>
+            <td className="p-2">{entry.payment_status === "paid" && <p>{entry.payment_date && formatFinancialDate(entry.payment_date)} · {formatMoney(entry.paid_amount_minor,contract.currency)}</p>}
+            {!entry.linked_transaction_id && <Link className="text-emerald-700 underline" href={base + "?parcela=" + entry.id + (all ? "&periodo=todas" : "") + "#vinculo"}>Vincular pagamento</Link>}</td>
+          </tr>)}</tbody></table>
+        {!visible.length && <p className="p-3">Nenhuma parcela neste período.</p>}
+      </section>}
     </main>
   );
 }

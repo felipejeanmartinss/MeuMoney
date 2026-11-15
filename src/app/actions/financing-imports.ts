@@ -1,5 +1,7 @@
 "use server";
 
+import { reconcileInstallment } from "@/services/finance/financing-payments-service";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -113,4 +115,17 @@ export async function createManualFinancingContract(
   revalidatePath("/goals");
   revalidatePath("/dashboard");
   redirect(`/investments/financings/${result.contractId}?message=${contractId ? "updated" : "created"}`);
+}
+
+export async function confirmFinancingPayment(form: FormData) {
+  const parsed = z.object({
+    contract_id_in: z.uuid(), entry_id_in: z.uuid(), transaction_id_in: z.uuid(),
+    version_in: z.iso.datetime({ offset: true }), amount_in: z.coerce.number().int().positive(),
+    date_in: z.iso.date(), account_in: z.uuid(), accept_difference: z.boolean(),
+  }).safeParse({ ...Object.fromEntries(form), accept_difference: form.get("accept_difference") === "yes" });
+  if (!parsed.success) redirect("/investments?tab=financing&message=import-error");
+  const ok = await reconcileInstallment(parsed.data);
+  const path = "/investments/financings/" + parsed.data.contract_id_in;
+  if (ok) { revalidatePath(path); revalidatePath("/investments"); }
+  redirect(path + "?message=" + (ok ? "linked" : "link-error"));
 }
