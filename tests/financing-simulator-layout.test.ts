@@ -3,18 +3,23 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AmortizationDecision, FinancingAmortizationSimulator } from "../src/components/financing/financing-amortization-simulator";
 import { simulateFinancing } from "../src/domain/financing-imports";
+import { compareAmortizationBenefits, projectInstallmentDifference } from "../src/domain/financing-reinvestment";
 
 describe("simulador de amortização", () => {
   it.each(["sac","price"] as const)("compares both choices for %s and recognizes an early payoff tie", method => {
     const input = { principalMinor: 120000, annualRatePercent: 12, termMonths: 12, method };
     const baseline = simulateFinancing(input);
-    const render = (extraAmortizationMinor: number) => renderToStaticMarkup(createElement(AmortizationDecision, {
-      currency:"BRL", comparison:[baseline, simulateFinancing({...input,extraAmortizationMinor,extraAmortizationMode:"term"}),
-        simulateFinancing({...input,extraAmortizationMinor,extraAmortizationMode:"payment"})],
-    }));
-    expect(render(30000)).toContain("a menos em juros");
+    const render = (extraAmortizationMinor: number, rate = 0) => {
+      const term = simulateFinancing({...input,extraAmortizationMinor,extraAmortizationMode:"term"});
+      const payment = simulateFinancing({...input,extraAmortizationMinor,extraAmortizationMode:"payment"});
+      const { earnings } = projectInstallmentDifference(term, payment, rate);
+      const decision = compareAmortizationBenefits(baseline.totalInterestMinor, term.totalInterestMinor, payment.totalInterestMinor, earnings);
+      return renderToStaticMarkup(createElement(AmortizationDecision, { currency:"BRL", comparison:[baseline, term, payment], decision }));
+    };
+    expect(render(30000)).toContain("reduzir prazo é a melhor opção: vantagem de");
+    expect(render(30000, 500)).toContain("reduzir prestação e investir a diferença é a melhor opção: vantagem de");
     const payoff = render(baseline.rows[0].balanceMinor);
-    expect(payoff).toContain("mesmo custo estimado");
+    expect(payoff).toContain("Empate");
     expect(payoff).toContain("Sem próxima prestação");
   });
   it("asks for one extra amount at the next due date instead of a new financing schedule", () => {

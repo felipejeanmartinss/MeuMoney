@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { normalizeFinancingMoney } from "@/domain/financing-schedule";
 import { simulateFinancing, type FinancingAmortizationMethod, type FinancingSimulation } from "@/domain/financing-imports";
 import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
-import { projectInstallmentDifference, monthlyYieldBps } from "@/domain/financing-reinvestment";
+import { compareAmortizationBenefits, projectInstallmentDifference, monthlyYieldBps } from "@/domain/financing-reinvestment";
 import type { SupportedCurrency } from "@/types/database";
 import { formatIsoDatePtBr } from "@/utils/dates";
 
@@ -24,25 +24,29 @@ function ReinvestmentResult({ result, currency }: { result: ReturnType<typeof pr
   </section>;
 }
 
-export function AmortizationDecision({ comparison: [baseline, term, payment], currency }: { comparison: Comparison; currency: SupportedCurrency }) {
+type Decision = ReturnType<typeof compareAmortizationBenefits>;
+
+export function AmortizationDecision({ comparison: [baseline, term, payment], decision, currency }: { comparison: Comparison; decision: Decision; currency: SupportedCurrency }) {
   const money = (value: number) => formatMoney(value, currency);
-  const interestGap = payment.totalInterestMinor - term.totalInterestMinor;
   const months = baseline.rows.length - term.rows.length;
   return <section aria-label="Comparação das alternativas" className="mt-4 grid gap-3 sm:grid-cols-2">
+    <div role="status" className="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+      <h3 className="font-bold">{decision.winner === "tie"
+        ? "Empate: as duas opções têm o mesmo benefício estimado."
+        : `Nesta simulação, ${decision.winner === "term" ? "reduzir prazo" : "reduzir prestação e investir a diferença"} é a melhor opção: vantagem de ${money(decision.advantage)}.`}</h3>
+      <p className="mt-2 text-sm">Reduzir prazo: {money(decision.termSavings)} de juros poupados.</p>
+      <p className="text-sm">Reduzir prestação: {money(decision.paymentSavings)} de juros poupados + {money(decision.earnings)} de rendimentos líquidos estimados = {money(decision.paymentBenefit)}. Os aportes não contam como ganho.</p>
+    </div>
     <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <h3 className="font-bold">Reduzir prazo</h3>
       <p className="mt-2 text-xl font-bold">{months === 0 ? "Mesmo número de parcelas" : `${months} parcela(s) a menos`}</p>
       <p className="text-sm">{term.rows.length} parcela(s) até quitar, contra {baseline.rows.length} sem a amortização.</p>
-      <p className="mt-1 text-sm font-semibold">{money(baseline.totalInterestMinor - term.totalInterestMinor)} de juros poupados em relação ao contrato sem extra. Sem reinvestimento.</p>
     </article>
     <article className="rounded-xl border border-sky-200 bg-sky-50 p-4">
       <h3 className="font-bold">Reduzir valor das parcelas</h3>
       <p className="mt-2 text-xl font-bold">{payment.rows[1] ? money(payment.rows[1].paymentMinor) : "Sem próxima prestação"}</p>
       <p className="text-sm">{payment.rows[1] ? `Prestação seguinte, sem encargos. Sem amortizar: ${money(baseline.rows[1]?.paymentMinor ?? 0)}.` : "O saldo é quitado no vencimento simulado."}</p>
     </article>
-    <p className="sm:col-span-2 text-sm font-semibold">{interestGap === 0
-      ? "As duas opções têm o mesmo custo estimado de juros."
-      : `Reduzir ${interestGap > 0 ? "prazo" : "o valor das parcelas"} custa ${money(Math.abs(interestGap))} a menos em juros do que a outra opção.`}</p>
   </section>;
 }
 
@@ -61,7 +65,7 @@ export function FinancingAmortizationSimulator({
   nextInterestMinor: number;
   nextTotalMinor: number;
 }) {
-  const [projection, setProjection] = useState<{ comparison: Comparison; investment: ReturnType<typeof projectInstallmentDifference> } | null>(null);
+  const [projection, setProjection] = useState<{ comparison: Comparison; investment: ReturnType<typeof projectInstallmentDifference>; decision: Decision } | null>(null);
   const comparison = projection?.comparison;
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +83,9 @@ export function FinancingAmortizationSimulator({
         simulateFinancing({ ...baseInput, extraAmortizationMinor, extraAmortizationMode: "payment" }),
       ];
       const rate = monthlyYieldBps(String(data.get("monthlyYield") ?? ""));
-      setProjection({ comparison: scenarios, investment: projectInstallmentDifference(scenarios[1], scenarios[2], rate) });
+      const investment = projectInstallmentDifference(scenarios[1], scenarios[2], rate);
+      const decision = compareAmortizationBenefits(baseline.totalInterestMinor, scenarios[1].totalInterestMinor, scenarios[2].totalInterestMinor, investment.earnings);
+      setProjection({ comparison: scenarios, investment, decision });
       setError(null);
     } catch (caughtError) {
       setProjection(null);
@@ -108,7 +114,7 @@ export function FinancingAmortizationSimulator({
       <button className="min-h-10 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">Comparar prazo e prestação</button>
     </form>
     {error ? <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
-    {comparison && <AmortizationDecision comparison={comparison} currency={currency} />}
+    {projection && <AmortizationDecision comparison={projection.comparison} decision={projection.decision} currency={currency} />}
     {projection && <ReinvestmentResult result={projection.investment} currency={currency} />}
     {comparison && <div className="mt-5 overflow-x-auto"><table className="w-full text-sm tabular-nums">
       <caption className="text-left font-bold">Impacto estimado da amortização única</caption>

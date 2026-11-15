@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { projectInstallmentDifference, monthlyYieldBps } from "../src/domain/financing-reinvestment";
+import { compareAmortizationBenefits, projectInstallmentDifference, monthlyYieldBps } from "../src/domain/financing-reinvestment";
 import { simulateFinancing } from "../src/domain/financing-imports";
 
 const schedule = (...payments: number[]) => ({ rows: payments.map(paymentMinor => ({ paymentMinor })) });
 
 describe("reinvestimento da diferença entre prestações", () => {
+  it.each([[199, "term", 1], [200, "tie", 0], [201, "payment", 1]] as const)(
+    "compares interest saved plus %i cents of earnings at cent precision", (earnings, winner, advantage) => {
+      expect(compareAmortizationBenefits(1000, 300, 500, earnings)).toEqual({
+        termSavings: 700, paymentSavings: 500, paymentBenefit: 500 + earnings, earnings, winner, advantage,
+      });
+    });
   it("deposits only a positive monthly difference and earns interest without new deposits after payoff", () => {
     const result = projectInstallmentDifference(schedule(10000, 8000, 2000), schedule(10000, 5000, 5000, 5000), 100);
     expect(result).toEqual({ contributions: 3000, earnings: 60, balance: 3060, months: 4, rateBps: 100 });

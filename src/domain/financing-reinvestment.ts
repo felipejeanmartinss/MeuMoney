@@ -11,6 +11,15 @@ export function monthlyYieldBps(input: string) {
 
 type Schedule = { rows: ReadonlyArray<Pick<FinancingSimulation["rows"][number], "paymentMinor">> };
 
+export function compareAmortizationBenefits(baseInterest: number, termInterest: number, paymentInterest: number, earnings: number) {
+  const termSavings = assertMinorUnits(baseInterest - termInterest);
+  const paymentSavings = assertMinorUnits(baseInterest - paymentInterest);
+  const paymentBenefit = assertMinorUnits(paymentSavings + earnings);
+  const delta = assertMinorUnits(paymentBenefit - termSavings);
+  const winner = delta > 0 ? "payment" : delta < 0 ? "term" : "tie";
+  return { termSavings, paymentSavings, earnings, paymentBenefit, winner, advantage: Math.abs(delta) } as const;
+}
+
 export function projectInstallmentDifference(term: Schedule, payment: Schedule, rateBps: number) {
   if (!Number.isSafeInteger(rateBps) || rateBps < 0 || rateBps > 10000) throw new Error("Taxa de reinvestimento inválida.");
   const rate = BigInt(rateBps);
