@@ -10,6 +10,7 @@ import { CreditCardPurchaseForm } from "@/components/forms/credit-card-purchase-
 import {
   CREDIT_CARD_ENTRY_KIND_LABELS,
   CREDIT_CARD_INVOICE_STATUS_LABELS,
+  canEditUnpaidCreditCardInvoice,
   effectiveInvoiceStatus,
   getInvoiceBillingMonth,
 } from "@/domain/credit-cards";
@@ -26,7 +27,7 @@ const messages: Record<string, string> = {
   "invoice-paid": "Pagamento registrado e saldo da conta atualizado.",
   "payment-reversed": "Pagamento estornado com segurança.",
   "installment-updated": "Valor da parcela atualizado.",
-  "installment-error": "A parcela só pode ser alterada em uma fatura aberta.",
+  "installment-error": "A parcela só pode ser alterada antes do pagamento da fatura.",
   "invoice-error": "Não foi possível concluir a operação.",
   "entry-created": "Lançamento incluído na fatura.",
 };
@@ -52,6 +53,7 @@ export default async function CreditCardInvoicePage({
   if (!card || !invoice) notFound();
   const today = toIsoDate(new Date());
   const status = effectiveInvoiceStatus(invoice.status, invoice.due_date, today);
+  const canEditInvoice = canEditUnpaidCreditCardInvoice(invoice.status);
   const purchaseById = new Map(
     purchases.map((purchase) => [purchase.id, purchase]),
   );
@@ -107,7 +109,7 @@ export default async function CreditCardInvoicePage({
         </p>
       ) : null}
 
-      {invoice.status === "open" ? (
+      {canEditInvoice ? (
         <details className="group overflow-hidden rounded-2xl border bg-white shadow-sm">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 marker:hidden">
             <span className="font-extrabold text-slate-950">
@@ -119,6 +121,9 @@ export default async function CreditCardInvoicePage({
             </span>
           </summary>
           <div className="border-t bg-slate-50/60 p-3 sm:p-4">
+            <p className="mb-3 text-sm text-slate-600">
+              Informe a data real do lançamento. O valor desta fatura será atualizado; pagamentos já registrados não serão alterados.
+            </p>
             <CreditCardPurchaseForm
               cardId={card.id}
               closingDay={card.closing_day}
@@ -129,7 +134,7 @@ export default async function CreditCardInvoicePage({
               targetInvoiceId={invoice.id}
               entryKinds={["purchase", "refund", "cashback"]}
               values={{
-                entryKind: "purchase",
+                entryKind: invoice.status === "open" ? "purchase" : "cashback",
                 purchaseDate: today,
                 installmentCount: 1,
               }}
@@ -142,9 +147,9 @@ export default async function CreditCardInvoicePage({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div>
             <h2 className="font-extrabold text-slate-950">Extrato da fatura</h2>
-            {invoice.status === "open" ? (
+            {canEditInvoice ? (
               <p className="text-xs text-slate-500">
-                Valores podem ser ajustados enquanto a fatura estiver aberta.
+                Valores podem ser ajustados até o pagamento da fatura.
               </p>
             ) : null}
           </div>
@@ -198,8 +203,9 @@ export default async function CreditCardInvoicePage({
                       {installment.installment_count}
                     </td>
                     <td className="whitespace-nowrap px-4 py-1.5 text-right">
-                      {invoice.status === "open" &&
-                      installment.status === "pending" ? (
+                      {canEditInvoice &&
+                      (installment.status === "pending" ||
+                        installment.status === "invoiced") ? (
                         <form
                           action={updateCreditCardInstallmentAmount}
                           className="flex items-center justify-end gap-2"

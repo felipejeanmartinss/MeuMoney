@@ -35,6 +35,10 @@ export const CREDIT_CARD_INVOICE_STATUS_LABELS: Record<
   overdue: "Vencida",
 };
 
+export function canEditUnpaidCreditCardInvoice(status: CreditCardInvoiceStatus) {
+  return status === "open" || status === "closed" || status === "overdue";
+}
+
 export const CREDIT_CARD_ENTRY_KIND_LABELS: Record<CreditCardEntryKind, string> = {
   purchase: "Compra",
   refund: "Estorno",
