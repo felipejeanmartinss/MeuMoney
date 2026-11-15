@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FinancingAmortizationSimulator } from "@/components/financing/financing-amortization-simulator";
 import { nextFinancingInstallment } from "@/domain/financing-schedule";
+import { financingPaymentReport } from "@/domain/financing-payment-report";
 import { formatMoney } from "@/domain/money";
 import { getCurrentUserFinancingContract } from "@/services/finance/financing-imports-service";
 import { currentIsoDate } from "@/utils/dates";
@@ -40,9 +41,12 @@ export default async function FinancingDetailPage({
   const today = currentIsoDate();
   const base = "/investments/financings/" + id;
   const simulation = query.aba === "simular";
+  const report = query.aba === "relatorio";
+  const installmentsTab = !simulation && !report;
+  const payments = report && !hasError ? financingPaymentReport(schedule, extraAmortizations) : null;
   const all = query.periodo === "todas";
   const visible = schedule.filter(e => all || e.due_date >= today.slice(0,7) + "-01").sort((a,b) => a.due_date.localeCompare(b.due_date));
-  const selected = !simulation && !hasError ? schedule.find(e => e.id === query.parcela && !e.linked_transaction_id) : undefined;
+  const selected = installmentsTab && !hasError ? schedule.find(e => e.id === query.parcela && !e.linked_transaction_id) : undefined;
   const options = selected ? await getFinancingPaymentOptions(contract.currency) : null;
   const simulationMethod = contract.amortization_system?.toLowerCase();
 
@@ -69,11 +73,12 @@ export default async function FinancingDetailPage({
       ) : null}
 
       <nav aria-label="Financiamento" className="flex flex-wrap gap-4 rounded-xl border bg-white p-3 font-bold text-emerald-800">
-        <Link aria-current={!simulation ? "page" : undefined} href={base}>Parcelas</Link>
+        <Link aria-current={installmentsTab ? "page" : undefined} href={base}>Parcelas</Link>
         <Link aria-current={simulation ? "page" : undefined} href={base + "?aba=simular"}>Simular amortização</Link>
+        <Link aria-current={report ? "page" : undefined} href={base + "?aba=relatorio"}>Relatório do contrato</Link>
         <Link href={base + "/edit"}>Editar fluxo e Excel</Link>
       </nav>
-      {!simulation && nextInstallment && <section className="rounded-xl bg-emerald-50 p-4">
+      {installmentsTab && nextInstallment && <section className="rounded-xl bg-emerald-50 p-4">
         <h2 className="font-bold">Próxima parcela · nº {nextInstallment.next.installment_number}</h2>
         <p>{formatFinancialDate(nextInstallment.next.dueDate)} · {formatMoney(nextInstallment.next.total_amount_minor,contract.currency)}</p>
         {!nextInstallment.next.linked_transaction_id && <Link href={base + "?parcela=" + nextInstallment.next.id + "#vinculo"} className="text-emerald-800 underline">Vincular pagamento</Link>}
@@ -81,16 +86,11 @@ export default async function FinancingDetailPage({
       {selected && options && <div id="vinculo">{options.hasError ? <p role="alert">Não foi possível carregar os débitos.</p> : <FinancingPaymentPicker key={selected.id} contractId={id} entryId={selected.id} version={contract.updated_at}
         number={selected.installment_number} expected={(selected.payment_status === "paid" ? selected.paid_amount_minor : selected.total_amount_minor + (selected.extra_amortization_minor ?? 0)) - (selected.extra_fgts_minor ?? 0)}
         currency={contract.currency} options={options.transactions} />}</div>}
-      <details className="rounded-xl border bg-white p-3"><summary>Resumo e condições do contrato</summary>
+      {report && <section className="grid gap-4" aria-label="Relatório do contrato">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Saldo devedor", contract.current_balance_minor],
-          ["Valor pago", contract.total_paid_minor],
-          ["Principal amortizado", contract.principal_paid_minor],
-          ["Juros pagos", contract.interest_paid_minor],
-          ["Encargos pagos", contract.charges_paid_minor],
-          ["Extra com recursos próprios", contract.extra_cash_minor],
-          ["Extra com FGTS", contract.extra_fgts_minor],
+          ["Total pago registrado", contract.total_paid_minor],
           ["Valor original", contract.original_principal_minor],
         ].map(([label, value]) => (
           <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -100,6 +100,14 @@ export default async function FinancingDetailPage({
         ))}
       </section>
 
+      {payments && <section className="rounded-2xl border bg-white p-5">
+        <h2 className="font-bold">Composição dos pagamentos</h2>
+        <p className="mt-1 text-sm text-slate-600">{payments.paidCount} parcela(s) paga(s) no histórico, com ou sem vínculo bancário. Inclui amortizações extraordinárias registradas à parte.</p>
+        <table className="mt-3 w-full text-sm"><thead><tr><th className="p-2 text-left">Tipo</th><th className="p-2 text-right">Valor pago</th></tr></thead>
+          <tbody>{payments.lines.map(([label, amount]) => <tr className="border-t" key={label}><th scope="row" className="p-2 text-left font-normal">{label}</th><td className="p-2 text-right tabular-nums">{formatMoney(amount, contract.currency)}</td></tr>)}</tbody>
+          <tfoot><tr className="border-t font-bold"><th className="p-2 text-left">Total pago</th><td className="p-2 text-right">{formatMoney(payments.total, contract.currency)}</td></tr></tfoot>
+        </table>
+      </section>}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-black text-slate-950">Condições do contrato</h2>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -142,7 +150,7 @@ export default async function FinancingDetailPage({
         </dl>
       </section>
 
-      </details>
+      </section>}
       {simulation && (nextInstallment && contract.nominal_annual_rate && (simulationMethod === "sac" || simulationMethod === "price") && contract.current_balance_minor > 0 ? (
         <FinancingAmortizationSimulator
           currency={contract.currency}
@@ -163,7 +171,7 @@ export default async function FinancingDetailPage({
         </section>
       ))}
 
-      {simulation && extraAmortizations.length ? (
+      {report && extraAmortizations.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-black text-slate-950">Amortizações extraordinárias</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -179,7 +187,7 @@ export default async function FinancingDetailPage({
         </section>
       ) : null}
 
-      {!simulation && <section className="overflow-auto rounded-2xl border bg-white p-4">
+      {installmentsTab && <section className="overflow-auto rounded-2xl border bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-bold">Parcelas · {all ? "histórico completo" : "desde o mês atual"}</h2>
           <Link href={all ? base : base + "?periodo=todas"} className="text-emerald-700 underline">{all ? "Voltar ao mês atual" : "Mostrar todas desde o início"}</Link>
