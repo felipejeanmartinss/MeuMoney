@@ -1875,6 +1875,10 @@ export type Database = {
         Args: { target_invoice_id: string };
         Returns: boolean;
       };
+      reconcile_financing_installment: {
+        Args: { contract_id_in: string; entry_id_in: string; transaction_id_in: string; version_in: string; amount_in: number; date_in: string; account_in: string; accept_difference: boolean };
+        Returns: undefined;
+      };
       create_financing_import_job: {
         Args: {
           target_file_name: string;

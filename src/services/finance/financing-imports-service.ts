@@ -47,6 +47,7 @@ function importErrorMessage(error: unknown) {
 function normalizeJob(row: FinancingImportJob): FinancingImportJob {
   return {
     ...row,
+    nominal_annual_rate: row.nominal_annual_rate == null ? null : String(row.nominal_annual_rate),
     original_principal_minor: coerceMinorUnits(row.original_principal_minor),
     current_balance_minor: coerceMinorUnits(row.current_balance_minor),
   };

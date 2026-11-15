@@ -827,22 +827,22 @@ export default async function InvestmentsPage({
     view?: string;
   }>;
 }) {
-  const [investmentResult, netWorthResult, financingResult, params] = await Promise.all([
-    listCurrentUserInvestmentPositions(),
-    listCurrentUserNetWorth(),
-    listCurrentUserFinancingContracts(),
-    searchParams,
-  ]);
+  const params = await searchParams;
   const activeTab = params.tab === "financing" ? "financing" : "positions";
+  const [investmentResult, netWorthResult, financingResult] = await Promise.all([
+    activeTab === "positions" ? listCurrentUserInvestmentPositions() : null,
+    activeTab === "financing" ? listCurrentUserNetWorth() : null,
+    activeTab === "financing" ? listCurrentUserFinancingContracts() : null,
+  ]);
   const showArchived = activeTab === "positions" && params.view === "archived";
-  const archivedCount = investmentResult.positions.filter(
+  const archivedCount = investmentResult?.positions.filter(
     (position) => !position.is_active,
-  ).length;
+  ).length ?? 0;
   const feedback = params.message ? messages[params.message] : undefined;
   const hasError =
-    investmentResult.hasError ||
-    netWorthResult.hasError ||
-    financingResult.hasError;
+    investmentResult?.hasError ||
+    netWorthResult?.hasError ||
+    financingResult?.hasError;
 
   return (
     <main className="app-page max-w-[1760px]">
@@ -932,7 +932,7 @@ export default async function InvestmentsPage({
         </p>
       ) : null}
 
-      {activeTab === "positions" ? (
+      {investmentResult ? (
         <PositionsView
           positions={investmentResult.positions}
           portfolioPerformance={investmentResult.portfolioPerformance}
@@ -942,8 +942,8 @@ export default async function InvestmentsPage({
         />
       ) : (
         <FinancingsView
-          items={netWorthResult.items}
-          contracts={financingResult.contracts}
+          items={netWorthResult?.items ?? []}
+          contracts={financingResult?.contracts ?? []}
         />
       )}
     </main>

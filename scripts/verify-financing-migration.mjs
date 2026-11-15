@@ -82,6 +82,27 @@ try {
   await save(id,await version(id),[{...row,id:entry.id,due_date:"2026-01-03"}]);
   await db.exec(`reset role; delete from public.transactions where id='${tx}';`);
   assert.equal((await db.query("select linked_transaction_id from public.financing_schedule_entries where id=$1",[entry.id])).rows[0].linked_transaction_id,null);
+  await db.exec(await read("20261017000100_financing_amortization_sources.sql"));
+  await db.exec(await read("20261115225017_reconcile_financing_installment.sql"));
+  await db.exec("alter table public.transactions add column origin_type text default 'manual', add column credit_card_invoice_id uuid, add column transaction_date date default '2026-02-03'");
+  const account = (await db.query("select id from public.accounts where user_id=$1",[owner])).rows[0].id;
+  await db.query("insert into public.transactions(id,user_id,account_id,amount_minor) values ($1,$2,$3,11000)",[tx,owner,account]);
+  await db.exec("set role authenticated");
+  await save(id,await version(id),[{...row,id:entry.id,linked_transaction_id:null},{...row,source_sequence:2,installment_number:2,due_date:"2026-02-01",linked_transaction_id:null,payment_status:"scheduled",payment_date:null,paid_amount_minor:0}]);
+  const second = (await db.query("select id from public.financing_schedule_entries where installment_number=2")).rows[0].id;
+  const before = await version(id);
+  const pay = (confirm) => db.query("select public.reconcile_financing_installment($1,$2,$3,$4,$5,$6,$7,$8)",[id,second,tx,before,11000,"2026-02-03",account,confirm]);
+  await assert.rejects(pay(false),/confirm_difference/);
+  await pay(true);
+  const recorded = (await db.query("select payment_status,payment_date::text,paid_amount_minor,linked_transaction_id from public.financing_schedule_entries where id=$1",[second])).rows[0];
+  assert.equal(recorded.payment_status,"paid");
+  assert.equal(recorded.payment_date,"2026-02-03");
+  assert.equal(Number(recorded.paid_amount_minor),11000);
+  assert.equal(recorded.linked_transaction_id,tx);
+  await assert.rejects(pay(true),/financing_conflict/);
+  assert.equal((await db.query("select linked_transaction_id from public.financing_schedule_entries where id=$1",[entry.id])).rows[0].linked_transaction_id,null);
+  await db.exec("reset role");
+  assert.equal(Number((await db.query("select amount_minor from public.transactions where id=$1",[tx])).rows[0].amount_minor),11000);
   console.log("PostgreSQL: create/edit, optimistic lock, owner isolation, link validation, atomic rollback, unlink, preserved legacy metadata and benchmark permissions passed.");
 } catch (error) { console.error(error.message); process.exitCode = 1; }
 finally { await db.close(); }

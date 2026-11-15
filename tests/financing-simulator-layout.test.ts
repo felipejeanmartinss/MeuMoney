@@ -7,7 +7,7 @@ describe("simulador de amortização", () => {
   it("asks for one extra amount at the next due date instead of a new financing schedule", () => {
     const html = renderToStaticMarkup(createElement(FinancingAmortizationSimulator, {
       currency: "BRL", principalMinor: 17_897_552, balanceDate: "2026-10-01",
-      annualRate: "7.07", termMonths: 300, method: "sac", nextDueDate: "2026-11-01",
+      annualRate: 7.07, termMonths: 300, method: "sac", nextDueDate: "2026-11-01",
       nextPrincipalMinor: 49_000, nextInterestMinor: 105_000, nextTotalMinor: 160_000,
     }));
 

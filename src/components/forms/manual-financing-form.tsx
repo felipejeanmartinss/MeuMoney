@@ -5,9 +5,8 @@ import { createManualFinancingContract, type FinancingImportFormState } from "@/
 import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from "@/domain/currencies";
 import { mergeFinancingWorkbookRows, type FinancingWorkbookRow } from "@/domain/financing-workbook";
 import { amortizeFinancingSchedule, financingMoneyInput, normalizeFinancingMoney, projectFinancingSchedule, reprojectRemainingFinancingSchedule } from "@/domain/financing-schedule";
-import { formatMoney, parseMoneyInputToMinor } from "@/domain/money";
+import { parseMoneyInputToMinor } from "@/domain/money";
 import type { FinancingContractSummary, FinancingScheduleEntry } from "@/types/database";
-import type { FinancingTransactionOption } from "@/types/financing";
 import { exportFinancingWorkbook, importFinancingWorkbook } from "@/utils/financing-xlsx";
 import { Field, FormMessage, inputClass, SubmitButton } from "./form-controls";
 
@@ -60,8 +59,8 @@ function fromWorkbookRow(row: FinancingWorkbookRow, key: string): Row {
     paymentDate: row.paymentDate, paidAmountMinor: financingMoneyInput(row.paidAmountMinor), linkedTransactionId: row.linkedTransactionId ?? "" };
 }
 
-export function ManualFinancingForm({ contract, schedule = [], transactions = [] }: {
-  contract?: FinancingContractSummary; schedule?: FinancingScheduleEntry[]; transactions?: FinancingTransactionOption[];
+export function ManualFinancingForm({ contract, schedule = [] }: {
+  contract?: FinancingContractSummary; schedule?: FinancingScheduleEntry[];
 }) {
   const [state, formAction, pending] = useActionState(createManualFinancingContract, initialState);
   const [rows, setRows] = useState<Row[]>(() => schedule.length ? schedule.map(fromEntry) : [emptyRow(1, "row-1")]);
@@ -80,8 +79,6 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
   const [preview, setPreview] = useState<Row[] | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [workbookBusy, setWorkbookBusy] = useState(false);
-  const [linkRow, setLinkRow] = useState("");
-  const transactionById = new Map(transactions.map((transaction) => [transaction.id, transaction]));
   const sequence = useRef(1);
   const rowKey = () => `new-${sequence.current++}`;
   async function downloadWorkbook() {
@@ -242,19 +239,12 @@ export function ManualFinancingForm({ contract, schedule = [], transactions = []
               <td className="p-1"><select aria-label="Situação" className={cell} value={row.paymentStatus} disabled={Boolean(preview)} onChange={(event) => { try { paid(row.key, event.target.value as "paid" | "scheduled"); } catch { setMessage("Revise os valores antes de marcar o pagamento."); } }}><option value="scheduled">A vencer</option><option value="paid">Paga</option></select></td>
               <td className="p-1"><input aria-label="Data de pagamento" className={cell} type="date" value={row.paymentDate} disabled={Boolean(preview) || row.paymentStatus === "scheduled"} onChange={(event) => update(row.key, "paymentDate", event.target.value)} /></td>
               <td className="p-1">{moneyCell(row, "paidAmountMinor", "Valor pago, incluindo extra")}</td>
-              <td className="min-w-64 p-1">{row.linkedTransactionId ? <><span>{transactionById.get(row.linkedTransactionId)?.description ?? "Lançamento vinculado"}</span><button type="button" disabled={Boolean(preview)} className="min-h-11 px-2 text-emerald-800" onClick={() => update(row.key, "linkedTransactionId", "")}>Desvincular</button></> : <button type="button" disabled={Boolean(preview)} className="min-h-11 px-2 text-emerald-800" onClick={() => setLinkRow(row.key)}>Vincular lançamento</button>}</td>
+              <td className="p-1">{row.linkedTransactionId ? <>Vinculado <button type="button" disabled={Boolean(preview)} onClick={() => update(row.key, "linkedTransactionId", "")}>Desvincular</button></> : "Sem vínculo"}</td>
               <td className="p-1"><button type="button" disabled={Boolean(preview) || rows.length === 1} className="min-h-11 px-2 text-red-700 disabled:opacity-30" onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>Excluir parcela</button></td>
             </tr>)}</tbody>
           </table>
         </div>
       </section>
-      {linkRow ? <section aria-label="Vincular pagamento" className="sticky bottom-2 z-20 rounded-xl border border-emerald-600 bg-white p-4 shadow-lg">
-        <label className="grid gap-2 text-sm font-semibold">Lançamento da parcela {rows.find((row) => row.key === linkRow)?.installmentNumber}
-          <select autoFocus className={inputClass()} value="" onChange={(event) => { if (event.target.value) { update(linkRow, "linkedTransactionId", event.target.value); setLinkRow(""); } }}>
-            <option value="">Selecione um pagamento</option>{transactions.filter((tx) => !rows.some((row) => row.linkedTransactionId === tx.id)).map((tx) => <option key={tx.id} value={tx.id}>{tx.transaction_date.split("-").reverse().join("/")} · {tx.description} · {formatMoney(tx.amount_minor, tx.currency)}</option>)}
-          </select>
-        </label><button type="button" className="min-h-11 px-2 text-sm" onClick={() => setLinkRow("")}>Cancelar vínculo</button>
-      </section> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" className="min-h-11 rounded-lg border px-3 text-sm" onClick={() => { const latest = rows.filter((row) => row.paymentStatus === "paid" && row.paymentDate).sort((a, b) => a.paymentDate.localeCompare(b.paymentDate) || Number(a.installmentNumber) - Number(b.installmentNumber)).at(-1); if (latest) { setBalance(latest.outstandingBalanceMinor); setBalanceDate(latest.paymentDate); setMessage("Saldo atual atualizado pela última parcela paga."); } else setMessage("Nenhuma parcela paga para atualizar o saldo."); }}>Usar saldo da última parcela paga</button>
         <SubmitButton pending={pending} disabled={Boolean(preview)}>{contract ? "Salvar alterações" : "Cadastrar financiamento"}</SubmitButton>
