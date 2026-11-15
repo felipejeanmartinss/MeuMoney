@@ -9,6 +9,7 @@ import {
   creditCardInstallmentAmountFormSchema,
   creditCardInstallmentIdSchema,
   creditCardInvoiceIdSchema,
+  creditCardInvoiceReferenceMonthSchema,
   creditCardPurchaseFormSchema,
   creditCardPurchaseIdSchema,
   invoicePaymentFormSchema,
@@ -16,6 +17,7 @@ import {
 import {
   cancelCurrentUserCreditCardPurchase,
   closeCurrentUserCreditCardInvoice,
+  openCurrentUserZeroCreditCardInvoice,
   createCurrentUserCreditCard,
   createCurrentUserCreditCardPurchase,
   payCurrentUserCreditCardInvoice,
@@ -205,6 +207,26 @@ export async function closeCreditCardInvoice(formData: FormData) {
       result.ok ? "invoice-closed" : "invoice-error"
     }`,
   );
+}
+
+export async function openZeroCreditCardInvoice(formData: FormData) {
+  const cardId = creditCardIdSchema.safeParse(formData.get("cardId"));
+  const referenceMonth = creditCardInvoiceReferenceMonthSchema.safeParse(
+    formData.get("referenceMonth"),
+  );
+  if (!cardId.success || !referenceMonth.success) {
+    redirect("/credit-cards?message=invoice-error");
+  }
+  const result = await openCurrentUserZeroCreditCardInvoice(
+    cardId.data,
+    referenceMonth.data,
+  );
+  revalidateCardPaths(cardId.data);
+  revalidatePath(`/credit-cards/${cardId.data}/invoices`);
+  if (!result.ok) {
+    redirect(`/credit-cards/${cardId.data}/invoices?message=open-error`);
+  }
+  redirect(`/credit-cards/${cardId.data}/invoices/${result.invoiceId}?message=invoice-opened`);
 }
 
 export async function updateCreditCardInstallmentAmount(formData: FormData) {

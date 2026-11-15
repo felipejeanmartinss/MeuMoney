@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   boundedDayDate,
+  buildCreditCardInvoiceListRows,
   buildCreditCardInvoiceForecast,
   calculateCreditCardCommitment,
   canEditUnpaidCreditCardInvoice,
   creditCardPurchaseFormSchema,
+  creditCardInvoiceReferenceMonthSchema,
   effectiveInvoiceStatus,
   getCardReportCompetenceMonth,
   getInvoiceDueDate,
@@ -21,6 +23,32 @@ import {
 } from "../src/utils/dates";
 
 describe("credit card cycles", () => {
+  it("lists zero-value months even without persisted invoices", () => {
+    const invoices = [
+      { reference_month: "2026-10-01", closing_date: "2026-10-06", due_date: "2026-11-11", status: "paid", total_amount: 0 },
+      { reference_month: "2026-12-01", closing_date: "2026-12-06", due_date: "2027-01-11", status: "open", total_amount: 1200 },
+    ];
+    const rows = buildCreditCardInvoiceListRows(invoices, "2026-11-15", 6, 11);
+    expect(rows.map((row) => row.referenceMonth)).toEqual([
+      "2026-12-01", "2026-11-01", "2026-10-01",
+    ]);
+    expect(rows[1]).toMatchObject({
+      invoice: null,
+      closingDate: "2026-11-06",
+      dueDate: "2026-11-11",
+    });
+    expect(rows[2].invoice).toBe(invoices[0]);
+  });
+
+  it("allows the current and next zero-value invoice when no rows exist", () => {
+    expect(buildCreditCardInvoiceListRows([], "2026-11-15", 31, 10)).toMatchObject([
+      { referenceMonth: "2026-12-01", invoice: null, closingDate: "2026-12-31", dueDate: "2027-01-10" },
+      { referenceMonth: "2026-11-01", invoice: null, closingDate: "2026-11-30", dueDate: "2026-12-10" },
+    ]);
+    expect(creditCardInvoiceReferenceMonthSchema.safeParse("2026-11-01").success).toBe(true);
+    expect(creditCardInvoiceReferenceMonthSchema.safeParse("2026-11-15").success).toBe(false);
+  });
+
   it("keeps purchases through closing day in the current competence", () => {
     expect(getPurchaseReferenceMonth("2026-07-20", 20)).toBe("2026-07-01");
   });

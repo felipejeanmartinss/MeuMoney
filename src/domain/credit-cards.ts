@@ -206,6 +206,10 @@ export const invoicePaymentFormSchema = z.object({
 export const creditCardIdSchema = z.uuid("Cartão inválido.");
 export const creditCardPurchaseIdSchema = z.uuid("Compra inválida.");
 export const creditCardInvoiceIdSchema = z.uuid("Fatura inválida.");
+export const creditCardInvoiceReferenceMonthSchema = z.string().refine(
+  (value) => isValidIsoDate(value) && value.endsWith("-01"),
+  "Mês da fatura inválido.",
+);
 export const creditCardInstallmentIdSchema = z.uuid("Parcela inválida.");
 
 type DateParts = { year: number; month: number; day: number };
@@ -291,6 +295,38 @@ export function getInvoiceBillingMonth(dueDate: string) {
   const due = parseIsoDate(dueDate);
   const billing = shiftMonth(due.year, due.month, -1);
   return boundedDayDate(billing.year, billing.month, 1);
+}
+
+export function buildCreditCardInvoiceListRows<
+  T extends { reference_month: string; closing_date: string; due_date: string },
+>(invoices: readonly T[], today: string, closingDay: number, dueDay: number) {
+  const current = parseIsoDate(today);
+  const currentMonth = boundedDayDate(current.year, current.month, 1);
+  const next = shiftMonth(current.year, current.month, 1);
+  const nextMonth = boundedDayDate(next.year, next.month, 1);
+  const byMonth = new Map<string, T | null>(
+    invoices.map((invoice) => [invoice.reference_month, invoice]),
+  );
+  const firstMonth = [currentMonth, ...byMonth.keys()].sort()[0];
+
+  for (let month = firstMonth; month <= nextMonth;) {
+    if (!byMonth.has(month)) byMonth.set(month, null);
+    const parts = parseIsoDate(month);
+    const following = shiftMonth(parts.year, parts.month, 1);
+    month = boundedDayDate(following.year, following.month, 1);
+  }
+
+  return [...byMonth.entries()]
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([referenceMonth, invoice]) => {
+      const parts = parseIsoDate(referenceMonth);
+      return {
+        referenceMonth,
+        invoice: invoice ?? null,
+        closingDate: invoice?.closing_date ?? boundedDayDate(parts.year, parts.month, closingDay),
+        dueDate: invoice?.due_date ?? getInvoiceDueDate(referenceMonth, closingDay, dueDay),
+      };
+    });
 }
 
 export function splitInstallments(
