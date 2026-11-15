@@ -319,6 +319,7 @@ Cashback, milhas, cartões adicionais, juros rotativos, parcelamento de fatura, 
 - Assinaturas de cartão não possuem quantidade fixa de parcelas. A primeira cobrança integra sua fatura real e as cinco competências seguintes são apresentadas como projeção; compras parceladas aparecem somente até a última parcela cadastrada. Cancelar uma compra é apresentado como exclusão e só é permitido enquanto suas faturas podem ser recalculadas com segurança.
 - A lista principal de Recorrências apresenta regras automáticas de receitas e despesas. Uma seção separada reúne assinaturas das contas e dos cartões para revisão de custos; parcelas futuras continuam na central de cartões.
 - O patrimônio apura cartões pela soma pendente das faturas não pagas de cada cartão ativo, sem considerar limite disponível nem cobranças apenas projetadas.
+- A lista de faturas exibe todos os meses entre a primeira fatura registrada (ou o mês atual) e o mês seguinte, mesmo quando não há lançamentos. Meses ainda sem registro aparecem zerados e podem ser abertos sem alterar movimentações. Uma fatura zerada encerrada automaticamente como paga pode ser reaberta somente se não houver valor, pagamento ou vínculo de pagamento registrado; faturas efetivamente pagas permanecem protegidas.
 
 ## Posições datadas e simulação de IRPF
 

@@ -141,6 +141,9 @@ function mutationErrorMessage(error: { message?: string } | null) {
   if (message.includes("invoice_not_editable")) {
     return "A fatura já foi paga ou não está disponível para edição.";
   }
+  if (message.includes("invoice_reopen_protected")) {
+    return "Esta fatura possui valor ou histórico de pagamento e não pode ser reaberta como zerada.";
+  }
   return "Não foi possível concluir a operação.";
 }
 
@@ -654,6 +657,20 @@ export async function closeCurrentUserCreditCardInvoice(invoiceId: string) {
   return error
     ? { ok: false as const, message: mutationErrorMessage(error) }
     : { ok: true as const };
+}
+
+export async function openCurrentUserZeroCreditCardInvoice(
+  cardId: string,
+  referenceMonth: string,
+) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("open_zero_credit_card_invoice", {
+    target_card_id: cardId,
+    target_reference_month: referenceMonth,
+  });
+  return error
+    ? { ok: false as const, message: mutationErrorMessage(error) }
+    : { ok: true as const, invoiceId: data };
 }
 
 export async function payCurrentUserCreditCardInvoice(

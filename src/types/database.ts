@@ -1859,6 +1859,10 @@ export type Database = {
         Args: { target_invoice_id: string };
         Returns: boolean;
       };
+      open_zero_credit_card_invoice: {
+        Args: { target_card_id: string; target_reference_month: string };
+        Returns: string;
+      };
       pay_credit_card_invoice: {
         Args: {
           target_invoice_id: string;

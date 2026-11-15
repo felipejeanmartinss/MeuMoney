@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   closeCreditCardInvoice,
+  openZeroCreditCardInvoice,
   reverseCreditCardInvoicePayment,
   updateCreditCardInstallmentAmount,
 } from "@/app/actions/credit-cards";
@@ -30,6 +31,7 @@ const messages: Record<string, string> = {
   "installment-error": "A parcela só pode ser alterada antes do pagamento da fatura.",
   "invoice-error": "Não foi possível concluir a operação.",
   "entry-created": "Lançamento incluído na fatura.",
+  "invoice-opened": "Fatura aberta. Você já pode incluir lançamentos na data correta.",
 };
 
 export default async function CreditCardInvoicePage({
@@ -278,10 +280,18 @@ export default async function CreditCardInvoicePage({
 
       {invoice.status === "paid" &&
       invoice.total_amount === 0 &&
-      !invoice.payment_transaction_id ? (
-        <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900">
-          Fatura zerada encerrada como paga, sem lançamento na conta.
-        </p>
+      !invoice.payment_transaction_id &&
+      !invoice.payment_account_id ? (
+        <form action={openZeroCreditCardInvoice} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+          <input type="hidden" name="cardId" value={card.id} />
+          <input type="hidden" name="referenceMonth" value={invoice.reference_month} />
+          <span className="text-sm font-semibold text-emerald-900">
+            Esta fatura zerada foi encerrada sem pagamento.
+          </span>
+          <button className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white">
+            Reabrir fatura
+          </button>
+        </form>
       ) : null}
 
       {(invoice.status === "closed" || invoice.status === "overdue") &&
