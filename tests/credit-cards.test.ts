@@ -3,6 +3,7 @@ import {
   boundedDayDate,
   buildCreditCardInvoiceForecast,
   calculateCreditCardCommitment,
+  canEditUnpaidCreditCardInvoice,
   creditCardPurchaseFormSchema,
   effectiveInvoiceStatus,
   getCardReportCompetenceMonth,
@@ -91,6 +92,13 @@ describe("credit card installment split", () => {
 });
 
 describe("invoice presentation status", () => {
+  it("allows corrections only before an invoice is paid", () => {
+    expect(canEditUnpaidCreditCardInvoice("open")).toBe(true);
+    expect(canEditUnpaidCreditCardInvoice("closed")).toBe(true);
+    expect(canEditUnpaidCreditCardInvoice("overdue")).toBe(true);
+    expect(canEditUnpaidCreditCardInvoice("paid")).toBe(false);
+  });
+
   it("derives overdue only for a closed invoice past due", () => {
     expect(effectiveInvoiceStatus("closed", "2026-07-10", "2026-07-11")).toBe(
       "overdue",

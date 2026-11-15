@@ -106,7 +106,7 @@ function mutationErrorMessage(error: { message?: string } | null) {
     return "Selecione compra, estorno ou cashback.";
   }
   if (message.includes("invalid_credit_card_credit")) {
-    return "Estornos e cashback devem ser lançamentos únicos em uma fatura aberta.";
+    return "Estornos e cashback devem ser lançamentos únicos, sem categoria.";
   }
   if (message.includes("invalid_credit_card")) {
     return "O cartão não está disponível.";
@@ -118,7 +118,7 @@ function mutationErrorMessage(error: { message?: string } | null) {
     return "A soma e a quantidade das parcelas devem corresponder à compra.";
   }
   if (message.includes("installment_not_editable")) {
-    return "A parcela só pode ser editada enquanto a fatura estiver aberta.";
+    return "A parcela só pode ser editada antes do pagamento da fatura.";
   }
   if (message.includes("invalid_installment_amount")) {
     return "Informe um valor de parcela maior que zero.";
@@ -137,6 +137,9 @@ function mutationErrorMessage(error: { message?: string } | null) {
   }
   if (message.includes("invoice_not_open")) {
     return "Esta fatura não está mais aberta.";
+  }
+  if (message.includes("invoice_not_editable")) {
+    return "A fatura já foi paga ou não está disponível para edição.";
   }
   return "Não foi possível concluir a operação.";
 }

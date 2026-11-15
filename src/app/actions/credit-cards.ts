@@ -133,6 +133,9 @@ export async function createCreditCardPurchase(
   );
   if (!result.ok) return { status: "error", message: result.message };
   revalidateCardPaths(cardId.data);
+  if (parsed.data.targetInvoiceId) {
+    revalidatePath(`/credit-cards/${cardId.data}/invoices/${parsed.data.targetInvoiceId}`);
+  }
   redirect(
     parsed.data.targetInvoiceId
       ? `/credit-cards/${cardId.data}/invoices/${parsed.data.targetInvoiceId}?message=entry-created`
